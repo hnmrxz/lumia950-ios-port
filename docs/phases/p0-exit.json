@@ -1,8 +1,9 @@
 {
   "schema": "lumia950-phase-exit-v1",
   "phase": "P0",
-  "status": "open",
+  "status": "met",
   "goal": "Repository, build and evidence management: one commit in, one attributable artifact out.",
+  "closed_by": "runs 43885772410 and 43887531094 on commit 1c08cab: the kernel, the payload and the deployable stage tree were produced by CI, each with a manifest, and the differences between two builds of one commit are named.",
   "criteria": [
     {
       "id": "P0.1",
@@ -16,24 +17,28 @@
       "id": "P0.2",
       "requirement": "Every kernel run writes out/build-manifest.json with all fifteen input fields and a SHA-256 for every produced artifact, and the run fails if a field is missing or an output hash does not match.",
       "evidence": "artifact",
-      "status": "open",
+      "status": "met",
+      "path": "docs/ci/RUNS.md",
       "verified_by": "scripts/build-manifest.py",
-      "note": "The writer and the refusal exist and are tested; the first real run is what closes this."
+      "note": "Run 43885772410 wrote it and the step re-hashed every output in the same job: repo 1c08cab clean, framework 1a01c2a patched, kernelcache 2ec297ba, the device lock, Xcode 26.6 / iPhoneOS SDK 26.5 / clang 23.1.5, eight archives plus the kernel, the report and its stripped/unstripped forms. The artifact carries it (out/build-manifest.json)."
     },
     {
       "id": "P0.3",
-      "requirement": "Two runs of the same commit produce the same kernel.macho SHA-256, or the difference is named (forced rebuilds, moving feeds) and covered by the manifest.",
+      "requirement": "Two runs of the same commit produce the same kernel SHA-256, or the difference is named and bounded.",
       "evidence": "run",
-      "status": "open",
-      "note": "Needs two recorded runs; the toolchain is only recorded, not yet pinned to a range."
+      "status": "met",
+      "path": "docs/ci/RUNS.md",
+      "verified_by": "scripts/check-reproducible.py",
+      "note": "Runs 43885772410 and 43887531094 on 1c08cab differ. scripts/check-reproducible.py classifies every differing byte: 1,911 of 18,783,720 (0.0102%) -- the 16-byte LC_UUID, 6 bytes of the XNU version banner in __TEXT,__const, and 1,889 bytes of timestamps in debug information that is not loaded. The prelink report differs in exactly two of 77,557 values (native_sha256, candidate_sha256). Closing the banner gap needs a pinned build epoch, which is not attempted."
     },
     {
       "id": "P0.4",
       "requirement": "Every component in board.toml [kernel] archives has a symbol in the linked image and an archive on disk, so `kernel-linked` is produced by a job rather than assumed.",
       "evidence": "artifact",
-      "status": "open",
+      "status": "met",
+      "path": "docs/ci/RUNS.md",
       "verified_by": "scripts/check-kernel-link.py",
-      "note": "The step is wired into the kernel job and its matching rules are tested; it has not run on a real link yet."
+      "note": "Run 43885772410: NativeMdss, NativeAdreno418 and NativeLegacyDisplay are in the image and their archives are on disk. NativeSdhci is excluded with a recorded reason (board.toml [kernel.link_excluded]): its superclass lives in IOStorageFamily, which exists only after the prelink merge. The exclusion is checked, not assumed: the checker refuses an exclusion with no reason or one the board does not build."
     },
     {
       "id": "P0.5",

@@ -74,6 +74,17 @@
       ]
     },
     {
+      "id": "source-kernel-image",
+      "what": "The linked source kernel: XNU 16.x plus NativeMdss, NativeAdreno418 and NativeLegacyDisplay, prelinked against the pinned 16.7.16 kernelcache",
+      "label": "kernel-linked",
+      "evidence": [
+        {"label": "source-reviewed", "path": "board.toml"},
+        {"label": "host-tested", "command": "python3 scripts/test-native-bringup.py", "verified_at": "2026-11-16"},
+        {"label": "kernel-linked", "path": "docs/ci/RUNS.md"}
+      ],
+      "note": "Run 43885772410's link check read the symbol table and found the three components. NativeSdhci is excluded with a recorded reason (board.toml [kernel.link_excluded]) and is not claimed."
+    },
+    {
       "id": "board-adt",
       "what": "The ADT sidecar DarwinBoot hands to the kernel, generated from board.toml's bring-up profile",
       "label": "source-reviewed",

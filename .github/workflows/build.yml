@@ -207,6 +207,7 @@ jobs:
               scripts/check-evidence.py scripts/test-evidence.py \
               scripts/check-doc-references.py scripts/test-doc-references.py \
               scripts/check-action-pins.py scripts/test-action-pins.py \
+              scripts/check-reproducible.py scripts/test-reproducible.py \
               scripts/test-probe-qemu.py scripts/test-handoff-qemu.py scripts/adreno-firmware.py \
               scripts/test-gpu-tools.py scripts/prepare-armcpu.py scripts/test-armcpu-patch.py \
               scripts/check-oem-scm-profile.py scripts/test-oem-scm-profile.py \
@@ -291,6 +292,11 @@ jobs:
         run: |
           python3 scripts/test-checkpoints.py
           python3 scripts/check-checkpoints.py docs/native-checkpoints.json
+
+      - name: Two builds of one commit, compared
+        # The two kernels of 1c08cab differ in 1911 bytes out of 18.8 MB. The checker accepts the
+        # LC_UUID, the version banner and debug data, and refuses anything else.
+        run: python3 scripts/test-reproducible.py
 
       - name: No action can move under a run
         # A tag is a mutable pointer; a compromised action would run with this repository's token.
