@@ -45,6 +45,30 @@ def fail(message: str):
     raise SystemExit(1)
 
 
+def excluded_from_board(path: Path) -> dict:
+    """Components the board says cannot be in the source link yet, and why.
+
+    An exclusion is a recorded decision: it has to name an archive the board actually builds and it
+    has to say why. NativeSdhci subclasses IOBlockStorageDevice, which lives in IOStorageFamily --
+    an Apple kext merged after the source kernel link -- so the source link cannot resolve it.
+    """
+    board = tomllib.loads(path.read_text())
+    kernel = board.get("kernel") or {}
+    excluded = kernel.get("link_excluded") or {}
+    archives = set()
+    for entry in kernel.get("archives") or []:
+        parts = entry.split()
+        if len(parts) == 2 and parts[0] == "build-arm-driver.py":
+            archives.add(parts[1])
+    for name, reason in excluded.items():
+        if name not in archives:
+            fail(f"{path} excludes {name} from the link, but [kernel] archives never builds it")
+        if not str(reason or "").strip():
+            fail(f"{path} excludes {name} from the link without saying why; an unexplained "
+                 "exclusion is the silent gap this check exists to prevent")
+    return excluded
+
+
 def expected_from_board(path: Path) -> list[str]:
     """Every `build-arm-driver.py <Component>` entry in board.toml is a component to prove.
 
@@ -114,6 +138,11 @@ def main() -> int:
         expected = list(args.expect)
     elif args.board is not None and args.board.is_file():
         expected = expected_from_board(args.board)
+        excluded = excluded_from_board(args.board)
+        for name in expected:
+            if name in excluded:
+                print(f"excluded from the source link: {name} ({excluded[name]})")
+        expected = [name for name in expected if name not in excluded]
     else:
         expected = list(DEFAULT_EXPECTED)
     expected = [name for name in expected if name not in args.omit]

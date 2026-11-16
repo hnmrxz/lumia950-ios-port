@@ -46,6 +46,17 @@ archives = [
   "build-arm-driver.py NativeLegacyDisplay",
   # "build-arm-driver.py NativeRamBlock",   # Data volume; also needs the virtio bindings builder
 ]
+# Components whose archive cannot be linked into the source kernel yet, with the reason. The link
+# checker reads this map, so an exclusion is a recorded decision rather than a silent omission.
+#
+# NativeSdhci subclasses IOBlockStorageDevice, and that class lives in IOStorageFamily: an Apple
+# kext this board merges only after the source kernel is linked (see [kernel.prelink] roots). The
+# source link therefore cannot resolve the vtable or the superclass calls. Until the driver is
+# emitted as a kext bundle and merged by the prelink step, it is built and checked but not in the
+# image, and `kernel-linked` is not claimed for it.
+[kernel.link_excluded]
+NativeSdhci = "subclasses IOBlockStorageDevice from IOStorageFamily, which only exists after the prelink merge"
+
 # TODO: obtain the real userdata GPT geometry (first_lba, last_lba) read-only from the phone.
 
 # The Apple reference image: iPhone X, iOS 16.7.16. The port requires 16.x, so the kernel

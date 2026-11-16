@@ -30,13 +30,15 @@ CONFIG_XNU_BUILD_ARCHIVES=y
 # the symbol even with the display provider unselected. The kernel script's
 # XNU_EXTRA_LD_ARCHIVES hook is for exactly this: a stub for an unselected offline probe.
 #
-# The three device drivers are force-loaded as well, and that is a correction rather than a
-# convenience: CONFIG_XNU_NATIVE_* builds the archives but nothing referenced their code, so the
-# linker dropped every member and the image carried no eMMC, display or GPU driver at all. The
-# kernel job was green because no step read the symbol table; scripts/check-kernel-link.py does
-# now. Being in the image is still not the same as being instantiated -- the personality table is
-# the other half, and that is not proved here.
-CONFIG_XNU_EXTRA_LD_ARCHIVES="-Wl,-force_load,{tree}/build/native-legacy-display/libNativeLegacyDisplay.a -Wl,-force_load,{tree}/build/native-sdhci/libNativeSdhci.a -Wl,-force_load,{tree}/build/native-mdss/libNativeMdss.a -Wl,-force_load,{tree}/build/native-adreno418/libNativeAdreno418.a"
+# The display and GPU drivers are force-loaded for the same reason plus one: CONFIG_XNU_NATIVE_*
+# builds their archives but nothing referenced their code, so the linker dropped every member and
+# the image carried no display or GPU driver. The kernel job was green because no step read the
+# symbol table; scripts/check-kernel-link.py does now.
+#
+# NativeSdhci is NOT here, and that is a finding rather than an omission: it subclasses
+# IOBlockStorageDevice, which lives in IOStorageFamily and only exists after the prelink merge, so
+# the source link cannot resolve it. See [kernel.link_excluded] in board.toml.
+CONFIG_XNU_EXTRA_LD_ARCHIVES="-Wl,-force_load,{tree}/build/native-legacy-display/libNativeLegacyDisplay.a -Wl,-force_load,{tree}/build/native-mdss/libNativeMdss.a -Wl,-force_load,{tree}/build/native-adreno418/libNativeAdreno418.a"
 
 # The Data volume is a RAM block until the eMMC write path exists.
 # CONFIG_XNU_NATIVE_RAM_BLOCK is not set

@@ -9,7 +9,7 @@
       "requirement": "NativeSdhci performs one real read on the handset: card initialisation, clock, bus width and a PIO read of at least one block, with the controller state logged.",
       "evidence": "hardware",
       "status": "open",
-      "note": "Host tests and an ABI compile exist; no XNU read path has run on the phone."
+      "note": "Host tests and an ABI compile exist; no XNU read path has run on the phone. The archive is not even in the kernel image yet: NativeSdhci subclasses IOBlockStorageDevice, which lives in IOStorageFamily and only exists after the prelink merge, so the source link cannot resolve it (board.toml [kernel.link_excluded]). Linking it needs the driver emitted as a kext bundle and merged by the prelink step, which is P2 work."
     },
     {
       "id": "P2.2",

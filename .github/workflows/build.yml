@@ -83,11 +83,19 @@ jobs:
           assert "CONFIG_XNU_BUILD_ARCHIVES" in keys, keys
           assert "CONFIG_XNU_EXTRA_LD_ARCHIVES" in keys, keys
           # Building an archive is not linking it: nothing referenced the device drivers' code, so
-          # the linker dropped every member and the image carried no eMMC, display or GPU driver.
-          # The force-load list is what puts them in, so it has to name all four archives.
+          # the linker dropped every member and the image carried no display or GPU driver. The
+          # force-load list is what puts them in.
           force = next(line for line in config if line.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES"))
-          for component in ("NativeSdhci", "NativeMdss", "NativeAdreno418", "NativeLegacyDisplay"):
+          excluded = board["kernel"].get("link_excluded", {})
+          for component, reason in excluded.items():
+              assert str(reason).strip(), f"{component} is excluded from the link without a reason"
+          for component in ("NativeMdss", "NativeAdreno418", "NativeLegacyDisplay"):
               assert f"lib{component}.a" in force, f"{component} is not force-loaded: {force}"
+              assert component not in excluded, f"{component} is both forced and excluded"
+          # NativeSdhci's superclass only exists after the prelink merge; forcing it fails the
+          # source link with an unresolved IOBlockStorageDevice vtable.
+          assert "libNativeSdhci.a" not in force, \
+              "NativeSdhci cannot be in the source link; see [kernel.link_excluded] in board.toml"
           archives = board["kernel"]["archives"]
           assert "build-arm-driver.py NativeLegacyDisplay" in archives, archives
           assert pathlib.Path("drivers/NativeLegacyDisplay/NativeLegacyDisplay.cpp").is_file()

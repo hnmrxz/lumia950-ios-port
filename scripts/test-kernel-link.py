@@ -117,6 +117,47 @@ class KernelLinkTests(unittest.TestCase):
                                "--expect", "NativeLegacyDisplay"))
         self.assertIn("NativeLegacyDisplay 1", result.stdout)
 
+    def test_an_excluded_component_is_not_required(self):
+        board = self.root / "board.toml"
+        board.write_text(textwrap.dedent("""\
+            [kernel]
+            archives = [
+              "build-arm-driver.py NativeSdhci",
+              "build-arm-driver.py NativeMdss",
+            ]
+            [kernel.link_excluded]
+            NativeSdhci = "superclass lives in a kext merged after the source link"
+            """))
+        partial = "\n".join(line for line in DUMP.splitlines() if "NativeSdhci" not in line)
+        result = self._run(0, ("--symbols-from", str(self.dump(partial)),
+                               "--expect", "NativeMdss"))
+        self.assertIn("kernel link ok", result.stdout)
+        # ... and the board-driven path reports the exclusion rather than silently skipping it.
+        result = self._run(0, ("--symbols-from", str(self.dump(partial)), "--board", str(board)))
+        self.assertIn("excluded from the source link: NativeSdhci", result.stdout)
+
+    def test_an_exclusion_without_a_reason_is_refused(self):
+        board = self.root / "board.toml"
+        board.write_text(textwrap.dedent("""\
+            [kernel]
+            archives = ["build-arm-driver.py NativeSdhci"]
+            [kernel.link_excluded]
+            NativeSdhci = ""
+            """))
+        result = self._run(1, ("--symbols-from", str(self.dump()), "--board", str(board)))
+        self.assertIn("without saying why", result.stderr)
+
+    def test_an_exclusion_for_an_archive_the_board_does_not_build_is_refused(self):
+        board = self.root / "board.toml"
+        board.write_text(textwrap.dedent("""\
+            [kernel]
+            archives = ["build-arm-driver.py NativeMdss"]
+            [kernel.link_excluded]
+            NativeSdhci = "not built here"
+            """))
+        result = self._run(1, ("--symbols-from", str(self.dump()), "--board", str(board)))
+        self.assertIn("never builds it", result.stderr)
+
     def test_a_component_without_an_archive_is_refused(self):
         # The compile half: the symbol can only legitimately be there if the archive was built.
         tree = self.root / "out/lumia950/tree/build"
