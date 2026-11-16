@@ -717,6 +717,7 @@ jobs:
               --framework-dir unixnu \
               --framework-ref 1a01c2afa197d975d04da892325c56b6b14aaecb \
               --scratch-board "$RUNNER_TEMP/device/board.toml" \
+              --device-dir "$RUNNER_TEMP/device" \
               --probe-toolchain --expect-sdk "${IPHONEOS_SDK:-}"
           python3 scripts/build-manifest.py --check out/build-manifest.json --verify-outputs
 
@@ -755,7 +756,9 @@ jobs:
         if: always()
         run: |
           rm -rf out/ipsw out/feeds out/*/tree
-          rm -f unixnu/unixnu.lock
+          # unixnu fetch writes the lock into the device repository, not into the framework
+          # checkout; this used to delete a path that never existed.
+          rm -f "$RUNNER_TEMP/device/unixnu.lock"
 
   stage:
     # The deployable tree, assembled from this run's own artifacts: the menu, the source-only

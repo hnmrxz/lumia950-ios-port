@@ -168,10 +168,10 @@ def collect_inputs(root: Path, args: argparse.Namespace) -> dict:
     inputs["framework_patched"] = bool(
         git(framework, "status", "--porcelain", "--untracked-files=no"))
 
-    lock = framework / "unixnu.lock"
+    lock = Path(args.device_dir) / "unixnu.lock"
     if not lock.is_file():
-        fail(f"{lock} is missing; it is the resolved feeds record and the only place the "
-             "component refs of this run exist")
+        fail(f"{lock} is missing; `unixnu fetch` writes it into the device repository and it is "
+             "the only place the resolved component commits of this run exist")
     inputs["unixnu_lock_sha256"] = sha256_file(lock)
 
     prelink = board.get("kernel", {}).get("prelink") or {}
@@ -286,6 +286,10 @@ def main() -> int:
                              "unless --check, and it must equal the checkout's HEAD")
     parser.add_argument("--scratch-board",
                         help="the board.toml copy the build ran from (the guard-cleared one)")
+    parser.add_argument("--device-dir",
+                        help="the device repository the build used; `unixnu fetch` writes "
+                             "unixnu.lock there. Default: the directory holding --scratch-board, "
+                             "else --root")
     parser.add_argument("--probe-toolchain", action="store_true",
                         help="read sw_vers/uname/xcodebuild/xcrun/clang (macOS)")
     parser.add_argument("--expect-sdk", default="",
@@ -310,6 +314,9 @@ def main() -> int:
     if not args.framework_ref:
         fail("--framework-ref is required when writing a manifest; it must equal the pinned "
              "commit the workflow checks out")
+    if args.device_dir is None:
+        args.device_dir = (Path(args.scratch_board).resolve().parent
+                           if args.scratch_board else root)
     inputs = collect_inputs(root, args)
     if inputs["repo_dirty"] and not args.allow_dirty:
         fail(f"{root} has tracked changes; the artifact would not be attributable to "

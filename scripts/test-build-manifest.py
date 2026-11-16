@@ -6,6 +6,7 @@ about the script's rules, not about this repository's current state.
 
     python3 scripts/test-build-manifest.py
 """
+import hashlib
 import json
 import subprocess
 import sys
@@ -60,11 +61,12 @@ class ManifestTestCase(unittest.TestCase):
         self.framework = self.root / "unixnu"
         self.framework.mkdir()
         git(self.framework, "init", "-q")
-        (self.framework / "unixnu.lock").write_text("xnu = 8796.141.3\n")
         (self.framework / "unixnu").write_text("# the framework\n")
         self.framework_ref = commit_all(self.framework)
         self.framework_tree = git(self.framework, "rev-parse", "HEAD^{tree}").stdout.strip()
 
+        # `unixnu fetch` writes the lock into the device repository, not into the framework
+        # checkout; the manifest looks where the framework actually writes it.
         (self.root / ".gitignore").write_text("unixnu/\nout/\nscratch/\n")
         (self.root / "board.toml").write_text(BOARD)
         (self.root / "feeds.toml").write_text('[xnu]\nref = "8796.141.3"\n')
@@ -78,6 +80,8 @@ class ManifestTestCase(unittest.TestCase):
         self.scratch = self.root / "scratch/board.toml"
         self.scratch.parent.mkdir()
         self.scratch.write_text(SCRATCH_BOARD)
+        # The device repository the build ran from; `unixnu fetch` writes unixnu.lock here.
+        (self.scratch.parent / "unixnu.lock").write_text("xnu = 8796.141.3\n")
 
         kernel = self.root / "out/lumia950/kernel"
         kernel.mkdir(parents=True)
@@ -174,6 +178,22 @@ class WritingTests(ManifestTestCase):
         (self.root / "out/lumia950/kernel/kernel.json").unlink()
         output = self.write_manifest(expect=1)
         self.assertIn("no kernel_prelink_report", output.stderr)
+
+    def test_a_missing_device_lock_is_refused(self):
+        # The lock lives in the device repository, not in the framework checkout.
+        (self.scratch.parent / "unixnu.lock").unlink()
+        output = self.write_manifest(expect=1)
+        self.assertIn("unixnu fetch", output.stderr)
+
+    def test_the_lock_is_read_from_the_device_directory(self):
+        (self.scratch.parent / "unixnu.lock").write_text("xnu = 8796.141.3\n")
+        other = self.root / "elsewhere"
+        other.mkdir()
+        (other / "unixnu.lock").write_text("xnu = 9999.1.1\n")
+        self.write_manifest("--device-dir", str(other))
+        # Hash the bytes on disk: a text-mode write turns \n into \r\n on Windows.
+        expected = hashlib.sha256((other / "unixnu.lock").read_bytes()).hexdigest()
+        self.assertEqual(self.manifest()["inputs"]["unixnu_lock_sha256"], expected)
 
     def test_the_sdk_prefix_guard_refuses_a_silent_change(self):
         output = self.write_manifest("--expect-sdk", "17.", expect=1)
