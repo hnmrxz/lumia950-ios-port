@@ -110,6 +110,13 @@ class KernelLinkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("--symbols-from", result.stderr)
 
+    def test_a_component_whose_symbol_is_not_named_after_it_is_still_found(self):
+        # The image can carry the C entry point without any symbol spelled like the directory.
+        dump = "00000000000a4000 T _native_legacy_display_probe\n"
+        result = self._run(0, ("--symbols-from", str(self.dump(dump)),
+                               "--expect", "NativeLegacyDisplay"))
+        self.assertIn("NativeLegacyDisplay 1", result.stdout)
+
     def test_a_component_without_an_archive_is_refused(self):
         # The compile half: the symbol can only legitimately be there if the archive was built.
         tree = self.root / "out/lumia950/tree/build"

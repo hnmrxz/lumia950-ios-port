@@ -82,6 +82,12 @@ jobs:
           assert "CONFIG_XNU_NATIVE_MDSS" in keys, keys
           assert "CONFIG_XNU_BUILD_ARCHIVES" in keys, keys
           assert "CONFIG_XNU_EXTRA_LD_ARCHIVES" in keys, keys
+          # Building an archive is not linking it: nothing referenced the device drivers' code, so
+          # the linker dropped every member and the image carried no eMMC, display or GPU driver.
+          # The force-load list is what puts them in, so it has to name all four archives.
+          force = next(line for line in config if line.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES"))
+          for component in ("NativeSdhci", "NativeMdss", "NativeAdreno418", "NativeLegacyDisplay"):
+              assert f"lib{component}.a" in force, f"{component} is not force-loaded: {force}"
           archives = board["kernel"]["archives"]
           assert "build-arm-driver.py NativeLegacyDisplay" in archives, archives
           assert pathlib.Path("drivers/NativeLegacyDisplay/NativeLegacyDisplay.cpp").is_file()

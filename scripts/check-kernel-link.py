@@ -30,6 +30,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXPECTED = ("ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeLegacyDisplay", "NativeMdss",
                     "NativeAdreno418")
 
+# Not every component exports a symbol named after itself. The driver classes are C++ and land in
+# the table as `__ZN11NativeSdhci...`, but NativeLegacyDisplay is a C entry point called by
+# bsd_init.c and its symbol is `_native_legacy_display_probe` -- the image can contain that
+# component and nothing spelled like the directory. A component counts as linked when any of its
+# needles is found.
+SYMBOL_ALIASES = {
+    "NativeLegacyDisplay": ("NativeLegacyDisplay", "native_legacy_display_probe"),
+}
+
 
 def fail(message: str):
     print(f"error: {message}", file=sys.stderr)
@@ -65,8 +74,9 @@ def symbol_dump(image: Path, nm: str) -> str:
 
 
 def find(dump: str, name: str) -> int:
-    needle = name.casefold()
-    return sum(1 for line in dump.splitlines() if needle in line.casefold())
+    needles = [needle.casefold() for needle in SYMBOL_ALIASES.get(name, (name,))]
+    return sum(1 for line in dump.splitlines() if any(needle in line.casefold()
+                                                      for needle in needles))
 
 
 def main() -> int:
