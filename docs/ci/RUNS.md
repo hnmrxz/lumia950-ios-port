@@ -11,36 +11,46 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [43883767146](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43883767146) | `0b8f074` | push | … Sdhci excluded | failure: the manifest looked for `unixnu.lock` in the wrong repository | 9m15s |
 | [43885772410](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43885772410) | `1c08cab` | push | validate, efi-preflight, gicv2-emulation, kernel | success | 9m04s |
 | [43887531094](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43887531094) | `1c08cab` | dispatch `target=both` | validate, efi-preflight, gicv2-emulation, payload, kernel, **stage** | success | 11m08s |
+| [43890111246](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43890111246) | `2d6cfda` | push | validate, efi-preflight, gicv2-emulation, kernel | success | 8m20s |
+| [43891763434](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43891763434) | `2d6cfda` | dispatch `target=both` | all six jobs | success | 11m08s |
 
-## What the two successful runs establish
+The last row is the definitive one: the head commit builds validate, efi-preflight, gicv2-emulation,
+payload, kernel and stage, so all three artifacts come from one commit and one run.
 
-Run 43885772410 (push) is the kernel line after the review's changes:
+## What the runs establish
+
+The kernel line (every push to `main`):
 
 - validate passes with the new checkers: the staging-directory guard, the build manifest, the ADT
   profile, the link assertion, the phase exits, the checkpoint contract, the evidence table, the
-  device-identifier scan, the doc-reference scan and the action pins;
+  device-identifier scan, the doc-reference scan, the action pins and the reproducibility test;
 - efi-preflight builds `LumiaGpuProbe` and `LumiaGpuPower` and runs the QEMU refusal cases;
 - gicv2-emulation runs the pinned ArmCpu patch preparation and the timer/SGI/SPI fixtures;
 - the kernel job compiles XNU on macOS, builds the eight archives, links, prelinks against the
   pinned 16.7.16 kernelcache, **reads the symbol table** and writes `out/build-manifest.json`.
 
-Run 43887531094 (dispatch `target=both`) adds the two artifacts that were never produced here:
+`target=both` adds the two artifacts that were never produced here:
 
 - `lumia950-payload`: `UniXNU.efi`, `DarwinBoot.efi`, `unixnu.toml`;
 - `lumia950-stage`: the deployable tree, 7 files — `BOOTAA64.EFI`, `UniXNU.efi`, the menu, the
   loader, `LumiaGpuPower.efi`, the stripped kernel (15,260,776 B) and its ADT (11,352 B) — with
-  `native-bringup.json` naming `build_manifest_sha256`, `build_repo_commit` `1c08cab`, the pinned
-  framework ref, `adt_profile` `bringup` and `secondary_cpu_conduit_qualified` false.
+  `native-bringup.json` naming `build_manifest_sha256`, `build_repo_commit`, the pinned framework
+  ref, `adt_profile` `bringup` and `secondary_cpu_conduit_qualified` false.
 
-## Artifact hashes of run 43887531094 (`lumia950-stage`)
+## Artifact hashes
+
+Run 43891763434 on `2d6cfda` (the head commit; this is the set to deploy from):
 
 | Value | SHA-256 |
 |---|---|
-| `native-bringup.json` → `build_manifest_sha256` | `412751833cf8e1585f312a7f754890b91cf11284a49581c622d2ce842fed962f` |
-| `native-bringup.json` → `native_kernel_sha256` (source kernel handed to the stager) | `f52d20cb5f50553125ff26c2d3284213f9c67bffaff9f9c48d29fa3e03978594` |
-| `native-bringup.json` → `stripped_kernel_sha256` (what the phone would read) | `7897d4866e9c3f234e81203a9b6364aaa86049b287166289e724127bea32e460` |
-| `build-manifest.json` → `outputs.kernel_macho[0]` (prelinked candidate) | `3c35443af3780013e2d2c4c97c8ab6004e365b3192d21dba8e87fdd67e84ca5d` |
+| `native-bringup.json` → `build_manifest_sha256` | `13dfb9c787c6b956d169790141093d7768d015663be314f4bb65c924f8e6b69c` |
+| `native-bringup.json` → `native_kernel_sha256` | `fbdbeac137baf82ebaa90ae02a58550e4fb2d4073b26f477670913d46a11f253` |
+| `native-bringup.json` → `stripped_kernel_sha256` (what the phone would read) | `8850ff3fd0764bff3edd89500717dabf7b290a3da8c180af4c85a1c2a461b660` |
 | every file in the staged tree | in `native-bringup.json` → `files` |
+
+Run 43887531094 on `1c08cab` produced the same seven-file tree with
+`native_kernel_sha256` `f52d20cb…` and `stripped_kernel_sha256` `7897d486…`; the difference is the
+same class of non-determinism this page measures below.
 
 The staged tree's `adt_profile` is `bringup`, `adt_dram_size` is `2942304256` (0xAF600000, the
 measured 2806 MiB), `secondary_cpu_conduit_qualified` is false and `handset_boot_observed` is
