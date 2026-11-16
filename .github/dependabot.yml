@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # The workflows pin actions by tag, which a tag move can change underneath a run. Dependabot at
+  # least makes the move visible as a pull request; the pin to a commit SHA is still owed.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+
+  # scripts/*.py are standard library only today; this keeps a stray requirement from sitting
+  # unpatched if one is ever added.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"

@@ -183,7 +183,8 @@ def describe(value: bytes) -> str:
     return f"{len(value)} bytes"
 
 
-def validate(root: Node, *, allow_missing_identity: bool = False) -> list[str]:
+def validate(root: Node, *, allow_missing_identity: bool = False,
+             profile: str | None = None) -> list[str]:
     """Raise Error on a defect; return the notes a human should still read."""
     errors: list[str] = []
     notes: list[str] = []
@@ -211,10 +212,36 @@ def validate(root: Node, *, allow_missing_identity: bool = False) -> list[str]:
         _check_psci(psci, errors)
     if arm_io is not None:
         _check_arm_io(arm_io, errors, notes)
+    if profile is not None:
+        _check_profile(root, errors, profile)
 
     if errors:
         raise Error("\n".join(errors))
     return notes
+
+
+def _check_profile(root: Node, errors: list[str], profile: str) -> None:
+    """The tree has to match the profile it was staged under.
+
+    board.toml names the profile and both stagers pass it here, so a tree that contradicts its
+    own profile is caught before it reaches a phone: the bring-up profile cannot publish a PSCI
+    conduit or drop the ownership bound, and the target profile cannot silently lose the conduit
+    that only it is allowed to claim.
+    """
+    psci = root.child("psci")
+    chosen = root.child("chosen")
+    cpus = root.child("cpus")
+    if profile == "bringup":
+        if psci is not None:
+            errors.append("/psci is present in the bring-up profile: no PSCI/HVC conduit has been "
+                          "qualified on this SoC, so the tree the phone runs must not claim one")
+        if chosen is not None and chosen.value("darwinboot-memory-size") is None:
+            errors.append("/chosen/darwinboot-memory-size is absent in the bring-up profile: "
+                          "DarwinBoot has no ownership bound to clamp the firmware map to")
+    elif profile == "target":
+        if cpus is not None and len(cpus.children) > 1 and psci is None:
+            errors.append("/psci is absent in the target profile, which is the only profile that "
+                          "claims secondary CPUs")
 
 
 def _check_chosen(chosen: Node, errors: list[str], notes: list[str], allow_missing_identity: bool) -> None:
@@ -512,8 +539,12 @@ def _check_arm_io(arm_io: Node, errors: list[str], notes: list[str]) -> None:
     elif len(interrupts) % 12:
         errors.append(f"/arm-io/{sdhci.name}/interrupts is {len(interrupts)} bytes; each interrupt is three 32-bit cells")
     clock = sdhci.value("clock-frequency")
-    if clock is None or len(clock) != 4:
-        errors.append(f"/arm-io/{sdhci.name} has no 32-bit clock-frequency")
+    if clock is not None and len(clock) != 4:
+        errors.append(f"/arm-io/{sdhci.name}/clock-frequency is {len(clock)} bytes, expected a "
+                      "32-bit integer")
+    if clock is None:
+        notes.append(f"/arm-io/{sdhci.name} publishes no clock-frequency: the controller clock has "
+                     "not been measured, and the 19.2 MHz counter is not it")
     if sdhci.name.startswith("sdhci@") and sdhci.value("reg") is not None:
         address = struct.unpack("<Q", reg[:8])[0]
         if f"@{address:x}" != sdhci.name[len("sdhci"):]:
@@ -664,6 +695,9 @@ def main() -> int:
     parser.add_argument("--dump", action="store_true", help="print the decoded tree")
     parser.add_argument("--allow-missing-identity", action="store_true",
                         help="downgrade the chip-id/unique-chip-id error to a note")
+    parser.add_argument("--profile", choices=("bringup", "target"),
+                        help="require the tree to match this board.toml profile; the stagers pass "
+                             "the resolved profile so a tree cannot contradict what staged it")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -673,10 +707,18 @@ def main() -> int:
         parser.error("pass an ADT file, or --self-test")
 
     data = args.adt.read_bytes()
-    root = parse(data)
+    # A defect is a message, not a traceback: the CI log is read by someone looking for the line
+    # that says what is wrong, and a stack through the parser hides it.
+    try:
+        root = parse(data)
+        notes = validate(root, allow_missing_identity=args.allow_missing_identity,
+                         profile=args.profile)
+    except Error as error:
+        for line in str(error).splitlines():
+            print(f"error: {line}", file=sys.stderr)
+        return 1
     if args.dump:
         dump(root)
-    notes = validate(root, allow_missing_identity=args.allow_missing_identity)
     print(f"ADT ok: {args.adt} ({len(data)} bytes, root {root.name})")
     for note in notes:
         print(f"note: {note}")

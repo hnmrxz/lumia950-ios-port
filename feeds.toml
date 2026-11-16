@@ -9,11 +9,15 @@
 # driverkit_tag and trustcache_tag are earlier tags of the same line: the kernel scripts need
 # iokit/DriverKit headers and EXTERNAL_HEADERS/TrustCache, which 8796.141.3 no longer carries.
 #
-# The differences from the base line are carried by patches/xnu-8796/ in UniXNU: five patches
-# whose 17.x context does not exist here are replaced by their 8796 form, nine are added for
-# what this line's sources, the current clang, the runner's iig or the merge need, and
-# skip.txt names the seven this line has no mechanism for. Every skip states why, and the
-# build refuses a skip that names a patch the base tree does not have.
+# The differences from the base line are carried by patches/xnu-8796/ in UniXNU: patches whose
+# 17.x context does not exist here are replaced by their 8796 form, others are added for what this
+# line's sources, the current clang, the runner's iig or the merge need, and skip.txt names the
+# ones this line has no mechanism for. Every skip states why, and the build refuses a skip that
+# names a patch the base tree does not have.
+#
+# The replaced/added/skipped counts are printed by the validate job. They are deliberately not
+# restated here: this comment used to carry numbers that had drifted from the tree, and a number
+# in a comment is a claim nothing checks.
 [[source]]
 name = "xnu"
 kind = "refer"

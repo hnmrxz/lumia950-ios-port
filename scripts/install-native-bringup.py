@@ -78,6 +78,11 @@ def stage_files(stage):
         manifest.get("source_crypto_integrity_verified") is not True or \
         manifest.get("ios_userspace_included") is not False or set(manifest.get("files", {})) != FILES:
         raise ValueError("unexpected native bring-up contract or file set")
+    if not manifest.get("build_manifest_sha256"):
+        # A tree staged on a laptop carries the operator's hash, not the run that produced the
+        # kernel. That is allowed (the device is a research device) but it must be visible.
+        print("warning: this stage carries no build-manifest provenance; the kernel hash is an "
+              "operator claim, not a record of the build that produced it")
     result = {}
     for name, expected in manifest["files"].items():
         source = stage / name

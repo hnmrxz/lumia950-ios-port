@@ -269,11 +269,16 @@ def build_tree(
     sdhci = node(
         "sdhci@f9824900",
         [
+            # The vendor's own name for this controller IP. The 8994 string is what the WOA
+            # firmware's DSDT and this port's driver INameMatch use for the block 8992 shares;
+            # it is recorded as unverified until the 8992 DSDT is read, not invented here.
             ("compatible", string("qcom,msm8994-sdhci", "qcom,sdhci-msm-v4")),
             ("reg", b"".join(u64(address) + u64(size) for address, size in SDHCI_WINDOWS)),
             ("interrupts", b"".join(u32(0) + u32(irq) + u32(4) for irq in SDHCI_INTERRUPTS)),
             ("interrupt-parent", u32(1)),
-            ("clock-frequency", u32(TIMEBASE_FREQUENCY)),
+            # No clock-frequency on purpose. It used to carry TIMEBASE_FREQUENCY, and the 19.2 MHz
+            # counter is not the SDHCI controller clock: a driver that sized a divider from it
+            # would be off by whatever the real clock is. Unknown stays absent.
         ],
     )
     kgsl = node(

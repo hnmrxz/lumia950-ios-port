@@ -63,7 +63,7 @@ class NativeInstallTests(unittest.TestCase):
             "Internal": False, "DeviceIdentifier": "disk9"}
         for replacement in [patch.object(INSTALL, "PHONE", self.phone), patch.object(INSTALL, "BACKUP_VOLUME", self.ssd),
             patch.object(INSTALL, "CRITICAL", self.critical), patch.object(INSTALL, "disk_info", self.disk_info),
-            patch.object(INSTALL.time, "sleep", lambda _: None), patch.object(INSTALL.os, "sync", lambda: None),
+            patch.object(INSTALL.time, "sleep", lambda _: None), patch.object(INSTALL.os, "sync", lambda: None, create=True),
             patch.object(UPDATE, "INSTALL", INSTALL)]:
             replacement.start()
             self.addCleanup(replacement.stop)

@@ -18,7 +18,7 @@ on:
     # separately, so a dispatch names which one to run instead of starting both.
     inputs:
       target:
-        description: Which manual job to run
+        description: Which manual job to run (both also stages the deployable tree)
         type: choice
         options: [payload, kernel, both]
         default: payload
@@ -43,15 +43,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: UniXNU/UniXNU
           ref: 1a01c2afa197d975d04da892325c56b6b14aaecb
           path: unixnu
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -183,6 +183,16 @@ jobs:
               scripts/get-ntfs-driver.py scripts/make-lumia950-adt.py scripts/check-adt.py \
               scripts/check-gpu-addon.py scripts/check-screenshot.py scripts/panel.py \
               scripts/stage-kernel.py scripts/check-probe-image.py \
+              scripts/test-stage-kernel.py scripts/build-manifest.py scripts/test-build-manifest.py \
+              scripts/board_profile.py scripts/test-adt-profile.py \
+              scripts/check-kernel-link.py scripts/test-kernel-link.py \
+              scripts/check-phase.py scripts/test-check-phase.py \
+              scripts/check-checkpoints.py scripts/test-checkpoints.py \
+              scripts/check-no-device-identifiers.py scripts/test-no-device-identifiers.py \
+              scripts/menu_render.py scripts/test-menu-render.py \
+              scripts/check-evidence.py scripts/test-evidence.py \
+              scripts/check-doc-references.py scripts/test-doc-references.py \
+              scripts/check-action-pins.py scripts/test-action-pins.py \
               scripts/test-probe-qemu.py scripts/test-handoff-qemu.py scripts/adreno-firmware.py \
               scripts/test-gpu-tools.py scripts/prepare-armcpu.py scripts/test-armcpu-patch.py \
               scripts/check-oem-scm-profile.py scripts/test-oem-scm-profile.py \
@@ -242,14 +252,84 @@ jobs:
             exit 1
           fi
 
+      - name: The staging directory guard refuses destructive targets
+        # The stage deletes its target before copying the menu tree over it. `--out .` and
+        # `--out <drive or mount root>` used to be accepted and took the checkout or the volume
+        # with them, so the refusal is a test rather than a comment.
+        run: python3 scripts/test-stage-kernel.py
+
+      - name: The build manifest refuses to describe a run it cannot attribute
+        # A manifest that names no framework pin, no feeds lock or no kernelcache is worse than
+        # no manifest: it looks like provenance. These cases pin that refusal down.
+        run: python3 scripts/test-build-manifest.py
+
+      - name: The phase exits are judgeable, and honest
+        # The roadmap's exit conditions used to be prose that nothing could fail. "met" now has
+        # to name the file or the dated command that proves it, so a phase cannot be called
+        # finished because it feels finished.
+        run: |
+          python3 scripts/test-check-phase.py
+          python3 scripts/check-phase.py docs/phases
+
+      - name: The bring-up checkpoint contract
+        # P1's exit needs a log that proves XNU took control. This is the list it will be judged
+        # against; a log that reaches a later checkpoint while skipping an earlier one is refused.
+        run: |
+          python3 scripts/test-checkpoints.py
+          python3 scripts/check-checkpoints.py docs/native-checkpoints.json
+
+      - name: No action can move under a run
+        # A tag is a mutable pointer; a compromised action would run with this repository's token.
+        run: |
+          python3 scripts/test-action-pins.py
+          python3 scripts/check-action-pins.py
+
+      - name: No comment points at a README section that is gone
+        # The bootstrap replaced the README and left a dozen comments referring to sections that
+        # no longer exist. They resolve through the index at the end of README.md now.
+        run: |
+          python3 scripts/test-doc-references.py
+          python3 scripts/check-doc-references.py
+
+      - name: The evidence labels are paid for, not asserted
+        # AGENTS.md's ten labels had no reader. This ties each subject to the thing that proves
+        # its level, and ties XNU-entry-tested / userland-booted to the phase that produces them.
+        run: |
+          python3 scripts/test-evidence.py
+          python3 scripts/check-evidence.py --phases docs/phases
+
+      - name: The two stagers render one menu, not two
+        # A change to the committed menu has to reach both staging paths; the overrides each one
+        # owns have to fail loudly if the committed file stops matching them.
+        run: python3 scripts/test-menu-render.py
+
+      - name: No raw device identifier in the evidence
+        # AGENTS.md rule 8 had no execution point; an EFI volume UUID was committed in two files.
+        run: |
+          python3 scripts/test-no-device-identifiers.py
+          python3 scripts/check-no-device-identifiers.py
+
+      - name: The link check reads the driver list from board.toml
+        # `ar t` proves a member is in an archive, not that the archive is in the link.
+        run: python3 scripts/test-kernel-link.py
+
+      - name: The ADT profile both stagers share
+        # board.toml carries one answer per question and both stagers read it; these cases pin
+        # that down, including that the bring-up profile cannot publish a PSCI conduit.
+        run: python3 scripts/test-adt-profile.py
+
       - name: The ADT generator and its checker
         # DarwinBoot hands this tree to XNU. The checker parses it with the encoding XNU reads,
         # and --self-test proves it rejects defects instead of only accepting good input.
+        # This generates the *target* shape on purpose: it is the only place the six-CPU and
+        # PSCI/HVC form is exercised, and it never reaches the phone -- staging reads the
+        # bring-up profile from board.toml instead.
         run: |
           python3 scripts/make-lumia950-adt.py --output build/lumia950.adt \
               --dram-size 0xC0000000 --unique-chip-id 1122334455667788 --chip-id 0x8015 \
-              --owned-memory-size 0x20000000
-          python3 scripts/check-adt.py build/lumia950.adt
+              --owned-memory-size 0x20000000 \
+              --cpu-regs 0,1,2,3,0x100,0x101 --psci-method hvc
+          python3 scripts/check-adt.py --profile target build/lumia950.adt
           python3 scripts/check-adt.py --self-test
           # The GPU node is the only thing that makes the driver matchable. The
           # checker above rejects a wrong shape; this proves the node is there at
@@ -306,8 +386,8 @@ jobs:
     env:
       UNIXNU_EDK2: ${{ github.workspace }}/work/edk2-headers
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: tianocore/edk2
           ref: 5c148d5a90825929283615136c20127bd7d14a69
@@ -358,7 +438,7 @@ jobs:
             python3 scripts/test-probe-qemu.py --application native-gpu --esp out/LumiaGpuPower/esp \
               --firmware "$firmware" --gic-version "$gic" --log "out/LumiaGpuPower/refusal-gic$gic.log"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: lumia950-efi-preflight
@@ -372,8 +452,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: UniXNU/ArmCpu
           ref: 9066b53bbc82e92a98ec44a11dd50fd13eaf1a1b
@@ -390,7 +470,7 @@ jobs:
         run: |
           bash scripts/build-gicv2-test.sh
           python3 scripts/test-gicv2-qemu.py build/gicv2-qemu/gicv2-test.elf
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: lumia950-gicv2-core-emulation
@@ -410,15 +490,15 @@ jobs:
       UNIXNU_EDK2: ${{ github.workspace }}/edk2
       UNIXNU_SOURCE: ${{ github.workspace }}/unixnu
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: UniXNU/UniXNU
           ref: 1a01c2afa197d975d04da892325c56b6b14aaecb
           path: unixnu
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -450,7 +530,7 @@ jobs:
       - name: Build and stage the payload
         run: bash scripts/build-payload.sh out/payload
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-payload
           path: out/payload/**
@@ -470,15 +550,15 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PYTHONPATH: ${{ github.workspace }}/ci-tools
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: UniXNU/UniXNU
           ref: 1a01c2afa197d975d04da892325c56b6b14aaecb
           path: unixnu
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -570,6 +650,19 @@ jobs:
           assert report['loadable'] is False, 'the tool no longer marks the candidate unqualified'
           PY
 
+      - name: The kernel image actually contains the drivers
+        # `ar t` proves a member is in an archive; it does not prove the archive is in the link.
+        # This reads the linked image's symbol table and the archive list from board.toml, so a
+        # driver that compiled and was dropped fails here instead of on a phone with a missing
+        # device and no explanation. The `kernel-linked` label needs this step to exist.
+        run: |
+          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          if [ -z "$image" ]; then
+            echo "::error::no unstripped kernel image; the link has nothing to prove against"
+            exit 1
+          fi
+          python3 scripts/check-kernel-link.py --image "$image" --archives-root "$UNIXNU_OUT"
+
       - name: Name the first compile error
         # util.run keeps a command's output in the log file and echoes only its last 30
         # lines, which are the make recursion and not the cause. The first error line is.
@@ -598,10 +691,35 @@ jobs:
 
 
 
-      - uses: actions/upload-artifact@v4
+      - name: Write the build manifest
+        # What this run consumed and what it produced, in one file. The artifact alone cannot say
+        # which framework commit, which 16.x shim, which kernelcache or which SDK produced it, and
+        # without that a prelinked image is not evidence of anything. --check re-hashes every
+        # output in the same second it was written, so the manifest cannot drift from the files.
+        env:
+          IPHONEOS_SDK: ${{ vars.IPHONEOS_SDK }}
+        run: |
+          python3 scripts/build-manifest.py --output out/build-manifest.json \
+              --framework-dir unixnu \
+              --framework-ref 1a01c2afa197d975d04da892325c56b6b14aaecb \
+              --scratch-board "$RUNNER_TEMP/device/board.toml" \
+              --probe-toolchain --expect-sdk "${IPHONEOS_SDK:-}"
+          python3 scripts/build-manifest.py --check out/build-manifest.json --verify-outputs
+
+      - name: Refuse to publish Apple-derived artifacts from a public repository
+        # The policy ("keep this repository private, keep the artifacts short-lived") is written in
+        # bootstrap.ps1, README.md and docs/BUILD-VERIFICATION.md. This is the only place that
+        # executes it. A public copy of this repository still builds; its artifacts stay put.
+        if: ${{ !github.event.repository.private }}
+        run: |
+          echo "::warning::repository is public; the lumia950-kernel artifact is not uploaded"
+          echo "::warning::it carries kernel extensions merged out of an Apple kernelcache"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         # always(): the compile log is what a failed run has to hand over, and every
-        # step after the failing one is skipped by default.
-        if: always()
+        # step after the failing one is skipped by default. Private only: this artifact contains
+        # Apple kernel extensions, and KERNEL_ARTIFACT_RETENTION_DAYS defaults to one day.
+        if: ${{ always() && github.event.repository.private }}
         with:
           name: lumia950-kernel
           path: |
@@ -614,12 +732,86 @@ jobs:
             out/*/tree/build/native-legacy-display/**
             out/*/kernel/**
             out/*/logs/**
+            out/build-manifest.json
             kernel.log
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: ${{ vars.KERNEL_ARTIFACT_RETENTION_DAYS || 1 }}
 
       - name: Remove fetched sources
         if: always()
         run: |
           rm -rf out/ipsw out/feeds out/*/tree
           rm -f unixnu/unixnu.lock
+
+  stage:
+    # The deployable tree, assembled from this run's own artifacts: the menu, the source-only
+    # kernel and the GPU driver. Until this job existed nothing in CI produced the tree that the
+    # installer consumes, so "CI -> stage -> phone" had no middle and the installer's inputs were
+    # whatever a laptop happened to hold. `both` is the only dispatch that has all three jobs.
+    needs: [payload, kernel, efi-preflight]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'both'
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-26' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-kernel
+          path: out/kernel
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-payload
+          path: out/payload
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-efi-preflight
+          path: out/preflight
+
+      - name: Stage the tree this run built
+        # Every input is located by name under the artifact, not by an assumed directory layout:
+        # the artifact's own prefix is GitHub's business, and a wrong assumption here would fail
+        # a six-hour build's last step for no reason.
+        run: |
+          kernel=$(find out/kernel -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          [ -n "$kernel" ] || { echo "::error::the kernel artifact has no unstripped source kernel"; exit 1; }
+          manifest=$(find out/kernel -name 'build-manifest.json' -print -quit || true)
+          [ -n "$manifest" ] || { echo "::error::the kernel artifact has no build manifest"; exit 1; }
+          gpu=$(find out/preflight -name 'LumiaGpuPower.efi' -print -quit || true)
+          [ -n "$gpu" ] || { echo "::error::the efi-preflight artifact has no LumiaGpuPower.efi"; exit 1; }
+          config=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
+          [ -n "$config" ] || { echo "::error::the payload artifact has no menu configuration"; exit 1; }
+          menu=${config%/EFI/UniXNU/unixnu.toml}
+          sha=$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$kernel")
+          python3 scripts/stage-native-bringup.py \
+              --kernel "$kernel" --kernel-sha256 "$sha" \
+              --manifest "$manifest" --expect-repo-commit "$(git rev-parse HEAD)" \
+              --menu-tree "$menu" --gpu "$gpu" \
+              --unique-chip-id 1122334455667788 \
+              --out out/stage
+
+      - name: The staged tree is what the installer would see
+        run: |
+          python3 scripts/check-payload.py --config out/stage/EFI/UniXNU/unixnu.toml \
+              --payload-dir out/stage --panel 1080x1920
+          python3 - <<'PY'
+          import json
+          manifest = json.load(open("out/stage/native-bringup.json"))
+          assert manifest["build_manifest_sha256"], "the tree carries no build provenance"
+          assert manifest["adt_profile"] == "bringup", \
+              f"staged profile is {manifest['adt_profile']}, not the bring-up one"
+          assert manifest["secondary_cpu_conduit_qualified"] is False
+          print(f"staged tree ok: kernel {manifest['native_kernel_sha256'][:16]}, "
+                f"profile {manifest['adt_profile']}, dram {manifest['adt_dram_size']:#x}")
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        # Source-only: the tree holds no Apple binary, so it does not need the private-only gate
+        # the kernel artifact has. It is still a device tree, hence the short retention.
+        with:
+          name: lumia950-stage
+          path: out/stage/**
+          if-no-files-found: error
+          retention-days: 3

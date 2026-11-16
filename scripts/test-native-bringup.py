@@ -1,13 +1,17 @@
 import importlib.util
+import hashlib
 import hmac
+import json
 from pathlib import Path
 import struct
+import tempfile
 import unittest
 
 
 spec = importlib.util.spec_from_file_location("native_stage", Path(__file__).with_name("stage-native-bringup.py"))
 stage = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stage)
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def image():
@@ -96,7 +100,7 @@ class NativeBringupTests(unittest.TestCase):
 
     def test_menu_does_not_claim_ios_or_autoboot_a_test(self):
         import tomllib
-        menu = tomllib.loads(stage.menu_config())
+        menu = tomllib.loads(stage.menu_config(ROOT / "payload"))
         self.assertEqual(menu["boot"]["default"], "exit")
         self.assertEqual(len(menu["entry"]), 3)
         self.assertIn("no iOS userspace", menu["entry"][1]["title"])
@@ -117,6 +121,78 @@ class NativeBringupTests(unittest.TestCase):
         data[1028] ^= 1
         with self.assertRaisesRegex(ValueError, "not sealed"):
             stage.crypto_contract(data)
+
+
+class BuildManifestTests(unittest.TestCase):
+    """--manifest: the kernel has to be an output of the run that reported it.
+
+    Without it the stager only checked a hash the operator typed, which proves the file did not
+    change since the operator typed it -- not that CI produced it.
+    """
+
+    COMMIT = "a" * 40
+    FRAMEWORK = "b" * 40
+    CACHE = "c" * 64
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.kernel = self.root / "mach.development.bcm2837.unstripped"
+        self.kernel.write_bytes(b"a kernel")
+        self.sha = hashlib.sha256(b"a kernel").hexdigest()
+
+    def write(self, manifest) -> Path:
+        path = self.root / "build-manifest.json"
+        path.write_text(json.dumps(manifest))
+        return path
+
+    def manifest(self, sha=None, name=None, **inputs):
+        base = {"repo_commit": self.COMMIT, "repo_dirty": False, "framework_ref": self.FRAMEWORK,
+                "kernelcache_sha256_expected": self.CACHE}
+        base.update(inputs)
+        return {"schema": "lumia950-build-manifest-v1", "inputs": base,
+                "outputs": {"kernel_unstripped": [
+                    {"path": f"out/lumia950/tree/build/xnu/ios-obj/{name or self.kernel.name}",
+                     "bytes": 8, "sha256": sha or self.sha}]}}
+
+    def test_a_kernel_the_run_recorded_is_accepted(self):
+        record = stage.verify_build_manifest(self.write(self.manifest()), self.kernel, self.sha,
+                                            self.COMMIT)
+        self.assertEqual(record["build_repo_commit"], self.COMMIT)
+        self.assertEqual(record["build_framework_ref"], self.FRAMEWORK)
+        self.assertEqual(record["build_kernelcache_sha256"], self.CACHE)
+        self.assertEqual(len(record["build_manifest_sha256"]), 64)
+        self.assertIn("mach.development.bcm2837.unstripped", record["build_manifest_output"])
+
+    def test_a_kernel_the_manifest_does_not_record_is_refused(self):
+        path = self.write(self.manifest(name="something-else"))
+        with self.assertRaisesRegex(ValueError, "records no"):
+            stage.verify_build_manifest(path, self.kernel, self.sha, self.COMMIT)
+
+    def test_a_kernel_whose_hash_differs_from_the_record_is_refused(self):
+        path = self.write(self.manifest(sha="d" * 64))
+        with self.assertRaisesRegex(ValueError, "does not hash to the value"):
+            stage.verify_build_manifest(path, self.kernel, self.sha, self.COMMIT)
+
+    def test_a_dirty_manifest_is_refused(self):
+        path = self.write(self.manifest(repo_dirty=True))
+        with self.assertRaisesRegex(ValueError, "dirty checkout"):
+            stage.verify_build_manifest(path, self.kernel, self.sha, self.COMMIT)
+
+    def test_a_manifest_from_another_commit_is_refused(self):
+        path = self.write(self.manifest())
+        with self.assertRaisesRegex(ValueError, "was built from"):
+            stage.verify_build_manifest(path, self.kernel, self.sha, "e" * 40)
+
+    def test_a_missing_manifest_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "build manifest not found"):
+            stage.verify_build_manifest(self.root / "absent.json", self.kernel, self.sha)
+
+    def test_a_foreign_manifest_is_refused(self):
+        path = self.write({"schema": "something-else", "inputs": {}, "outputs": {}})
+        with self.assertRaisesRegex(ValueError, "is not a lumia950 build manifest"):
+            stage.verify_build_manifest(path, self.kernel, self.sha)
 
 
 if __name__ == "__main__":

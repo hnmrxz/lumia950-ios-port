@@ -11,7 +11,35 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# scripts/ is not a package; the shared ADT profile resolver is one file beside this one.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from board_profile import resolve_profile  # noqa: E402  (import after the path is set)
+import menu_render  # noqa: E402
+
 CRYPTO_SYMBOLS = {"_source_corecrypto14_bootstrap", "_source_corecrypto14_status", "_corecrypto_kext_start"}
+
+
+def adt_command(profile, adt, unique_chip_id):
+    """The generator flags for this profile.
+
+    Kept as a function, not inlined: scripts/test-adt-profile.py runs both this and the one in
+    scripts/stage-kernel.py and requires them to agree flag for flag. They used to disagree about
+    the CPU count and the PSCI conduit, so the tree CI checked was not the tree the phone ran.
+    """
+    command = [sys.executable, str(ROOT / profile["tool"]), "--output", str(adt),
+               "--dram-size", hex(profile["dram_size"])]
+    if profile.get("owned_memory_size") is not None:
+        command += ["--owned-memory-size", hex(profile["owned_memory_size"])]
+    if profile.get("cpu_regs"):
+        command += ["--cpu-regs", str(profile["cpu_regs"])]
+    if profile.get("psci_method"):
+        command += ["--psci-method", str(profile["psci_method"])]
+    if profile.get("chip_id") is not None:
+        command += ["--chip-id", hex(profile["chip_id"])]
+    if profile.get("dram_base") is not None:
+        command += ["--dram-base", hex(profile["dram_base"])]
+    command += ["--unique-chip-id", unique_chip_id]
+    return command
 
 
 def contract(blob):
@@ -149,39 +177,69 @@ def verify_strip(original, stripped):
     return checked, len(after["external_symbols"])
 
 
-def menu_config():
-    return '''version = 1
-[boot]
-timeout = 300
-fallback_timeout = 10
-connect_all = true
-default = "exit"
-[ui]
-title = "Native Lumia 950"
-logo = false
-layout = "auto"
-console = "auto"
-[kits]
-autoload = false
-[[driver]]
-path = "Drivers/DarwinBoot.efi"
-[[entry]]
-id = "gpu"
-title = "Native Adreno hardware test"
-type = "efi"
-path = "Drivers/LumiaGpuPower.efi"
-[[entry]]
-id = "xnu"
-title = "Experimental XNU kernel - no iOS userspace"
-type = "xnu"
-path = "Payloads/kernel.macho"
-args = "-v keepsyms=1 debug=0x100 cpus=1"
-[[entry]]
-id = "exit"
-title = "Exit to firmware"
-type = "action"
-action = "exit"
-'''
+def menu_config(menu_tree):
+    '''The test menu, rendered from the committed one rather than maintained beside it.
+
+    This used to be a second configuration written out by hand: its own countdown (300 against
+    20), its own title, `logo = false`, its own entry set. A change to the committed menu reached
+    one staging path and not the other. Everything that genuinely differs is an argument here,
+    and each one fails loudly if the committed file stops matching it.
+    '''
+    source = (Path(menu_tree) / "EFI/UniXNU/unixnu.toml").read_text()
+    insert = ('[[driver]]\npath = "Drivers/DarwinBoot.efi"\n\n'
+              '[[entry]]\nid = "gpu"\ntitle = "Native Adreno hardware test"\n'
+              'type = "efi"\npath = "Drivers/LumiaGpuPower.efi"\n\n'
+              '[[entry]]\nid = "xnu"\ntitle = "Experimental XNU kernel - no iOS userspace"\n'
+              'type = "xnu"\npath = "Payloads/kernel.macho"\n'
+              'args = "-v keepsyms=1 debug=0x100 cpus=1"\n')
+    overrides = (
+        # A test menu is picked by hand: 300 s leaves time to watch the panel and choose.
+        ("timeout = 20", "timeout = 300", "boot countdown"),
+        ('title = "UniXNU"', 'title = "Native Lumia 950"', "menu title"),
+        ("logo = true", "logo = false", "logo flag"),
+    )
+    return menu_render.render(source, insert=insert, default="exit",
+                              overrides=overrides, drop=menu_render.FIRMWARE_ACTIONS)
+
+
+def verify_build_manifest(manifest_path, kernel_path, kernel_sha256, repo_commit=None):
+    """Tie the kernel to the run that produced it.
+
+    --kernel-sha256 proved the file did not change since the operator typed the hash; it did not
+    prove CI produced the file. The manifest does: the kernel has to be one of the outputs that
+    run recorded, with the hash it recorded, from a clean checkout of a named commit.
+    """
+    manifest_file = Path(manifest_path)
+    if not manifest_file.is_file():
+        raise ValueError(f"build manifest not found: {manifest_file}")
+    manifest = json.loads(manifest_file.read_text())
+    if manifest.get("schema") != "lumia950-build-manifest-v1":
+        raise ValueError(f"{manifest_file} is not a lumia950 build manifest")
+    inputs = manifest.get("inputs") or {}
+    if inputs.get("repo_dirty"):
+        raise ValueError(f"{manifest_file} describes a dirty checkout; the artifact cannot be "
+                         "attributed to a commit")
+    if repo_commit is not None and inputs.get("repo_commit") != repo_commit:
+        raise ValueError(f"{manifest_file} was built from {inputs.get('repo_commit')}, not the "
+                         f"checked-out {repo_commit}")
+    name = Path(kernel_path).name
+    recorded = {entry["sha256"]: entry["path"]
+                for items in (manifest.get("outputs") or {}).values()
+                for entry in items if Path(entry["path"]).name == name}
+    if not recorded:
+        raise ValueError(f"{manifest_file} records no {name}; this kernel is not an output of "
+                         "the run that produced the manifest")
+    if kernel_sha256 not in recorded:
+        raise ValueError(f"{name} does not hash to the value {manifest_file} recorded for it "
+                         f"({sorted(recorded)[0][:16]}...); the file is not the artifact that run "
+                         "produced")
+    return {
+        "build_manifest_sha256": hashlib.sha256(manifest_file.read_bytes()).hexdigest(),
+        "build_manifest_output": recorded[kernel_sha256],
+        "build_repo_commit": inputs.get("repo_commit"),
+        "build_framework_ref": inputs.get("framework_ref"),
+        "build_kernelcache_sha256": inputs.get("kernelcache_sha256_expected"),
+    }
 
 
 def main():
@@ -193,10 +251,25 @@ def main():
     parser.add_argument("--strip", default="/usr/bin/strip")
     parser.add_argument("--unique-chip-id", required=True)
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--manifest", type=Path,
+                        help="the build manifest from the run that produced --kernel; without it "
+                             "the kernel hash is an operator claim, not provenance")
+    parser.add_argument("--expect-repo-commit",
+                        help="the commit this staging is meant to correspond to (the manifest "
+                             "has to agree)")
     args = parser.parse_args()
     original = args.kernel.read_bytes()
     if hashlib.sha256(original).hexdigest() != args.kernel_sha256:
         raise ValueError("native kernel does not match the explicit source-build hash")
+    provenance = {"build_manifest_sha256": None, "build_manifest_output": None,
+                  "build_repo_commit": None, "build_framework_ref": None,
+                  "build_kernelcache_sha256": None}
+    if args.manifest is not None:
+        provenance = verify_build_manifest(args.manifest, args.kernel, args.kernel_sha256,
+                                           args.expect_repo_commit)
+    else:
+        print("note: no --manifest, so the kernel hash is an operator claim and the tree carries "
+              "no record of the run that produced it")
     contract(original)
     crypto = crypto_contract(original)
     if args.out.exists():
@@ -215,18 +288,17 @@ def main():
         "EFI/UniXNU/Drivers/DarwinBoot.efi": (args.menu_tree / "EFI/UniXNU/Drivers/DarwinBoot.efi").read_bytes(),
         "EFI/UniXNU/Drivers/LumiaGpuPower.efi": args.gpu.read_bytes(),
         "EFI/UniXNU/Payloads/kernel.macho": stripped,
-        "EFI/UniXNU/unixnu.toml": menu_config().encode(),
+        "EFI/UniXNU/unixnu.toml": menu_config(args.menu_tree).encode(),
     }
     for name, data in files.items():
         destination = output / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
     adt = output / "EFI/UniXNU/Payloads/kernel.macho.adt"
-    subprocess.run([sys.executable, str(ROOT / "scripts/make-lumia950-adt.py"), "--output", str(adt),
-        "--dram-size", "0xc0000000", "--dram-base", "0", "--owned-memory-size", "0x20000000",
-        "--unique-chip-id", args.unique_chip_id, "--chip-id", "0x8015",
-        "--cpu-regs", "0", "--psci-method", "none"], check=True)
-    subprocess.run([sys.executable, str(ROOT / "scripts/check-adt.py"), str(adt)], check=True)
+    profile = resolve_profile(ROOT / "board.toml")
+    subprocess.run(adt_command(profile, adt, args.unique_chip_id), check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts/check-adt.py"), str(adt),
+                    "--profile", profile["profile"]], check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts/check-payload.py"), "--config",
         str(output / "EFI/UniXNU/unixnu.toml"), "--payload-dir", str(output), "--panel", "1080x1920"], check=True)
     manifest = {"schema": "lumia950-native-bringup-v1", "native_kernel_sha256": args.kernel_sha256,
@@ -235,7 +307,8 @@ def main():
         "root_filesystem_included": False, "ios_userspace_included": False, "handset_boot_observed": False,
         "exposed_boot_cpu_affinity": 0, "secondary_cpu_conduit_qualified": False,
         "source_crypto_integrity_verified": True, "source_crypto": crypto,
-        "gpu_frame_observed": False, "files": {}}
+        "gpu_frame_observed": False, "adt_profile": profile["profile"],
+        "adt_dram_size": profile["dram_size"], "files": {}, **provenance}
     for destination in sorted(output.rglob("*")):
         if destination.is_file():
             blob = destination.read_bytes()
