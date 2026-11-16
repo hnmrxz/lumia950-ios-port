@@ -3,6 +3,15 @@ name: build
 on:
   push:
     branches: [main]
+    paths:
+      - 'board.toml'
+      - 'configs/**'
+      - 'drivers/**'
+      - 'scripts/**'
+      - 'payload/**'
+      - 'ci/**'
+      - 'feeds.toml'
+      - '.github/workflows/build.yml'
   pull_request:
   workflow_dispatch:
     # Both manual jobs are long (edk2 and the macOS Xcode build) and are wanted
@@ -451,8 +460,8 @@ jobs:
   # The real compile. The kernel step needs macOS: Xcode and the iphoneos SDK.
   # Manual, because a first build takes a long time on a shared runner.
   kernel:
-    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'kernel' || inputs.target == 'both')
-    runs-on: macos-latest
+    if: (github.event_name == 'workflow_dispatch' && (inputs.target == 'kernel' || inputs.target == 'both')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ${{ vars.MACOS_RUNNER || 'macos-26' }}
     timeout-minutes: 360
     env:
       # prepare-xnu-source.py asks api.github.com for directory listings, and anonymous
