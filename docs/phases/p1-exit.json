@@ -1,0 +1,46 @@
+{
+  "schema": "lumia950-phase-exit-v1",
+  "phase": "P1",
+  "status": "open",
+  "goal": "EFI -> DarwinBoot -> XNU entry: prove on the handset that XNU took control.",
+  "criteria": [
+    {
+      "id": "P1.1",
+      "requirement": "A log transport exists and is implemented: either a GOP framebuffer console written after ExitBootServices, or a reserved RAM mailbox read back by a diagnostic EFI application. Without one, a successful XNU entry and a hang look identical on a phone with no serial port.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Undecided and unimplemented. The GOP framebuffer avenue is currently scheduled in P3, which is why this criterion blocks P1 rather than P3."
+    },
+    {
+      "id": "P1.2",
+      "requirement": "The checkpoint set is a single machine-readable list (arm_vm_init, crypto self-test, PE_init_iokit and the rest the QEMU fixture already asserts) shared by the fixture, the transport and the handset record.",
+      "evidence": "document",
+      "status": "open",
+      "verified_by": "scripts/check-checkpoints.py",
+      "note": "docs/native-checkpoints.json now holds the list and scripts/check-checkpoints.py judges a recorded log against it, including refusing a log that reaches a later marker while skipping an earlier one. The fixture still asserts its own hardcoded sequence, so 'shared by the fixture' is not true yet."
+    },
+    {
+      "id": "P1.3",
+      "requirement": "The XNU early-boot QEMU fixture runs in CI and archives its report; today scripts/test-native-xnu-entry.py and test-handoff-qemu.py are only py_compile'd.",
+      "evidence": "artifact",
+      "status": "open",
+      "verified_by": "scripts/test-native-xnu-entry.py",
+      "note": "Running it needs a staged tree, which the stage job now produces; the CI step is not written yet."
+    },
+    {
+      "id": "P1.4",
+      "requirement": "A handset record shows the checkpoint sequence reaching a named milestone, plus at least one negative case (a panic or a stop) that the same transport captured.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Requires P1.1 and P1.2. This is the criterion the roadmap called 'a real-device log proves XNU took control'."
+    },
+    {
+      "id": "P1.5",
+      "requirement": "The condition for removing board.toml's `example = true` guard is defined in exactly one place and the other documents reference it.",
+      "evidence": "document",
+      "status": "met",
+      "path": "board.toml",
+      "note": "board.toml's header is now the single statement; AGENTS.md rule 10 and the roadmap's P1 line reference it instead of restating a different rule. This is the only definition change in this round, not a claim about the guard's condition being satisfied."
+    }
+  ]
+}

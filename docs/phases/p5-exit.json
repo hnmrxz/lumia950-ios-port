@@ -1,0 +1,30 @@
+{
+  "schema": "lumia950-phase-exit-v1",
+  "phase": "P5",
+  "status": "blocked",
+  "blocked_by": "A Format 2 framework ref that still supports the 16.x overlay, plus an MSM8992 SoC common package. Neither exists in the upstream catalog: UniXNU's main line has moved to 17.x and its devices.toml still records Lumia 950 as format = 1.",
+  "goal": "Migrate to Format 2 once the prerequisites exist, without losing the behaviour proved in P0-P4.",
+  "criteria": [
+    {
+      "id": "P5.1",
+      "requirement": "The migration is proved by behavioural equivalence, not by tool exit codes: the same six QEMU milestones, the same staged tree file set and hashes, and the same handset checkpoint sequence before and after.",
+      "evidence": "artifact",
+      "status": "open",
+      "note": "The roadmap's current exit ('unixnu status --json, unixnu tree and a kernel build pass') can be satisfied by a tree that no longer boots."
+    },
+    {
+      "id": "P5.2",
+      "requirement": "The last Format 1 state stays reachable as a tag so a failed migration can be reverted in one checkout.",
+      "evidence": "artifact",
+      "status": "open",
+      "note": "No tags exist; artifacts expire in one to three days."
+    },
+    {
+      "id": "P5.3",
+      "requirement": "The framework ref, devices.toml excerpt and date of the format-1 decision are recorded, so the premise of the current architecture can be re-checked instead of remembered.",
+      "evidence": "document",
+      "status": "open",
+      "note": "The 'no MSM8992 SoC common' claim is about a repository this project does not contain; nothing in the tree pins the evidence for it."
+    }
+  ]
+}

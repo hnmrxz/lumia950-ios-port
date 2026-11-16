@@ -1,0 +1,37 @@
+{
+  "schema": "lumia950-phase-exit-v1",
+  "phase": "P4",
+  "status": "open",
+  "goal": "Userland: launchd, backboardd and SpringBoard run, with the trust boundary stated rather than implied.",
+  "criteria": [
+    {
+      "id": "P4.1",
+      "requirement": "launchd, backboardd and SpringBoard each start, with a log line and a screenshot checked by scripts/check-screenshot.py.",
+      "evidence": "hardware",
+      "status": "open",
+      "verified_by": "scripts/check-screenshot.py",
+      "note": "Not started; the userland pipeline does not exist in this repository (ci/hackios-userland-build.patch targets a tree outside it)."
+    },
+    {
+      "id": "P4.2",
+      "requirement": "Stability is quantified, not described: ten minutes of uptime, one hundred interactions, zero panics and an empty crash log for the run counted.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "The roadmap's 'the desktop is visible and interaction is basically stable' cannot be judged; these numbers can."
+    },
+    {
+      "id": "P4.3",
+      "requirement": "A trust matrix exists and says which security capabilities are implemented, which are permanently absent on MSM8992 (SEP), and which user-visible features are therefore unsupported (Apple ID, passcode, Data volume encryption).",
+      "evidence": "document",
+      "status": "open",
+      "note": "board.toml deliberately omits early_security_init; nothing writes down that this is permanent rather than pending."
+    },
+    {
+      "id": "P4.4",
+      "requirement": "Until P4.3 is met, the device is documented as untrusted: no network, no Apple ID, no personal data.",
+      "evidence": "document",
+      "status": "open",
+      "note": "A usage constraint, not a code change. It belongs in README.md next to the status table."
+    }
+  ]
+}

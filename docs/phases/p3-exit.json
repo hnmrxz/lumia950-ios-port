@@ -1,0 +1,36 @@
+{
+  "schema": "lumia950-phase-exit-v1",
+  "phase": "P3",
+  "status": "open",
+  "goal": "Display and input: the kernel can draw and the phone can be touched.",
+  "criteria": [
+    {
+      "id": "P3.1",
+      "requirement": "Kernel console text is visible on the handset panel, recorded as a photograph with a SHA-256, not only as a description.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Depends on P1.1: the same transport that proves XNU entered is what makes console text possible."
+    },
+    {
+      "id": "P3.2",
+      "requirement": "NativeMdss scans out a test pattern after taking over from the firmware's GOP, with the transition logged (mode, stride, pixel format, and the point the firmware framebuffer stopped being written).",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "NativeMdss is at rung 1 (register probe) and publishes no framebuffer."
+    },
+    {
+      "id": "P3.3",
+      "requirement": "Touch and volume-key events reach an IOHIDEventService and produce an end-to-end log line per event.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Volume keys and GOP input are proven at the EFI menu, not inside XNU."
+    },
+    {
+      "id": "P3.4",
+      "requirement": "The Apple logo and the lock screen are not P3 criteria: this boot chain has no iBoot to draw the logo, and the lock screen is SpringBoard's.",
+      "evidence": "document",
+      "status": "not-applicable",
+      "note": "Moved to P4.3/P4.1 so P3 is not blocked by a picture nothing in this chain produces."
+    }
+  ]
+}

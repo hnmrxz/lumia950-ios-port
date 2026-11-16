@@ -37,3 +37,7 @@
 - [WOA-Project Linux (v5.8-rc3-lumia)](https://github.com/WOA-Project/linux/tree/v5.8-rc3-lumia)
 
 所有测量需标注设备型号、固件版本、工具版本、日期、原始日志/照片及哈希。照片、截图或文档中的宣传性描述不能替代原始读数。
+
+这条规则从 2026-10-27 的记录起逐条执行。两份更早的转录没有照片哈希，已显式标成
+`photo_sha256: null` 并写明原因（`2026-10-26-probe-v1.json`、`2026-10-26-handoff-v1.json`）——
+留白比补一个编出来的哈希诚实。新的证据文件必须带哈希，否则不要加入 `docs/hardware/`。

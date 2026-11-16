@@ -39,6 +39,16 @@ gh run download <RUN_ID> -n lumia950-kernel --repo hnmrxz/lumia950-ios-port
 - `lumia950-kernel`：kernel logs、build reports、prelinked candidate（包含从 Apple IPSW kernelcache 合并的 Apple kernel extensions）。
 - 对 Apple 相关 binary artifacts，保持私有仓库和短保留期；不要发布到公开 Release、Pages、公开 artifact 镜像或 git history。
 - 不上传完整 IPSW、firmware image、trust cache、UniqueChipID 或未经脱敏的设备日志。
+- `lumia950-stage`：只有 `target=both` 的 `stage` job 产出。它是 `scripts/install-native-bringup.py`
+  唯一接受的输入形状，由同一次 run 的 payload / kernel / GPU artifact 拼出，kernel 的 SHA-256 与
+  `build-manifest.json` 记录一致才继续；`native-bringup.json` 里因此有 `build_manifest_sha256`、
+  `build_repo_commit`、`adt_profile`。保留 3 天，因为它虽然只含 source-only 二进制，却是设备树。
+- `lumia950-kernel` 携带 `out/build-manifest.json`：本仓库 commit、决定构建内容的四个文件
+  （workflow、`ci/unixnu-16x.patch`、`feeds.toml`、`board.toml`）的 SHA-256、pinned framework
+  ref 与 tree id、`unixnu.lock`、`[kernel.prelink] kernelcache_sha256`、`board.toml` 与 CI 一次性
+  副本的守卫状态、Xcode/SDK/clang，以及每个产物的字节数与 SHA-256。缺任一输入、或产物哈希与
+  文件不符，kernel job 在写完 manifest 的同一分钟失败（`scripts/build-manifest.py --check
+  --verify-outputs`）。**没有 manifest 的 artifact 不算证据**，只有日志。
 
 ## 通过证据的级别
 

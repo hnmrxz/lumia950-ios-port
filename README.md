@@ -22,6 +22,8 @@
 
 **因此本仓库当前应被称为 P1 bring-up / research，而不是“已经能在 Lumia 950 运行 iOS”。** 首个可交付目标是稳定、可重复地构建 EFI payload 和 XNU candidate；后续必须分别通过真机 XNU entry、storage/root、display 和 userland checkpoint。
 
+上表的每个结论都有一个可判定的出处：[docs/evidence.json](docs/evidence.json) 把 AGENTS.md 的十个证据标签逐个绑定到证明它的文件或带日期的命令，`scripts/check-evidence.py` 校验它；[docs/phases/](docs/phases) 把 P0–P5 的出口条件写成机器可判定的条目，`scripts/check-phase.py` 校验它。两者目前都很诚实：**没有任何一项超过 `EFI-tested`**，因为本仓库还没有自己的 CI 运行记录。
+
 ## 为什么选这个基线
 
 - `TwisstedToast/UniXNU-lumia950` 是 Lumia 950（MSM8992）设备仓库的后续 fork，包含设备探测、GICv2、eMMC、显示/GPU 的分阶段实现和 CI。
@@ -61,8 +63,43 @@ UniXNU 主框架是单独的构建依赖：`https://github.com/UniXNU/UniXNU`。
 2. 下载 `lumia950-payload` artifact，检查 `UniXNU.efi`、`DarwinBoot.efi` 和 payload 配置。
 3. 再手动运行 `target=kernel`，重点检查每个设备 driver 的 XNU ABI 编译记录、archive 成员、kernel link 和 prelink report。
 4. 只有构建产物通过静态检查后，才进入真机测试。第一次 XNU entry 测试必须保留可回滚的 Windows boot route，不要先改分区或覆盖原厂启动文件。
+5. `target=both` 会在这两个 job 之后追加 `stage` job，产出 `lumia950-stage`：由本次 run 自己的 payload / kernel / GPU artifact 拼出的可部署树，kernel 的 SHA-256 必须出现在本次 run 的 `build-manifest.json` 里，`native-bringup.json` 记录 manifest 哈希、framework ref 与 ADT profile。本地产物没有这层绑定（`--manifest` 缺席时会打印提示）。
 
 具体门槛见 [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md)，硬件资料见 [docs/HARDWARE-INVENTORY.md](docs/HARDWARE-INVENTORY.md)，路线图见 [docs/PORTING-ROADMAP.md](docs/PORTING-ROADMAP.md)。
+
+## 三种产物：各自的 stager 和 installer
+
+不要把任意一个 artifact 直接放到手机上。三条路径的守卫强度不同，只有第三条带备份和回滚。
+
+| 产物 | 由谁产生 | stager | 能否上台 | 守卫 |
+|---|---|---|---|---|
+| `lumia950-payload`（菜单树） | CI `target=payload` | 无需 stage，本身即 `\EFI` 树 | 可（手机已跑过菜单） | `check-payload.py` 校验配置与文件 |
+| `lumia950-kernel`（**合并后的** kernel candidate） | CI `target=kernel` | `scripts/stage-kernel.py` | **不可**：`native-bringup.md` 明确它 "is not staged here"，runtime/ABI/relocation 未鉴定 | 只校验 Mach-O 头（magic/cputype/filetype），**无法区分** source-only 与合并内核 |
+| source-only 内核（CI `target=both` 的 `stage` job，或本地源码构建） | CI / 本地 | `scripts/stage-native-bringup.py` | 可（唯一带安装器的路径） | Mach-O 契约 + POST 完整性 + strip 前后运行时字节比对 + ADT/payload 双重校验；CI 路径额外要求 kernel 的 SHA-256 出现在本次 run 的 `build-manifest.json` 里 |
+
+上机只走第三条：`install-native-bringup.py`（macOS，默认 dry-run，身份核验 + 完整备份 + 原子写 +
+回读）。Windows 上没有等价路径；手动把文件拷进 EFIESP **没有身份校验、没有备份、不是原子写**，
+不要把 Windows 手工拷贝算作验收通过的安装。
+
+## 旧章节索引
+
+本仓库的初始提交把原来 896 行的 README 换成了现在这份，但 `board.toml`、`configs/`、`drivers/`
+和 `scripts/` 的注释仍按旧章节名指路。下表把这些名字映射到它们现在所在的位置，`scripts/check-doc-references.py`
+会检查代码里引用的每个名字都在本文件里出现——下一次替换 README 时不能再把注释指成悬空引用。
+
+| 旧章节名 | 现在的位置 |
+|---|---|
+| The GPU | [docs/gpu-bringup.md](docs/gpu-bringup.md)、[docs/native-gpu-batch.md](docs/native-gpu-batch.md)、[docs/native-gpu-power.md](docs/native-gpu-power.md) |
+| The display path | [docs/native-bringup.md](docs/native-bringup.md)（NativeMdss 的 rung）与 [drivers/NativeMdss](drivers/NativeMdss) |
+| The boot route | [board.toml](board.toml) 的 `[payload]` 注释与 [docs/native-bringup.md](docs/native-bringup.md) |
+| Linking it into the kernel | [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md) 与 `board.toml` 的 `[kernel] archives` |
+| The ladder | [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md) 的证据级别，以及 [docs/evidence.json](docs/evidence.json) |
+| The ADT node | [scripts/make-lumia950-adt.py](scripts/make-lumia950-adt.py) 与其注释 |
+| What is not implemented | 上面的「当前真实状态」表 |
+| Vendor registers | [docs/storage-bringup.md](docs/storage-bringup.md) |
+| The eMMC map | [docs/HARDWARE-INVENTORY.md](docs/HARDWARE-INVENTORY.md) |
+| Proving the map | [docs/storage-bringup.md](docs/storage-bringup.md) |
+| blocker 4 | [docs/native-bringup.md](docs/native-bringup.md) 的 PSCI 小节（无 SYSTEM_OFF / SYSTEM_RESET） |
 
 ## 安全边界
 

@@ -25,9 +25,10 @@
     "REPORT_STAGE": "COMPLETE",
     "REPORT_EFI_STATUS": "0x0000000000000000"
   },
+  "identifier_redaction": "raw volume/partition identifiers are withheld; the sha256: prefix over the former UUID keeps cross-file correlation without publishing a device identifier (AGENTS.md rule 8)",
   "disk_inspection_after_return_to_mass_storage": {
-    "volume_uuid": "455FB1CB-F473-3654-A26A-8E96BB80B44C",
-    "partition_uuid": "8183040A-8B44-4592-92F7-C6D9EE0560F7",
+    "volume_uuid": "sha256:49d22a0759873eb5",
+    "partition_uuid": "sha256:dfd79a7757341144",
     "report_path": "EFI/LumiaProbe/gpu-report-00.txt",
     "captured_report": "out/gpu-preflight-v2/hardware/gpu-report-00.txt",
     "report_bytes": 628,

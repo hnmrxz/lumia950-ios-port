@@ -1,0 +1,86 @@
+{
+  "schema": "lumia950-evidence-v1",
+  "note": "The evidence labels defined in AGENTS.md, attached to subjects, with the thing that proves each one. A subject may not claim a label whose evidence is not listed here. Nothing in this table is above EFI-tested: the repository does have one recorded CI run (docs/ci/RUNS.md) but it predates the manifest, the link assertion and the profile check, so no subject here has a run-backed host-tested or ABI-compiled claim yet.",
+  "labels": [
+    "source-reviewed",
+    "host-tested",
+    "QEMU-tested",
+    "ABI-compiled",
+    "kernel-linked",
+    "prelink-checked",
+    "EFI-tested",
+    "XNU-entry-tested",
+    "hardware-tested",
+    "userland-booted"
+  ],
+  "subjects": [
+    {
+      "id": "efi-probe",
+      "what": "LumiaProbe.efi: EL1, 1080x1920 GOP, 47 memory descriptors, 19.2 MHz counter, 2806 MiB conventional",
+      "label": "EFI-tested",
+      "evidence": [
+        {"label": "source-reviewed", "path": "tools/uefi-probe"},
+        {"label": "EFI-tested", "path": "docs/hardware/2026-10-26-probe-v1.json"}
+      ]
+    },
+    {
+      "id": "efi-handoff",
+      "what": "LumiaHandoff.efi: framebuffer writes survive ExitBootServices and the firmware MMU mappings are used",
+      "label": "EFI-tested",
+      "evidence": [
+        {"label": "source-reviewed", "path": "tools/uefi-probe"},
+        {"label": "EFI-tested", "path": "docs/hardware/2026-10-26-handoff-v1.json"}
+      ]
+    },
+    {
+      "id": "unixnu-menu",
+      "what": "UniXNU.efi draws its menu through the GOP and takes the volume keys. README.md calls this verified; the only record of it is a private, unhashed photograph, so this table stops at source-reviewed until the phase files carry it.",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "payload/EFI/UniXNU/unixnu.toml"}
+      ]
+    },
+    {
+      "id": "native-sdhci",
+      "what": "The eMMC controller driver: card init, clock, bus width and a PIO read",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "drivers/NativeSdhci/NativeSdhci.cpp"}
+      ],
+      "note": "scripts/test-storage.sh exercises the core on the host, but no run of this repository is recorded, so host-tested is not claimed."
+    },
+    {
+      "id": "native-mdss",
+      "what": "The display controller at rung 1: window map and DSI state, no framebuffer published",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "drivers/NativeMdss/NativeMdss.cpp"}
+      ]
+    },
+    {
+      "id": "native-adreno418",
+      "what": "The GPU at rung 1: identity and power domain, no GPU service",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "drivers/NativeAdreno418/NativeAdreno418.cpp"}
+      ]
+    },
+    {
+      "id": "native-gicv2",
+      "what": "The GICv2 interrupt controller and timer path used by ArmCpu",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "drivers/NativeGicV2/GicV2Core.cpp"}
+      ]
+    },
+    {
+      "id": "board-adt",
+      "what": "The ADT sidecar DarwinBoot hands to the kernel, generated from board.toml's bring-up profile",
+      "label": "source-reviewed",
+      "evidence": [
+        {"label": "source-reviewed", "path": "scripts/make-lumia950-adt.py"}
+      ],
+      "note": "Generated and checked by scripts/check-adt.py and the validate job; no recorded run."
+    }
+  ]
+}

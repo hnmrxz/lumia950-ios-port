@@ -19,8 +19,9 @@
     "gpu_and_smmu_windows": "NOT touched",
     "report_save_status": "0x8000000000000002 (EFI_INVALID_PARAMETER)"
   },
+  "identifier_redaction": "raw volume/partition identifiers are withheld; the sha256: prefix over the former UUID keeps cross-file correlation without publishing a device identifier (AGENTS.md rule 8)",
   "disk_inspection_after_return_to_mass_storage": {
-    "volume_uuid": "455FB1CB-F473-3654-A26A-8E96BB80B44C",
+    "volume_uuid": "sha256:49d22a0759873eb5",
     "report_path": "EFI/LumiaProbe/gpu-report-v1.txt",
     "report_bytes": 0,
     "report_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

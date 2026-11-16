@@ -1,0 +1,25 @@
+# Who reviews what. The files below carry the invariants, so they need an owner's eye.
+*                         @hnmrxz
+
+# The build and the artifact boundary: what runs, what is uploaded, what is published.
+/.github/workflows/       @hnmrxz
+/scripts/build-manifest.py @hnmrxz
+/scripts/stage-kernel.py  @hnmrxz
+/scripts/stage-native-bringup.py @hnmrxz
+/scripts/install-native-bringup.py @hnmrxz
+/scripts/update-native-bringup.py @hnmrxz
+
+# The board contract: identity, ADT profile, the incomplete-board guard.
+/board.toml               @hnmrxz
+/feeds.toml               @hnmrxz
+/scripts/board_profile.py @hnmrxz
+/scripts/check-adt.py     @hnmrxz
+
+# Patches applied to the framework and the loader: they decide what the image is.
+/ci/                      @hnmrxz
+
+# Evidence and the rules that judge it.
+/docs/hardware/           @hnmrxz
+/docs/phases/             @hnmrxz
+/scripts/check-phase.py   @hnmrxz
+/scripts/check-checkpoints.py @hnmrxz

@@ -26,6 +26,15 @@ UniXNU 当前官方文档将新设备引导到 Format 2：SoC common source、OS
 | `WOA-Project/linux` | Linux/设备树和 Qualcomm 驱动作为寄存器/时钟/中断交叉来源 | 旧 Linux kernel 5.8 分支不是 XNU 内核构建基础，也不证明苹果驱动 ABI |
 | `UniXNU/UniXNU` | 官方 build engine、component catalog、bring-up、QEMU fixtures、porting-record、当前 runner workflow 规范 | 最新 `main` 默认 XNU/profile 已更新，不能不经 16.x patch-overlay 验证就替换旧的 build-framework pin |
 
+## 阶段出口的机器判据
+
+每个阶段的出口不再是散文，而是 `docs/phases/pN-exit.json` 里的条目，由 `scripts/check-phase.py`
+校验。只有一条硬规则：标 `met` 的条目必须指出证明它的文件（且该文件存在）或命令（且带执行日期）。
+`open` 是诚实的默认，不是失败；阶段之间不允许越级，前面的阶段没 met，后面就不能 met。
+
+当前：P0–P4 全 `open`，P5 `blocked`（需要一件仍支持 16.x overlay 的 Format 2 framework ref，
+以及 MSM8992 SoC common——上游目录里两者都不存在）。
+
 ## 阶段计划
 
 ### P0 — 仓库、构建和证据管理
@@ -43,10 +52,12 @@ UniXNU 当前官方文档将新设备引导到 Format 2：SoC common source、OS
 - [x] Lumia 原厂 UEFI 可链式启动 UniXNU 菜单。
 - [x] EFI 设备报告已实测 EL1、GOP、RAM descriptors、CPU topology。
 - [ ] DarwinBoot handoff 使用实际 1080×1920 GOP、EL1、真实 EFI memory map；保留固件映射策略有明确检查。
-- [ ] 在屏幕不可用时建立可读取的持久日志/串口/内存日志路径。
+- [ ] 在屏幕不可用时建立可读取的持久日志/串口/内存日志路径。方案取舍与所需证据见
+      [docs/decisions/0001-log-transport.md](decisions/0001-log-transport.md)：首选 GOP 帧缓冲控制台
+      （该机已在 EFI 应用里证明 EBS 后写入帧缓冲可见），RAM mailbox 作备选。
 - [ ] XNU 进入 `arm_init` / platform expert / timer / GICv2；逐个 checkpoint 记录日志。
 - [ ] 先只启动单核；完成 IRQ/timer，再逐核 bring-up，最后启用 SMP。
-- [ ] 成功一次从 DarwinBoot 进入 XNU 后才评估删除 `board.example = true`。
+- [ ] 成功一次从 DarwinBoot 进入 XNU，并且满足 `board.toml` 顶部注释里的三条（那是唯一权威定义；本文不再复述）。
 
 **出口条件：**真机记录证明 XNU 已取控制权，明确日志 checkpoint，不是单凭黑屏、重启或 EFI probe。
 
@@ -58,7 +69,9 @@ UniXNU 当前官方文档将新设备引导到 Format 2：SoC common source、OS
 - [ ] 在 host/macOS builder 构建 root image；CI 产物不含原始 IPSW 或未授权 Apple binaries。
 - [ ] XNU 只读挂载 root，逐步到 `launchd`。
 
-**出口条件：**可重复只读挂载 iOS root、`launchd` 启动，设备存储范围与回滚策略已验证。
+**出口条件：**可重复只读挂载 iOS root、`launchd` 启动，设备存储范围已验证。备份恢复演练是
+**上机部署**的前置条件（`docs/phases/p2-exit.json` P2.2），不放在这一阶段的退出条件里空转——
+P2 本身不写盘，写盘发生在部署步骤。
 
 ### P3 — 显示与输入
 
@@ -68,7 +81,10 @@ UniXNU 当前官方文档将新设备引导到 Format 2：SoC common source、OS
 - [ ] 实测触摸控制器、I2C、GPIO、IRQ，建立 IOHIDEventService。
 - [ ] 实测实体按键映射、旋转/分辨率/刷新率。
 
-**出口条件：**iOS kernel console、Apple logo、锁屏首帧可见；触摸/按键事件有端到端证据。
+**出口条件：**iOS kernel console 文本、NativeMdss 自绘测试图、触摸/按键事件端到端证据。
+Apple logo 与锁屏首帧**不属于 P3**：本链路没有 iBoot 去画 logo，锁屏是 SpringBoard 的；
+这两项在 `docs/phases/p3-exit.json`（P3.4 标为 not-applicable）和 `p4-exit.json` 里。
+日志运输在 P1，不在 P3——否则 P1 无法验收。
 
 ### P4 — userland / 系统服务
 

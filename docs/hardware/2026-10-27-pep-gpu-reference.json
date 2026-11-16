@@ -3,9 +3,10 @@
   "date": "2026-10-27",
   "device": "Lumia 950 / MSM8992",
   "evidence_kind": "static tables in user-owned Windows driver, not live GPU or RPM state",
+  "identifier_redaction": "raw volume/partition identifiers are withheld; the sha256: prefix over the former UUID keeps cross-file correlation without publishing a device identifier (AGENTS.md rule 8)",
   "acquisition": {
     "volume": "Windows",
-    "partition_uuid": "87BD60CF-310C-4F0A-9F55-4C343256BF31",
+    "partition_uuid": "sha256:00ad27a6b25346ac",
     "read_only": true,
     "file": "qcpep8992.inf_arm64_8101853e844488d8/arm64/qcpep8992.sys",
     "bytes": 1800680,

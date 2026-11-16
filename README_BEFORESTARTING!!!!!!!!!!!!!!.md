@@ -16,13 +16,14 @@ Do not say a driver works, or even builds, because `py_compile`, `g++` on the ho
 ## Run it
 
 ```sh
-# The job that compiles every driver listed in [kernel] archives of board.toml:
-gh workflow run build.yml -f target=kernel --repo TwisstedToast/UniXNU-lumia950
+# The job that compiles every driver listed in [kernel] archives of board.toml.
+# Whatever `origin` is: forking this repository under another account does not move it.
+gh workflow run build.yml -f target=kernel --repo "$(git remote get-url origin | sed -e 's#.*github.com[:/]##' -e 's#\.git$##')"
 
 # See it, follow it, get the artifact:
-gh run list --workflow build.yml --repo TwisstedToast/UniXNU-lumia950
-gh run watch <run-id> --repo TwisstedToast/UniXNU-lumia950
-gh run download <run-id> -n lumia950-kernel --repo TwisstedToast/UniXNU-lumia950
+gh run list --workflow build.yml
+gh run watch <run-id>
+gh run download <run-id> -n lumia950-kernel
 ```
 
 `target` is `payload`, `kernel` or `both`; the default is `payload`, so **name `kernel`
@@ -38,15 +39,19 @@ upstream `main`; changing that pin requires revalidating the patch and driver AB
 | `gicv2-emulation` | every push, PR and dispatch | pinned ArmCpu patch preparation and standalone asynchronous timer/SGI/SPI exceptions in QEMU; not XNU or handset validation | `lumia950-gicv2-core-emulation` |
 | `efi-preflight` | every push, PR and dispatch | AArch64 EFI image build, mock report/clock tests, non-Lumia MMIO refusal and actual two-boot report persistence in QEMU; not XNU or handset GPU execution | `lumia950-efi-preflight` |
 | `payload` | dispatch with `target=payload` or `both` | `UniXNU.efi`, `DarwinBoot.efi` and the staged `out/payload` tree | `lumia950-payload` |
-| `kernel` | dispatch with `target=kernel` or `both` | **every driver compiles against the recorded XNU ABI with `-Werror`**, the kernel links, and the pinned 16.7.16 kernelcache merges | `lumia950-kernel` |
+| `kernel` | dispatch with `target=kernel` or `both`, **and every push to `main`** | **every driver compiles against the recorded XNU ABI with `-Werror`**, the kernel links, the pinned 16.7.16 kernelcache merges, and the linked image carries a symbol for each `[kernel] archives` component | `lumia950-kernel` |
+| `stage` | dispatch with `target=both` | the deployable tree the installer consumes, assembled from this run's own payload, kernel and GPU artifacts; the kernel hash has to appear in this run's `build-manifest.json` | `lumia950-stage` |
 
 ## Run it even when you are not sure you need to
 
-If a change *might* have broken compilation, **just dispatch the job**. Actions minutes are
-free on a public repository, the run is the cheapest possible smoke test, and a red log that
-names a file and a line is worth more than an hour of reading the diff. There is no quota to
-spend here and no reason to hoard a run. Same for the payload job: if the menu or the loader
-changed, build it and look at the artifact.
+If a change *might* have broken compilation, **just dispatch the job**. The run is the cheapest
+possible smoke test, and a red log that names a file and a line is worth more than an hour of
+reading the diff. Same for the payload job: if the menu or the loader changed, build it and look
+at the artifact.
+
+**This repository has to stay private.** The `kernel` artifact carries kernel extensions merged
+out of an Apple kernelcache; the workflow refuses to upload it from a public repository, and
+Actions minutes are not free here. Do not "fix" a red job by making the repository public.
 
 Do not ask "should I run CI?" — run it, then read the log.
 

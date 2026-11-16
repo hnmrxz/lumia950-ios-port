@@ -4,7 +4,6 @@
 AGENTS.md defines ten evidence labels and BUILD-VERIFICATION.md repeats them, but nothing read
 them: README.md uses a different vocabulary, and any page could quietly promote a driver from
 "compiles" to "works". This makes the ladder mechanical.
-
     python3 scripts/check-evidence.py
     python3 scripts/check-evidence.py --phases docs/phases
 

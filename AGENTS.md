@@ -28,7 +28,7 @@ No local Mac is assumed. GitHub Actions is the canonical Xcode/iPhoneOS SDK buil
 7. Preserve rollback paths. No CI workflow may unlock, flash, repartition, edit BCD/EFI variables or write phone storage.
 8. Do not store Apple IPSW contents, kernelcache blobs, trust caches, private chip identifiers, or generated proprietary binaries in git. Keep temporary artifacts short-lived and access-restricted.
 9. Do not run `git push --force`, rewrite upstream history, or change the upstream remote without explicit instruction.
-10. Keep `board.example = true` until a real XNU entry + required device inputs have been verified. Never manufacture a successful boot report.
+10. Keep `board.example = true` until the conditions stated at the top of `board.toml` — that comment is the single authority; this file does not restate it. Never manufacture a successful boot report.
 
 ## Build policy
 

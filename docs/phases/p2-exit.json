@@ -1,0 +1,29 @@
+{
+  "schema": "lumia950-phase-exit-v1",
+  "phase": "P2",
+  "status": "open",
+  "goal": "Storage and iOS root: read the phone's own storage, then mount an iOS root read-only.",
+  "criteria": [
+    {
+      "id": "P2.1",
+      "requirement": "NativeSdhci performs one real read on the handset: card initialisation, clock, bus width and a PIO read of at least one block, with the controller state logged.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Host tests and an ABI compile exist; no XNU read path has run on the phone."
+    },
+    {
+      "id": "P2.2",
+      "requirement": "The real GPT is enumerated read-only and backed up to independent media, and a restore from that backup has been rehearsed once (install -> boot -> restore -> Windows boots again).",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "The backup half exists in scripts/install-native-bringup.py; there is no --restore and no rehearsal. This is the rollback evidence P2 used to claim without owning the write."
+    },
+    {
+      "id": "P2.3",
+      "requirement": "XNU mounts the iOS root read-only and reaches launchd, with the mount and the launchd start in the same record.",
+      "evidence": "hardware",
+      "status": "open",
+      "note": "Depends on P1 exiting and on the Data volume question being answered explicitly (see P4.3)."
+    }
+  ]
+}

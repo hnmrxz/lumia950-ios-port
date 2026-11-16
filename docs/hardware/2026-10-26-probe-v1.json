@@ -5,7 +5,9 @@
     "filename": "PXL_20261026_122000055.jpg",
     "date": "2026-10-26",
     "application": "LumiaProbe.efi v1",
-    "application_sha256": "fbf9e4c469871d3c516e61a8b0e5ebf8459cf562deba21e3064293b2bb2e2b41"
+    "application_sha256": "fbf9e4c469871d3c516e61a8b0e5ebf8459cf562deba21e3064293b2bb2e2b41",
+    "photo_sha256": null,
+    "photo_hash_status": "not recorded: this transcription predates the hash rule in HARDWARE-INVENTORY.md, and the photograph stays private. Left explicit rather than filled with a guess."
   },
   "measured": {
     "current_el": 1,

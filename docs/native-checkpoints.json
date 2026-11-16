@@ -1,0 +1,50 @@
+{
+  "schema": "lumia950-xnu-checkpoint-v1",
+  "transport": "undecided",
+  "decision_record": "docs/decisions/0001-log-transport.md",
+  "note": "The milestone sequence scripts/test-native-xnu-entry.py already asserts in QEMU, written down as one list so a handset record can be judged against the same sequence. The transport that carries these markers on real hardware is not chosen yet: a GOP framebuffer console written after ExitBootServices, or a reserved RAM mailbox read back by a diagnostic EFI application. Until it exists, P1 cannot be judged, because a successful entry and a hang both look like a black screen.",
+  "checkpoints": [
+    {
+      "id": "handoff",
+      "marker": "xnu:handoff",
+      "proves": "DarwinBoot transferred control to the kernel image at its entry point, with the ADT boot arguments it built.",
+      "fixture": null
+    },
+    {
+      "id": "arm_vm_init_entry",
+      "marker": "xnu:arm_vm_init",
+      "proves": "The kernel reached arm_vm_init, so the pmap and the early memory map are usable rather than merely parsed.",
+      "fixture": "arm_vm_init_entry"
+    },
+    {
+      "id": "arm_vm_init_return",
+      "marker": "xnu:arm_vm_init:done",
+      "proves": "arm_vm_init returned: the VM structures were built without a fault.",
+      "fixture": "arm_vm_init_return"
+    },
+    {
+      "id": "crypto_entry",
+      "marker": "xnu:crypto",
+      "proves": "The source corecrypto provider was entered after VM setup.",
+      "fixture": "source_crypto_bootstrap_entry"
+    },
+    {
+      "id": "crypto_return",
+      "marker": "xnu:crypto:done",
+      "proves": "The provider returned and its POST ran; the fixture also reads its status word.",
+      "fixture": "source_crypto_bootstrap_return"
+    },
+    {
+      "id": "iokit_entry",
+      "marker": "xnu:iokit",
+      "proves": "PE_init_iokit was entered: the platform expert is bringing up the driver tree.",
+      "fixture": "iokit_entry"
+    },
+    {
+      "id": "iokit_return",
+      "marker": "xnu:iokit:done",
+      "proves": "PE_init_iokit returned, which is the last checkpoint this port has a QEMU fixture for.",
+      "fixture": "iokit_return"
+    }
+  ]
+}
