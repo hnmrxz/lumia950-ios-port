@@ -159,10 +159,21 @@ com.apple.security.AppleImage4
 libraries. The pthread kext is nobody's library dependency, so it is not in the closure, its start
 routine never runs, `pthread_kext_register()` is never called, and `_pthread_functions` stays NULL.
 
-The fix is a `roots` entry, and it cannot be guessed: the component name has to be read from the
-iOS 16.7.16 kernelcache's component list. The kernel build that reads that cache runs on CI macOS,
-which currently does not start, so this is the one item on the critical path that is genuinely
-blocked — the diagnosis is complete, the last step is a one-line board change plus a rebuild.
+The fix is a configuration flag, and the framework names it: `XNU_SOURCE_PTHREAD` builds
+`build/libpthread-kernel/libpthread_kernel.a` and, with `patches/xnu/source-pthread-bootstrap.patch`,
+registers it through `STARTUP(EARLY_BOOT, STARTUP_RANK_SECOND, source_pthread_bootstrap)`, which
+calls `pthread_start()` so the function table is filled before `bsd_init`. `configs/lumia950_defconfig`
+did not set it, so the component was never built.
+
+```
+image symbols              _pthread_functions, _pthread_kext_register   (the xnu shims)
+                           pthread_start, source_pthread_bootstrap      ABSENT
+```
+
+`configs/lumia950_defconfig` now sets `CONFIG_XNU_SOURCE_PTHREAD=y`, and
+`scripts/test-native-bringup.py::test_the_pthread_provider_must_stay_in_the_configuration` fails if
+it disappears. What is not done is the verification: linking the source component needs the macOS
+kernel job, so the next real image is the proof, not this repository state.
 
 ## Reading a report
 

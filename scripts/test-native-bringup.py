@@ -105,6 +105,17 @@ class NativeBringupTests(unittest.TestCase):
         self.assertEqual(len(menu["entry"]), 3)
         self.assertIn("no iOS userspace", menu["entry"][1]["title"])
 
+    def test_the_pthread_provider_must_stay_in_the_configuration(self):
+        # bsd_init calls pthread_init() before anything else in BSD and panics when the function
+        # table is NULL; the prelink closure does not carry the pthread kext, so the source
+        # component is the only provider. Measured without the flag:
+        # docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json
+        config = (ROOT / "configs/lumia950_defconfig").read_text().splitlines()
+        enabled = [line.strip() for line in config if line.strip().startswith("CONFIG_")]
+        self.assertIn("CONFIG_XNU_SOURCE_PTHREAD=y", enabled)
+        self.assertIn("CONFIG_XNU_SOURCE_CORECRYPTO14=y", enabled,
+                      "ArmCpu is only accepted with the real source crypto provider")
+
     def test_source_provider_integrity_is_not_optional(self):
         with self.assertRaisesRegex(ValueError, "bootstrap/provider"):
             stage.crypto_contract(image())

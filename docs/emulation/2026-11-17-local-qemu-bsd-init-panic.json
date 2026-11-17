@@ -73,5 +73,12 @@
     "pthread_component": null,
     "reading": "board.toml [kernel.prelink] roots names four kernelcache components; the prelink adds what those declare as libraries. The pthread kext is not a library of any of them, so it is not in the closure, its start routine never runs, pthread_kext_register() is never called, and _pthread_functions stays NULL."
   },
-  "next_action": "Add the pthread kext to [kernel.prelink] roots. Its kernelcache component name is unknown here and must be read from the iOS 16.7.16 kernelcache's component list, not guessed: the kernel build runs on CI macOS, which currently does not start. The image already contains _pthread_kext_register and _pthread_functions (the xnu shims), so nothing else is missing from the link."
+  "next_action": "configs/lumia950_defconfig now sets CONFIG_XNU_SOURCE_PTHREAD=y, guarded by scripts/test-native-bringup.py::test_the_pthread_provider_must_stay_in_the_configuration. The fix is not yet verified in an image: linking the source component needs the macOS kernel job, which currently does not start. When it does, the run should show bsd_init returning and the panic string changing.",
+  "root_cause": {
+    "missing_config": "CONFIG_XNU_SOURCE_PTHREAD=y",
+    "framework_flag": "XNU_SOURCE_PTHREAD",
+    "framework_effect": "builds build/libpthread-kernel/libpthread_kernel.a and registers it: patches/xnu/source-pthread-bootstrap.patch adds STARTUP(EARLY_BOOT, STARTUP_RANK_SECOND, source_pthread_bootstrap), which calls pthread_start() so _pthread_functions is filled before bsd_init",
+    "image_evidence": "the linked image contains _pthread_functions and _pthread_kext_register (the xnu shims) but neither pthread_start nor source_pthread_bootstrap, so the source component was never built or linked",
+    "why_not_the_kext": "the prelink closure is roots plus their declared libraries; the pthread kext is nobody's library dependency, so it can never arrive that way"
+  }
 }
