@@ -257,7 +257,7 @@ def run(args):
             gdb = f"tcp:127.0.0.1:{port}"
         else:
             gdb = f"unix:{endpoint},server=on,wait=off"
-        command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", "1",
+        command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", str(args.smp),
             "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
             "-monitor", "none", "-nic", "none", "-no-reboot", "-device", "ramfb", "-S",
             "-gdb", gdb,
@@ -376,7 +376,7 @@ def run(args):
                     report["pc_symbol"] = nearest_symbol(names, values["pc"])
                     if watched:
                         report["watched"] = watched
-                    if reads:
+                    if reads or args.read_at:
                         # Globals the kernel keeps its state in, read at the stop. This is how a
                         # "blocked on a lock" observation becomes a number.
                         report["read"] = {}
@@ -386,6 +386,13 @@ def run(args):
                                     connection, names[name] + offset, size).hex()
                             except ValueError as error:
                                 report["read"][f"{name}+{offset:#x}"] = f"unreadable: {error}"
+                        for spec in args.read_at:
+                            address, _, size = spec.partition(":")
+                            try:
+                                report["read"][spec] = read_memory(
+                                    connection, int(address, 16), int(size or "16", 0)).hex()
+                            except ValueError as error:
+                                report["read"][spec] = f"unreadable: {error}"
                     try:
                         elr = int(report["system_registers"].get("elr_el1", "0"), 16)
                         report["fault_elr_symbol"] = nearest_symbol(names, elr) if elr else None
@@ -454,12 +461,20 @@ def main():
     parser.add_argument("--watch", action="append", default=[], metavar="SYMBOL",
                         help="record whether this symbol is reached at all (one shot, retired on "
                              "the first hit); repeatable")
+    parser.add_argument("--smp", type=int, default=1,
+                        help="CPUs in the emulated machine (default 1). QEMU returns zero for the "
+                             "GIC target registers on a uniprocessor GICv2 (hw/intc/arm_gic.c: "
+                             "'For uniprocessor GICs these RAZ/WI'), which is why ArmCpu's CPU "
+                             "target probe fails there; a multiprocessor machine reports a mask")
     parser.add_argument("--break-at", action="append", default=[], metavar="ADDRESS",
                         help="set a breakpoint at a raw kernel virtual address and stop there; "
                              "the registers in the report then hold the values at that point "
                              "(for example a function's return value in x0)")
     parser.add_argument("--read", action="append", default=[], metavar="SYMBOL[:BYTES]",
                         help="dump the bytes at a symbol when the run stops; repeatable")
+    parser.add_argument("--read-at", action="append", default=[], metavar="ADDRESS:BYTES",
+                        help="dump the bytes at a raw kernel virtual address when the run stops "
+                             "(for example a panic format string); repeatable")
     parser.add_argument("--adt-profile",
                         help="regenerate the ADT in the ESP copy from this board.toml profile "
                              "(for example qemu, whose GIC sits at 0x08000000); the staged tree "

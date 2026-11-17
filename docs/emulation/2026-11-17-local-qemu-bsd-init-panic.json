@@ -1,0 +1,59 @@
+{
+  "schema": "lumia950-xnu-entry-emulation-v1",
+  "date": "2026-11-17",
+  "host": "Windows x64, QEMU 11.1.0 (TCG), edk2-aarch64-code.fd, --smp 2",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "ios_userspace_booted": false,
+  "kernel_sha256": "67763775014f3029b127b426f6ad9cf8d823a41cd0922e5a56cbb878a85e5d34",
+  "adt_profile": "qemu",
+  "gic_windows": {
+    "distributor": "0x08000000:0x10000",
+    "cpu_interface": "0x08010000:0x10000"
+  },
+  "milestones": [
+    "arm_vm_init_entry",
+    "arm_vm_init_return",
+    "kernel_bootstrap_entry",
+    "source_crypto_bootstrap_entry",
+    "source_crypto_bootstrap_return",
+    "iokit_entry",
+    "iokit_return",
+    "bsd_init_entry"
+  ],
+  "bsd_init_entry_observed": true,
+  "stop_symbols": [
+    "_bsd_init"
+  ],
+  "pc_symbol": "_bsd_init+0x0",
+  "system_registers": {
+    "sctlr_el1": "0x3454593d",
+    "cntfrq_el0": "0x124f800",
+    "elr_el1": "0x6fdf74ac",
+    "tcr_el1": "0x22a51a251a",
+    "esr_el1": "0x0",
+    "far_el1": "0x0"
+  },
+  "cpsr": "0x60000204",
+  "watched_from_smp2_run": {
+    "__ZN5gicv210Controller12prepareLocalEj": true,
+    "__ZN5gicv210Controller11enableLocalEv": false,
+    "__ZN6ArmCpu9enableGicEv": false,
+    "__ZN6ArmCpu7initCPUEb": false,
+    "_fleh_irq": false,
+    "_bsd_init": true
+  },
+  "panic": {
+    "observed_at": "_panic",
+    "x0_format_pointer": "0xfffffff0070c55ea",
+    "format": "pthread kernel extension not loaded (function table is NULL). @%s:%d",
+    "reading": "bsd_init calls pthread_init(); it panics unless the pthread kext has called pthread_kext_register() to fill _pthread_functions"
+  },
+  "finding": "A multiprocessor emulated machine gets past the GIC target probe: gicv2::Controller::prepareLocal is reached (it was not with --smp 1), the kernel enters bsd_init -- a milestone this port had never reached -- and then panics with 'pthread kernel extension not loaded (function table is NULL)'. The linked image does contain _pthread_functions, _pthread_kext_register and the pthread kext symbols, so the gap is that the kext never starts and registers, not that it is missing from the link.",
+  "corrected_earlier_reading": "QEMU's hw/intc/arm_gic.c returns 0 for the whole target register range only when num_cpu == 1 ('For uniprocessor GICs these RAZ/WI'); with two or more CPUs it reports cm for the banked SGI/PPI range. The handset GIC is multiprocessor, so the ArmCpu probe is probably correct on hardware: the earlier note that it 'may be wrong on the handset too' was wrong.",
+  "not_proven": [
+    "XNU entry or iOS userland on a handset",
+    "that the pthread kext can be started on this port (its dependencies are unexamined)",
+    "anything about the eMMC, display or GPU on real hardware"
+  ]
+}

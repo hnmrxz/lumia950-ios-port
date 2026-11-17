@@ -95,5 +95,6 @@
     "target": 0,
     "lastError": "4 (InvalidCpuTarget)",
     "registerFailure": "cleared, because fail() clears it and this failure came from fail()"
-  }
+  },
+  "corrected_later": "The note that the ArmCpu CPU-target probe 'may be wrong on the handset too' was wrong. QEMU's hw/intc/arm_gic.c returns zero for the whole target register range only when the machine has one CPU ('For uniprocessor GICs these RAZ/WI'); with --smp 2 it reports the CPU mask and prepareLocal is reached. The handset GIC is multiprocessor, so the probe is probably correct on hardware. See 2026-11-17-local-qemu-bsd-init-panic.json, which also records the later milestone: bsd_init is entered with --smp 2."
 }

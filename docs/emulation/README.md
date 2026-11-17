@@ -122,14 +122,30 @@ lastError                      4        (InvalidCpuTarget)
 ```
 
 So the failing check is the CPU-target probe: it ORs `GICD_ITARGETSR` 0x800..0x81f and rejects a
-zero result. QEMU's GICv2 returns zero there, and per the GICv2 architecture those registers read
-as zero for the banked SGI/PPI range — which means the probe may be wrong on the handset too, not
-only in emulation. That is now the first question to answer: read `GICD_ITARGETSR0` on the phone
-(or from the WOA GIC driver's behaviour) and decide whether ArmCpu should take the target from
-`MPIDR_EL1`/`GICD_TYPER` rather than from those registers.
+zero result. QEMU's `hw/intc/arm_gic.c` returns zero for that whole range **only when the machine
+has one CPU** ("For uniprocessor GICs these RAZ/WI"); with two or more it reports the CPU mask for
+the banked range. The handset GIC is multiprocessor, so the probe is probably right on hardware and
+this was an emulator configuration, not a port bug.
 
-`docs/emulation/2026-11-17-local-qemu-max-cpus-block.json` is the trimmed report, with the source
-citations for each step.
+That is what `--smp` is for. With `--smp 2` the run goes further than any earlier one:
+
+```
+milestones: ... iokit_return, bsd_init_entry
+watched:    prepareLocal hit (it was never reached with --smp 1)
+stop:       _panic
+panic:      "pthread kernel extension not loaded (function table is NULL). @%s:%d"
+```
+
+**The kernel enters `bsd_init`** — the last milestone before a root volume is needed — and then
+panics because the pthread kext never registered its function table. The linked image does contain
+`_pthread_functions`, `_pthread_kext_register` and the kext's symbols, so the gap is startup and
+registration, not the link.
+
+`docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json` is the trimmed report.
+
+The next question: **why the pthread kext does not start.** It is a built-in kext, so either its
+personality never matches in the emulated machine or the port's kext set does not start it before
+`bsd_init` runs.
 
 ## Reading a report
 

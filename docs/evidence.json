@@ -19,17 +19,45 @@
       "what": "LumiaProbe.efi: EL1, 1080x1920 GOP, 47 memory descriptors, 19.2 MHz counter, 2806 MiB conventional",
       "label": "EFI-tested",
       "evidence": [
-        {"label": "source-reviewed", "path": "tools/uefi-probe"},
-        {"label": "EFI-tested", "path": "docs/hardware/2026-10-26-probe-v1.json"}
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "docs/hardware/2026-10-26-probe-v1.json"
+        }
       ]
+    },
+    {
+      "id": "xnu-bsd-init-qemu",
+      "what": "The linked kernel entering bsd_init under QEMU with a multiprocessor emulated machine, then panicking because the pthread kext never registers",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/emulation/README.md"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json"
+        }
+      ],
+      "note": "Run locally on 2026-11-17 with QEMU 11.1.0 and the qemu ADT profile, --smp 2. Emulation only: the report says emulator_only true and handset_boot_observed false. bsd_init is the last milestone before a root volume is required, and the boot after it is a panic, not a boot."
     },
     {
       "id": "efi-handoff",
       "what": "LumiaHandoff.efi: framebuffer writes survive ExitBootServices and the firmware MMU mappings are used",
       "label": "EFI-tested",
       "evidence": [
-        {"label": "source-reviewed", "path": "tools/uefi-probe"},
-        {"label": "EFI-tested", "path": "docs/hardware/2026-10-26-handoff-v1.json"}
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "docs/hardware/2026-10-26-handoff-v1.json"
+        }
       ]
     },
     {
@@ -37,7 +65,10 @@
       "what": "UniXNU.efi draws its menu through the GOP and takes the volume keys. README.md calls this verified; the only record of it is a private, unhashed photograph, so this table stops at source-reviewed until the phase files carry it.",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "payload/EFI/UniXNU/unixnu.toml"}
+        {
+          "label": "source-reviewed",
+          "path": "payload/EFI/UniXNU/unixnu.toml"
+        }
       ]
     },
     {
@@ -45,7 +76,10 @@
       "what": "The eMMC controller driver: card init, clock, bus width and a PIO read",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "drivers/NativeSdhci/NativeSdhci.cpp"}
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeSdhci/NativeSdhci.cpp"
+        }
       ],
       "note": "scripts/test-storage.sh exercises the core on the host, but no run of this repository is recorded, so host-tested is not claimed."
     },
@@ -54,7 +88,10 @@
       "what": "The display controller at rung 1: window map and DSI state, no framebuffer published",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "drivers/NativeMdss/NativeMdss.cpp"}
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeMdss/NativeMdss.cpp"
+        }
       ]
     },
     {
@@ -62,7 +99,10 @@
       "what": "The GPU at rung 1: identity and power domain, no GPU service",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "drivers/NativeAdreno418/NativeAdreno418.cpp"}
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeAdreno418/NativeAdreno418.cpp"
+        }
       ]
     },
     {
@@ -70,7 +110,10 @@
       "what": "The GICv2 interrupt controller and timer path used by ArmCpu",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "drivers/NativeGicV2/GicV2Core.cpp"}
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeGicV2/GicV2Core.cpp"
+        }
       ]
     },
     {
@@ -78,8 +121,14 @@
       "what": "The linked kernel executing under QEMU: arm_vm_init, the source crypto POST (status 0), PE_init_iokit and kernel_bootstrap",
       "label": "QEMU-tested",
       "evidence": [
-        {"label": "source-reviewed", "path": "scripts/test-native-xnu-entry.py"},
-        {"label": "QEMU-tested", "path": "docs/ci/RUNS.md"}
+        {
+          "label": "source-reviewed",
+          "path": "scripts/test-native-xnu-entry.py"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/ci/RUNS.md"
+        }
       ],
       "note": "Run 44003233713, job xnu-entry-qemu. Emulation only: the report itself says emulator_only true and handset_boot_observed false, and a CI step asserts those fields. It is not XNU-entry-tested, which requires the handset."
     },
@@ -88,9 +137,19 @@
       "what": "The linked source kernel: XNU 16.x plus NativeMdss, NativeAdreno418 and NativeLegacyDisplay, prelinked against the pinned 16.7.16 kernelcache",
       "label": "kernel-linked",
       "evidence": [
-        {"label": "source-reviewed", "path": "board.toml"},
-        {"label": "host-tested", "command": "python3 scripts/test-native-bringup.py", "verified_at": "2026-11-16"},
-        {"label": "kernel-linked", "path": "docs/ci/RUNS.md"}
+        {
+          "label": "source-reviewed",
+          "path": "board.toml"
+        },
+        {
+          "label": "host-tested",
+          "command": "python3 scripts/test-native-bringup.py",
+          "verified_at": "2026-11-16"
+        },
+        {
+          "label": "kernel-linked",
+          "path": "docs/ci/RUNS.md"
+        }
       ],
       "note": "Run 43885772410's link check read the symbol table and found the three components. NativeSdhci is excluded with a recorded reason (board.toml [kernel.link_excluded]) and is not claimed."
     },
@@ -99,7 +158,10 @@
       "what": "The ADT sidecar DarwinBoot hands to the kernel, generated from board.toml's bring-up profile",
       "label": "source-reviewed",
       "evidence": [
-        {"label": "source-reviewed", "path": "scripts/make-lumia950-adt.py"}
+        {
+          "label": "source-reviewed",
+          "path": "scripts/make-lumia950-adt.py"
+        }
       ],
       "note": "Generated and checked by scripts/check-adt.py and the validate job; no recorded run."
     }
