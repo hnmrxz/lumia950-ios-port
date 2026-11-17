@@ -251,6 +251,18 @@ On the emulator the log can simply be read out of memory. On a handset it still 
 which is what `docs/decisions/0001-log-transport.md` is about: this is the content that transport
 has to carry.
 
+**A panic is not in there.** Measured on 2026-11-17: with the buffer read at the `_panic`
+breakpoint, and again after letting the panic run for a second and a half, `msgbuf` ends at
+`mbinit: done` and the debug buffer (`_debug_buf_base` .. `_debug_buf_ptr`) stays empty. XNU's
+panic prints to the console, and this machine has no console — the kernel even logs
+"Serial requested, consistent debug disabled or debug boot arg not present, configuring debugging
+over serial" and then finds nothing to talk to. The panic's format string is all that can be
+recovered (the fixture records it as `panic_format`).
+
+That is the argument for P1.1 in one measurement: on the handset a panic is an empty screen, and
+the transport is what turns it back into a message. `--dump-dmesg` also appends the debug buffer when
+a kernel keeps one, and `--panic-settle` exists for those kernels; for this one it buys nothing.
+
 ## Comparing two runs
 
 A kernel change is judged by the difference between two reports, not by one:

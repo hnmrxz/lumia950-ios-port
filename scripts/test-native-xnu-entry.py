@@ -136,6 +136,19 @@ def read_chunked(connection, address, size, chunk=4096):
     return data
 
 
+def read_debug_buffer(connection, names):
+    """The panic output XNU keeps for a debugger: debug_buf_base .. debug_buf_ptr."""
+    if not all(name in names for name in ("_debug_buf_base", "_debug_buf_ptr", "_debug_buf_size")):
+        return ""
+    base = int.from_bytes(read_memory(connection, names["_debug_buf_base"], 8), "little")
+    write = int.from_bytes(read_memory(connection, names["_debug_buf_ptr"], 8), "little")
+    size = int.from_bytes(read_memory(connection, names["_debug_buf_size"], 4), "little")
+    if not base or not write or write < base or size <= 0 or write - base > size:
+        return ""
+    data = read_chunked(connection, base, write - base)
+    return data.split(b"\0")[0].rstrip(b"\0").decode("utf-8", "replace").strip()
+
+
 def receive(connection):
     while True:
         byte = connection.recv(1)
@@ -461,14 +474,34 @@ def run(args):
                         # --past-bsd tolerates a kernel that cannot get past bsd_init; say so in the
                         # report rather than letting the panic look like an emulator fault.
                         report["pthread_providers_missing"] = list(providers_missing)
+                    if args.dump_dmesg and "_panic" in report["stop_symbols"] \
+                            and args.panic_settle > 0:
+                        # A breakpoint at panic() entry happens before a single character of the
+                        # panic is formatted. panic() prints the message, the caller and the stack,
+                        # then halts, so let it run and stop it again afterwards; the buffer read
+                        # below is then the complete record.
+                        connection.sendall(b"c")
+                        time.sleep(args.panic_settle)
+                        connection.sendall(b"\x03")
+                        try:
+                            receive(connection)
+                        except (TimeoutError, ValueError):
+                            pass
                     if args.dump_dmesg:
                         try:
                             dmesg = read_dmesg(connection, names)
                             text = dmesg.pop("text")
+                            # panic() prints to the debug buffer as well as the console; on a
+                            # machine with no console that buffer is the only place the message and
+                            # its caller chain appear. Append whatever it holds.
+                            debug_text = read_debug_buffer(connection, names)
+                            if debug_text:
+                                text += "\n--- debug buffer ---\n" + debug_text
                             (output / "dmesg.txt").write_text(text + "\n")
                             report["dmesg"] = {"magic": hex(dmesg["magic"]), "size": dmesg["size"],
                                                "bufx": dmesg["bufx"], "bufr": dmesg["bufr"],
                                                "chars": len(text),
+                                               "debug_buffer_chars": len(debug_text),
                                                "sha256": hashlib.sha256(text.encode()).hexdigest()}
                         except ValueError as error:
                             report["dmesg"] = f"unreadable: {error}"
@@ -516,6 +549,31 @@ def run(args):
                             report["panic_format"] = raw.split(b"\0")[0].decode("utf-8", "replace")
                         except ValueError as error:
                             report["panic_format"] = f"unreadable: {error}"
+                        # "... @%s:%d" takes the file and the line as the next arguments, and on a
+                        # machine with no console this is the only way to learn the panic site.
+                        found = []
+                        for register in ("x1", "x2", "x3"):
+                            pointer = values.get(register, 0)
+                            if pointer < 0xfffffff000000000:
+                                continue
+                            for _ in range(2):
+                                try:
+                                    raw = read_memory(connection, pointer, 128)
+                                except ValueError:
+                                    break
+                                text = raw.split(b"\0")[0].decode("utf-8", "replace")
+                                if text and text.isprintable() and len(text) > 2:
+                                    found.append(text)
+                                    break
+                                # Some panic call sites pass a pointer to the string pointer.
+                                if len(raw) >= 8:
+                                    pointer = int.from_bytes(raw[:8], "little")
+                                    if pointer < 0xfffffff000000000:
+                                        break
+                                else:
+                                    break
+                        if found:
+                            report["panic_string_args"] = found
                     report["wfe_event_index"] = int.from_bytes(read_memory(connection, names["_arm64_eventi"], 4), "little")
                     report["clock_info_bytes"] = read_memory(connection, names["_gPEClockFrequencyInfo"], 0x58).hex()
                     report["stack_bytes"] = read_memory(connection, values["sp"], 256).hex()
@@ -582,6 +640,12 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--panic-settle", type=float, default=0.0, metavar="SECONDS",
+                        help="when --dump-dmesg stops at a panic, let it print for this long before "
+                             "reading the buffer. Measured at 0 on this kernel: panic output goes to "
+                             "the console, and msgbuf and the debug buffer stay empty, so the delay "
+                             "buys nothing here; it exists for kernels whose panic does reach a "
+                             "buffer")
     parser.add_argument("--dump-dmesg", action="store_true",
                         help="also extract the kernel's own message buffer (msgbuf) at the stop and "
                              "write it to dmesg.txt; on a machine with no console this is the only "

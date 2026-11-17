@@ -182,5 +182,37 @@ class DmesgTests(unittest.TestCase):
         self.assertTrue(all(size <= 4096 for _, size in reads), reads)
 
 
+class DebugBufferTests(unittest.TestCase):
+    """The panic output XNU keeps for a debugger, when it keeps any."""
+
+    def run_with(self, base, write, size, payload):
+        layout = {}
+        for address, value, width in ((0x1000, base, 8), (0x1008, write, 8), (0x1010, size, 4)):
+            layout.update({address + index: byte for index, byte in
+                           enumerate(value.to_bytes(width, "little"))})
+        layout.update({base + index: byte for index, byte in enumerate(payload)})
+        names = {"_debug_buf_base": 0x1000, "_debug_buf_ptr": 0x1008, "_debug_buf_size": 0x1010}
+
+        def fake_read(connection, address, count):
+            return bytes(layout.get(address + index, 0) for index in range(count))
+
+        original = FIXTURE.read_memory
+        FIXTURE.read_memory = fake_read
+        try:
+            return FIXTURE.read_debug_buffer(None, names)
+        finally:
+            FIXTURE.read_memory = original
+
+    def test_an_empty_buffer_yields_nothing(self):
+        self.assertEqual(self.run_with(0x4000, 0x4000, 0x1000, b""), "")
+
+    def test_the_text_between_base_and_pointer_is_returned(self):
+        text = self.run_with(0x4000, 0x4000 + 5, 0x1000, b"panic")
+        self.assertEqual(text, "panic")
+
+    def test_a_buffer_without_symbols_yields_nothing(self):
+        self.assertEqual(FIXTURE.read_debug_buffer(None, {}), "")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -122,5 +122,20 @@
       "the log ends at 'mbinit: done', i.e. inside the BSD start, which is where the pthread panic happens."
     ],
     "why_it_matters": "This is the content the log transport (P1.1) exists to carry. On the emulator it can be read straight out of kernel memory; on a handset it still needs a way out, which is what the GOP-first decision record is about."
+  },
+  "panic_is_not_in_any_buffer": {
+    "_note": "measured 2026-11-17 with --dump-dmesg at the _panic breakpoint and again after --panic-settle 1.5",
+    "msgbuf_end": "mbinit: done [64 MB total pool size, (64/0) split]",
+    "msgbuf_chars_before_and_after": [
+      8976,
+      8973
+    ],
+    "debug_buffer_chars": 0,
+    "console_state": [
+      "Serial requested, consistent debug disabled or debug boot arg not present, configuring debugging over serial",
+      "Initializing serial KDP"
+    ],
+    "reading": "panic() prints to the console. This machine has no console and no serial device in the ADT, so the message reaches neither msgbuf nor the debug buffer. Only the format string survives, which the fixture records as panic_format; with --past-bsd it also records past_bsd_outcome and the stop symbol.",
+    "why_it_matters": "On a handset this is an empty screen. It is the concrete argument for P1.1: the log transport is what makes a panic readable at all."
   }
 }
