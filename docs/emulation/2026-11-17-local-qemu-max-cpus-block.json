@@ -1,0 +1,67 @@
+{
+  "schema": "lumia950-xnu-entry-emulation-v1",
+  "date": "2026-11-17",
+  "host": "Windows 10 x64, QEMU 11.1.0 (TCG), firmware share/edk2-aarch64-code.fd",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "ios_userspace_booted": false,
+  "kernel_sha256": "67763775014f3029b127b426f6ad9cf8d823a41cd0922e5a56cbb878a85e5d34",
+  "adt_profile": "qemu",
+  "gic_windows": {
+    "distributor": "0x08000000:0x10000",
+    "cpu_interface": "0x08010000:0x10000"
+  },
+  "milestones": [
+    "arm_vm_init_entry",
+    "arm_vm_init_return",
+    "kernel_bootstrap_entry",
+    "source_crypto_bootstrap_entry",
+    "source_crypto_bootstrap_return",
+    "iokit_entry",
+    "iokit_return"
+  ],
+  "watched": {
+    "_thread_block": true
+  },
+  "observation_timed_out": true,
+  "stop_symbols": [],
+  "pc_symbol": "_ml_get_speculative_timebase+0x14",
+  "system_registers": {
+    "sctlr_el1": "0x3454593d",
+    "cntfrq_el0": "0x124f800",
+    "elr_el1": "0x6fdf74ac",
+    "tcr_el1": "0x22a51a251a",
+    "esr_el1": "0x0",
+    "far_el1": "0x0"
+  },
+  "cpsr": "0x3c4",
+  "registers": {
+    "pc": "0xfffffff0073ee070",
+    "sp": "0xfffffffbf05dbe40",
+    "x30": "0xfffffff0073eb9ac"
+  },
+  "watch_details": {
+    "_thread_block": {
+      "pc": "0xfffffff0072aa514",
+      "pc_symbol": "_thread_block+0x0",
+      "x30": "0xfffffff007294cc0",
+      "x30_symbol": "_lck_mtx_sleep+0x78"
+    }
+  },
+  "read": {
+    "_max_cpus_initialized": {
+      "hex": "02000000",
+      "u32": 2
+    },
+    "_real_ncpus": {
+      "hex": "01000000",
+      "u32": 1
+    }
+  },
+  "finding": "With the qemu ADT profile the kernel reaches PE_init_iokit, then the bootstrap thread blocks in ml_wait_max_cpus() on max_cpus_lock while the boot CPU goes idle; over the whole run no IRQ or FIQ is ever taken (_fleh_irq and _fleh_fiq are never entered), so nothing can wake it. max_cpus_initialized is 2 while real_ncpus is 1.",
+  "not_proven": [
+    "XNU entry or iOS userland on a handset",
+    "that the block is caused by the CPU count rather than the missing interrupt delivery, or the other way round",
+    "anything about the eMMC, display or GPU on real hardware"
+  ]
+}

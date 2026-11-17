@@ -200,6 +200,23 @@ def run(args):
         # is required: kernel_bootstrap calls bsd_init, and bsd_init never returns to a caller.
         stops["_kernel_bootstrap"] = names["_kernel_bootstrap"]
         stops["_bsd_init"] = names["_bsd_init"]
+    watched = {}
+    if args.watch:
+        # A one-shot "was this code reached?" probe: retire the breakpoint on the first hit so the
+        # run can continue. It answers questions like "is any IRQ delivered at all?" without a
+        # second instrumented build.
+        for name in args.watch:
+            if name not in names:
+                raise ValueError(f"--watch {name} is not a symbol in this kernel")
+            stops[name] = names[name]
+            watched[name] = False
+    watched_by_address = {names[name]: name for name in watched}
+    reads = []
+    for spec in args.read:
+        name, _, size = spec.partition(":")
+        if name not in names:
+            raise ValueError(f"--read {name} is not a symbol in this kernel")
+        reads.append((name, int(size or "8", 0)))
     output = args.output.resolve()
     if output.exists():
         raise ValueError("use a new output directory to preserve earlier evidence")
@@ -295,6 +312,20 @@ def run(args):
                             break
                         values = read_registers(connection)
                         current = values["pc"]
+                        if current in watched_by_address:
+                            name = watched_by_address[current]
+                            watched[name] = True
+                            # Record where it was reached from, so "a thread blocked" can become
+                            # "this call blocked", without a second instrumented build.
+                            details = {"pc": hex(values["pc"]), "x30": hex(values["x30"])}
+                            try:
+                                details["stack"] = read_memory(connection, values["sp"], 256).hex() if values["sp"] else ""
+                            except ValueError:
+                                details["stack"] = ""
+                            report.setdefault("watch_details", {})[name] = details
+                            if request(connection, f"z1,{current:x},4") != b"OK":
+                                raise ValueError("could not retire a watch breakpoint")
+                            continue
                         if current in entries:
                             milestone = entries.pop(current)
                             report[milestone + "_entry_observed"] = True
@@ -338,6 +369,17 @@ def run(args):
                     # Name the code and the faulting instruction's site, so a stop that is not a
                     # breakpoint explains itself in the report instead of only in a log.
                     report["pc_symbol"] = nearest_symbol(names, values["pc"])
+                    if watched:
+                        report["watched"] = watched
+                    if reads:
+                        # Globals the kernel keeps its state in, read at the stop. This is how a
+                        # "blocked on a lock" observation becomes a number.
+                        report["read"] = {}
+                        for name, size in reads:
+                            try:
+                                report["read"][name] = read_memory(connection, names[name], size).hex()
+                            except ValueError as error:
+                                report["read"][name] = f"unreadable: {error}"
                     try:
                         elr = int(report["system_registers"].get("elr_el1", "0"), 16)
                         report["fault_elr_symbol"] = nearest_symbol(names, elr) if elr else None
@@ -403,6 +445,11 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--watch", action="append", default=[], metavar="SYMBOL",
+                        help="record whether this symbol is reached at all (one shot, retired on "
+                             "the first hit); repeatable")
+    parser.add_argument("--read", action="append", default=[], metavar="SYMBOL[:BYTES]",
+                        help="dump the bytes at a symbol when the run stops; repeatable")
     parser.add_argument("--adt-profile",
                         help="regenerate the ADT in the ESP copy from this board.toml profile "
                              "(for example qemu, whose GIC sits at 0x08000000); the staged tree "

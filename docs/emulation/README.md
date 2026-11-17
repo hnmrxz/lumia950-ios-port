@@ -69,20 +69,33 @@ Rules that keep it honest:
 With the bring-up ADT the kernel data-aborted inside `ArmCpu::mapGic()` (ESR `0x96000010`). With
 the qemu profile the same kernel gets past it: the run reaches all seven milestones —
 `arm_vm_init`, `kernel_bootstrap`, the source crypto POST returning 0, `PE_init_iokit` — with
-**no exception** (ESR 0, no stop symbol) and then, instead of a fault, **the boot CPU goes idle**:
+**no exception** (ESR 0, no stop symbol) and then it stops progressing without faulting.
+
+The fixture now has two probes for that situation, and they named the blocker:
 
 ```
-pc            _ml_get_speculative_timebase+0x14
-stack         _processor_idle+0x170 → _idle_thread+0x3c → _Call_continuation+0x40
-gdb           T02 (the fixture's own interrupt at the 240 s deadline)
-bsd_init      never entered
+--watch _thread_block   hit:  pc _thread_block, x30 _lck_mtx_sleep+0x78
+                        stack _ml_wait_max_cpus+0x64 ... _max_cpus_lock
+--watch _fleh_irq       never hit over 45 s
+--watch _fleh_fiq       never hit
+--read  _max_cpus_initialized   = 2
+--read  _real_ncpus             = 1
 ```
 
-So the next blocker is not a fault but a scheduling one: after IOKit the boot CPU runs the idle
-thread and the bootstrap thread does not reach `bsd_init`. The obvious candidate is the timer and
-interrupt path — `ArmCpu` programs the GIC and the timer, and the idle loop waits for an interrupt
-that may never arrive in this machine. That is the next thing to measure: a breakpoint or counter
-on the timer interrupt, and a check of whether the bootstrap thread is runnable at all.
+The bootstrap thread blocks in **`ml_wait_max_cpus()`** on `max_cpus_lock`, the boot CPU runs the
+idle thread (`_processor_idle` → `_idle_thread`), and **no interrupt is delivered at all**, so
+nothing can wake it. `docs/emulation/2026-11-17-local-qemu-max-cpus-block.json` is the trimmed
+report.
+
+Two readings are possible and the next run should separate them:
+
+1. `max_cpus_initialized` (2) will never reach whatever `ml_wait_max_cpus` waits for because the
+   ADT declares one CPU, so the wait is for CPUs that do not exist here;
+2. or the interrupt path never delivers the timer tick that would advance the wait.
+
+Either way the next blocker is the CPU-count and interrupt bring-up, not storage — and both are
+measurable locally: `--read _machine_info`, `--watch _ml_set_max_cpus`, and an interrupt-entry
+watch after the block.
 
 ## Reading a report
 
