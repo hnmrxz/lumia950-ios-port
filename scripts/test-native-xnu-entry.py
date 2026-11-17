@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -45,6 +46,13 @@ def nearest_symbol(names, address):
         if value <= address and (best is None or value > best[1]):
             best = (name, value)
     return None if best is None else f"{best[0]}+{address - best[1]:#x}"
+
+
+def choose_transport(kind):
+    """'unix' where the emulator can share a socket file, 'tcp' where it cannot (Windows)."""
+    if kind == "auto":
+        return "tcp" if os.name == "nt" else "unix"
+    return kind
 
 
 def apply_adt_profile(esp, name):
@@ -204,7 +212,7 @@ def run(args):
         "source_crypto_bootstrap_return_observed": False,
         "iokit_return_observed": False,
         "source_crypto_bootstrap_symbols_present": set(STAGE.contract(original)["source_crypto_symbols"]) == STAGE.CRYPTO_SYMBOLS}
-    with tempfile.TemporaryDirectory(prefix="lumia-xnu-", dir="/tmp") as temporary:
+    with tempfile.TemporaryDirectory(prefix="lumia-xnu-") as temporary:
         directory = Path(temporary)
         esp = directory / "esp"
         shutil.copytree(args.esp, esp)
@@ -217,23 +225,46 @@ def run(args):
         endpoint = directory / "gdb.sock"
         if args.adt_profile:
             report.update(apply_adt_profile(esp, args.adt_profile))
+        transport = choose_transport(args.gdb_transport)
+        port = None
+        if transport == "tcp":
+            # A Windows host has no AF_UNIX for the emulator's GDB chardev here, so the stub is a
+            # loopback TCP server instead. The port is picked from an ephemeral bind.
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.bind(("127.0.0.1", args.gdb_port))
+                port = probe.getsockname()[1]
+            gdb = f"tcp:127.0.0.1:{port}"
+        else:
+            gdb = f"unix:{endpoint},server=on,wait=off"
         command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", "1",
             "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
             "-monitor", "none", "-nic", "none", "-no-reboot", "-device", "ramfb", "-S",
-            "-gdb", f"unix:{endpoint},server=on,wait=off",
+            "-gdb", gdb,
             "-drive", f"if=none,id=boot,format=raw,readonly=on,file=fat:ro:{esp}",
             "-device", "virtio-blk-pci,drive=boot"]
         with (output / "serial.log").open("wb") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
             try:
                 deadline = time.monotonic() + args.timeout
-                while not endpoint.exists():
-                    if process.poll() is not None or time.monotonic() >= deadline:
-                        raise ValueError("QEMU GDB server did not start")
-                    time.sleep(0.1)
-                with socket.socket(socket.AF_UNIX) as connection:
+                if transport == "tcp":
+                    while True:
+                        if process.poll() is not None or time.monotonic() >= deadline:
+                            raise ValueError("QEMU GDB server did not start")
+                        try:
+                            connection = socket.create_connection(("127.0.0.1", port), timeout=1)
+                            break
+                        except OSError:
+                            time.sleep(0.1)
+                else:
+                    while not endpoint.exists():
+                        if process.poll() is not None or time.monotonic() >= deadline:
+                            raise ValueError("QEMU GDB server did not start")
+                        time.sleep(0.1)
+                    connection = socket.socket(socket.AF_UNIX)
+                with connection:
                     connection.settimeout(max(1, deadline - time.monotonic()))
-                    connection.connect(str(endpoint))
+                    if transport == "unix":
+                        connection.connect(str(endpoint))
                     request(connection, "qSupported")
                     for address in sorted(set(stops.values())):
                         if request(connection, f"Z1,{address:x},4") != b"OK":
@@ -367,6 +398,11 @@ def main():
     parser.add_argument("--firmware", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--qemu", default="qemu-system-aarch64")
+    parser.add_argument("--gdb-transport", choices=("auto", "unix", "tcp"), default="auto",
+                        help="how the fixture reaches the emulator's GDB stub (default: unix on "
+                             "POSIX, tcp on Windows)")
+    parser.add_argument("--gdb-port", type=int, default=0,
+                        help="loopback port for the tcp transport; 0 picks a free one")
     parser.add_argument("--adt-profile",
                         help="regenerate the ADT in the ESP copy from this board.toml profile "
                              "(for example qemu, whose GIC sits at 0x08000000); the staged tree "

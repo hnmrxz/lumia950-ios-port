@@ -30,6 +30,26 @@ quietly become a handset claim.
   GIC at the Lumia's SoC windows and QEMU has no device there. That is why the fixture has
   `--adt-profile`.
 
+## Running it locally (no CI, no Mac)
+
+The fixture also runs on a plain Windows host, which is how the measurements below were taken
+while the repository's Actions runs were unavailable:
+
+```powershell
+winget install --id SoftwareFreedomConservancy.QEMU -e
+gh run download <RUN_ID> --repo hnmrxz/lumia950-ios-port -n lumia950-kernel -D out\kernel
+gh run download <RUN_ID> --repo hnmrxz/lumia950-ios-port -n lumia950-stage  -D out\stage
+python scripts\test-native-xnu-entry.py `
+    --kernel "out\kernel\out\lumia950\tree\build\xnu\ios-obj\DEVELOPMENT_ARM64_BCM2837\mach.development.bcm2837.unstripped" `
+    --esp out\stage --firmware "C:\Program Files\qemu\share\edk2-aarch64-code.fd" `
+    --qemu "C:\Program Files\qemu\qemu-system-aarch64.exe" `
+    --output out\local-qemu --timeout 240 --crypto-post --finish-iokit --adt-profile qemu
+```
+
+Windows has no emulator-side unix socket here, so the fixture speaks GDB over loopback TCP
+(`--gdb-transport auto` picks it: tcp on Windows, unix on POSIX). A gate run takes about ten
+seconds on TCG.
+
 ## The qemu ADT profile
 
 `board.toml [payload.adt.profiles.qemu]` keeps the bring-up shape (one CPU, no PSCI conduit, an
@@ -43,6 +63,26 @@ Rules that keep it honest:
 - the fixture regenerates the ADT inside its temporary ESP copy and never writes into the staged
   artifact, and it runs `check-adt.py --profile qemu` on the result;
 - `scripts/test-xnu-entry-adt.py` covers that step without QEMU.
+
+## What the profile changed (local, 2026-11-17)
+
+With the bring-up ADT the kernel data-aborted inside `ArmCpu::mapGic()` (ESR `0x96000010`). With
+the qemu profile the same kernel gets past it: the run reaches all seven milestones —
+`arm_vm_init`, `kernel_bootstrap`, the source crypto POST returning 0, `PE_init_iokit` — with
+**no exception** (ESR 0, no stop symbol) and then, instead of a fault, **the boot CPU goes idle**:
+
+```
+pc            _ml_get_speculative_timebase+0x14
+stack         _processor_idle+0x170 → _idle_thread+0x3c → _Call_continuation+0x40
+gdb           T02 (the fixture's own interrupt at the 240 s deadline)
+bsd_init      never entered
+```
+
+So the next blocker is not a fault but a scheduling one: after IOKit the boot CPU runs the idle
+thread and the bootstrap thread does not reach `bsd_init`. The obvious candidate is the timer and
+interrupt path — `ArmCpu` programs the GIC and the timer, and the idle loop waits for an interrupt
+that may never arrive in this machine. That is the next thing to measure: a breakpoint or counter
+on the timer interrupt, and a check of whether the bootstrap thread is runnable at all.
 
 ## Reading a report
 
@@ -60,6 +100,14 @@ starting from:
 
 ## The next thing to measure
 
-With the qemu profile the run should pass `mapGic`. Whatever it reports next is the next blocker —
-the likely candidate is `vfs_mountroot`, because nothing in the emulated machine is an iOS root
-volume. That measurement is what turns "it boots this far" into a plan.
+The qemu profile answered one question and opened another: `mapGic` is behind us, and the boot CPU
+now idles instead of faulting. What to measure next:
+
+1. whether the timer interrupt is delivered at all in this machine (a breakpoint or a counter read
+   on the interrupt entry path);
+2. whether the bootstrap thread is runnable — `_bsd_init` is never entered, so either the thread is
+   not scheduled or it is blocked before `bsd_init`;
+3. only after that does the root volume question (`vfs_mountroot`) come up, because nothing in the
+   emulated machine is an iOS root volume.
+
+Each of those is a fixture change plus a run, not a hardware question.
