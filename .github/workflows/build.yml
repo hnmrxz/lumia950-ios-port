@@ -944,7 +944,7 @@ jobs:
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
               --output out/xnu-entry-bsd --timeout 240 \
-              --crypto-post --finish-iokit --past-bsd --dump-dmesg --dump-framebuffer --adt-profile qemu --smp 2
+              --crypto-post --finish-iokit --past-bsd --dump-dmesg --dump-framebuffer --dump-boot-args --adt-profile qemu --smp 2
 
       - name: What the emulated boot changed between the two runs
         if: always()

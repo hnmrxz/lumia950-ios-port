@@ -198,6 +198,48 @@ def save_physical_memory(port, address, size, path):
     return path.read_bytes()
 
 
+BOOT_ARGS_SIZE = 0x480
+DARWINBOOT_ARGS = re.compile(r"args=(0x[0-9A-Fa-f]+)")
+
+
+def boot_args_address(serial_log):
+    """DarwinBoot prints the physical address of the boot_args it built."""
+    match = DARWINBOOT_ARGS.search(serial_log)
+    return int(match.group(1), 16) if match else None
+
+
+def decode_boot_args(data):
+    """Decode the arm64 boot_args (pexpert/pexpert/arm64/boot.h at xnu-8796.141.3)."""
+    if len(data) < BOOT_ARGS_SIZE:
+        raise ValueError(f"boot_args needs {BOOT_ARGS_SIZE:#x} bytes, got {len(data):#x}")
+
+    def u16(offset):
+        return int.from_bytes(data[offset:offset + 2], "little")
+
+    def u32(offset):
+        return int.from_bytes(data[offset:offset + 4], "little")
+
+    def u64(offset):
+        return int.from_bytes(data[offset:offset + 8], "little")
+
+    video = {name: u64(0x28 + index * 8) for index, name in enumerate(
+        ("v_baseAddr", "v_display", "v_rowBytes", "v_width", "v_height", "v_depth"))}
+    depth = video["v_depth"] & 0xFF
+    # CommandLine follows deviceTreeLength (0x68 + 4) with no padding: reading it at 0x70 drops
+    # the first four characters, which is how the misspelt "-v" was noticed.
+    command_line = data[0x6C:0x6C + 1024].split(b"\0")[0].decode("utf-8", "replace")
+    return {
+        "Revision": u16(0x00), "Version": u16(0x02),
+        "virtBase": u64(0x08), "physBase": u64(0x10), "memSize": u64(0x18),
+        "topOfKernelData": u64(0x20),
+        "video": {**video, "depth_bits": depth},
+        "machineType": u32(0x58),
+        "deviceTreeP": u64(0x60), "deviceTreeLength": u32(0x68),
+        "commandLine": command_line,
+        "bootFlags": u64(0x470), "memSizeActual": u64(0x478),
+    }
+
+
 def read_chunked(connection, address, size, chunk=4096):
     """Read a large region: the GDB stub refuses a single packet the size of a message buffer."""
     data = b""
@@ -551,6 +593,32 @@ def run(args):
                         # --past-bsd tolerates a kernel that cannot get past bsd_init; say so in the
                         # report rather than letting the panic look like an emulator fault.
                         report["pthread_providers_missing"] = list(providers_missing)
+                    if args.dump_boot_args:
+                        # The hand-off structure DarwinBoot built, read from physical memory: this
+                        # is what the EFI site claims it passed, checked at the XNU boundary.
+                        try:
+                            log.flush()
+                            address = boot_args_address(
+                                (output / "serial.log").read_text(errors="replace"))
+                            if address is None:
+                                raise ValueError("DarwinBoot printed no boot_args address in the "
+                                                 "serial log")
+                            data = save_physical_memory(monitor_port, address, BOOT_ARGS_SIZE,
+                                                        output / "boot-args.bin")
+                            decoded = decode_boot_args(data)
+                            (output / "boot-args.json").write_text(
+                                json.dumps(decoded, indent=2) + "\n")
+                            video = {name: hex(value)
+                                     for name, value in decoded["video"].items()}
+                            report["boot_args"] = {
+                                "address": hex(address),
+                                **{name: hex(value) for name, value in decoded.items()
+                                   if name != "video" and isinstance(value, int)},
+                                "commandLine": decoded["commandLine"],
+                                "video": video,
+                            }
+                        except ValueError as error:
+                            report["boot_args"] = f"unreadable: {error}"
                     if args.dump_dmesg and "_panic" in report["stop_symbols"] \
                             and args.panic_settle > 0:
                         # A breakpoint at panic() entry happens before a single character of the
@@ -759,6 +827,9 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--dump-boot-args", action="store_true",
+                        help="read the boot_args DarwinBoot built from physical memory and decode "
+                             "it (video, memory, command line, device tree), writing boot-args.json")
     parser.add_argument("--dump-framebuffer", action="store_true",
                         help="with --dump-dmesg, also save the screen the kernel adopted as "
                              "framebuffer.ppm (the geometry comes from its initialize_screen line). "

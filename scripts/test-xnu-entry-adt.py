@@ -248,5 +248,49 @@ class ScreenTests(unittest.TestCase):
                                                                           "row_bytes": 2, "bpp": 16})
 
 
+class BootArgsTests(unittest.TestCase):
+    """The hand-off structure DarwinBoot built, decoded from the arm64 boot_args layout."""
+
+    @staticmethod
+    def build(command_line=b"-v cpus=1"):
+        data = bytearray(0x480)
+        data[0x00:0x02] = (2).to_bytes(2, "little")
+        data[0x02:0x04] = (2).to_bytes(2, "little")
+        for offset, value in ((0x08, 0xFFFFFFF007004000), (0x10, 0x48004000),
+                              (0x18, 0x20000000), (0x20, 0x48F6C000)):
+            data[offset:offset + 8] = value.to_bytes(8, "little")
+        for index, value in enumerate((0x6C7A0000, 1, 3200, 800, 600, 32)):
+            offset = 0x28 + index * 8
+            data[offset:offset + 8] = value.to_bytes(8, "little")
+        data[0x60:0x68] = (0xFFFFFFF007F69000).to_bytes(8, "little")
+        data[0x68:0x6C] = (0x2C58).to_bytes(4, "little")
+        data[0x6C:0x6C + len(command_line)] = command_line
+        return bytes(data)
+
+    def test_the_fields_are_decoded(self):
+        decoded = FIXTURE.decode_boot_args(self.build())
+        self.assertEqual(decoded["Revision"], 2)
+        self.assertEqual(decoded["physBase"], 0x48004000)
+        self.assertEqual(decoded["video"]["v_baseAddr"], 0x6C7A0000)
+        self.assertEqual(decoded["video"]["v_rowBytes"], 3200)
+        self.assertEqual(decoded["video"]["depth_bits"], 32)
+        self.assertEqual(decoded["deviceTreeLength"], 0x2C58)
+
+    def test_the_command_line_starts_at_0x6c(self):
+        # Reading it four bytes later drops "-v ", which is exactly the bug this pins.
+        decoded = FIXTURE.decode_boot_args(self.build())
+        self.assertEqual(decoded["commandLine"], "-v cpus=1")
+
+    def test_a_short_buffer_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "boot_args needs"):
+            FIXTURE.decode_boot_args(b"\0" * 16)
+
+    def test_the_address_is_read_from_darwinboots_line(self):
+        log = ("DARWINBOOT: ARM64 va=0xFFFFFFF007004000 pa=0x48004000 args=0x48F68000 "
+               "entry=0x483E8488 owned=0x20000000")
+        self.assertEqual(FIXTURE.boot_args_address(log), 0x48F68000)
+        self.assertIsNone(FIXTURE.boot_args_address("no hand-off here"))
+
+
 if __name__ == "__main__":
     unittest.main()

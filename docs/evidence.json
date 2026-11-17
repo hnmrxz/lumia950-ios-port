@@ -30,6 +30,22 @@
       ]
     },
     {
+      "id": "boot-args-qemu",
+      "what": "The arm64 boot_args DarwinBoot built, decoded from physical memory and cross-checked against the serial log, the kernel log and the staged ADT and menu",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/emulation/README.md"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/emulation/2026-11-17-local-qemu-boot-args.json"
+        }
+      ],
+      "note": "Measured on 2026-11-17 with the fixture. It shows the hand-off structure is what the staged tree asked for; it is not a handset record and does not show that XNU honours the command line."
+    },
+    {
       "id": "boot-screen-qemu",
       "what": "The emulated display as the machine left it: the UniXNU menu, the DarwinBoot verbose lines and the green hand-off bar, read from the framebuffer physical memory",
       "label": "QEMU-tested",

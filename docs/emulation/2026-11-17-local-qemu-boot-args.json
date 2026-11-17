@@ -1,0 +1,39 @@
+{
+  "schema": "lumia950-boot-args-v1",
+  "date": "2026-11-17",
+  "host": "Windows x64, QEMU 11.1.0 (TCG), qemu ADT profile, --smp 2",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "source": "read from physical memory with QEMU's pmemsave, then decoded with the arm64 boot_args layout of pexpert/pexpert/arm64/boot.h at xnu-8796.141.3",
+  "address": "0x48f68000",
+  "revision": "0x2",
+  "version": "0x2",
+  "virtBase": "0xfffffff007004000",
+  "physBase": "0x48004000",
+  "memSize": "0x20000000",
+  "topOfKernelData": "0x48f6c000",
+  "deviceTreeP": "0xfffffff007f69000",
+  "deviceTreeLength": "0x2c58",
+  "commandLine": "-v keepsyms=1 debug=0x100 cpus=1",
+  "video": {
+    "v_baseAddr": "0x6c7a0000",
+    "v_display": "0x1",
+    "v_rowBytes": "0xc80",
+    "v_width": "0x320",
+    "v_height": "0x258",
+    "v_depth": "0x20",
+    "depth_bits": "0x20"
+  },
+  "cross_checks": [
+    "physBase 0x48004000 and virtBase 0xFFFFFFF007004000 match the DARWINBOOT line in the serial log",
+    "video 0x6c7a0000 / 800x600 / row 3200 / 32 bpp matches both that line and the kernel's own initialize_screen record",
+    "deviceTreeLength 0x2c58 is exactly 11352 bytes, the size of the staged kernel.macho.adt that make-lumia950-adt.py produced",
+    "commandLine '-v keepsyms=1 debug=0x100 cpus=1' matches the xnu entry's args in the staged unixnu.toml",
+    "memSize 0x20000000 is the ownership bound the bring-up profile asks for, not the full 0xaf600000 DRAM: DarwinBoot clamped the map as designed"
+  ],
+  "defect_found_and_fixed": "The decoder first read CommandLine at 0x70 and produced 'eepsyms=1 ...': the field starts at 0x6c, right after deviceTreeLength, and reading four bytes late silently drops '-v '. The test suite pins 0x6c now.",
+  "not_proven": [
+    "that a handset hands over the same structure (nothing has run on one)",
+    "that XNU uses the command line it was given"
+  ]
+}

@@ -226,6 +226,24 @@ starting from:
 | `fault_far` | the address the faulting access touched |
 | `system_registers.esr_el1` | `0x96000010` is a synchronous external abort on a data access |
 
+## The hand-off structure
+
+`--dump-boot-args` reads the `boot_args` DarwinBoot built (its address is in the serial log) with the
+same `pmemsave` path, decodes it with the arm64 layout from `pexpert/pexpert/arm64/boot.h`, and writes
+`boot-args.json`. The first reading cross-checks against three independent records:
+
+| Field | Value | Agrees with |
+|---|---|---|
+| `physBase` / `virtBase` | `0x48004000` / `0xFFFFFFF007004000` | the `DARWINBOOT: ARM64 …` line |
+| video | `0x6c7a0000`, 800×600, row 3200, 32 bpp | that line *and* the kernel's `initialize_screen` |
+| `deviceTreeLength` | `0x2c58` = 11352 | the staged `kernel.macho.adt` size |
+| `commandLine` | `-v keepsyms=1 debug=0x100 cpus=1` | the `xnu` entry's `args` in the staged `unixnu.toml` |
+| `memSize` | `0x20000000` | the ownership bound the bring-up profile asks for, not the full 0xaf600000 DRAM |
+
+One defect came out of writing it down: the decoder first read `CommandLine` at `0x70` and produced
+`eepsyms=1 …` — the field starts at `0x6c`, immediately after `deviceTreeLength`, so reading four
+bytes late silently drops `-v `. `scripts/test-xnu-entry-adt.py` pins the offset now.
+
 ## The screen, as the machine left it
 
 `--dump-framebuffer` (with `--dump-dmesg`) saves what the display controller actually holds. The
