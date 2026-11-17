@@ -37,6 +37,15 @@ def symbols(blob):
     return result
 
 
+def nearest_symbol(names, address):
+    """The symbol an address falls in, as 'name+0xN', or None if it precedes the image."""
+    best = None
+    for name, value in names.items():
+        if value <= address and (best is None or value > best[1]):
+            best = (name, value)
+    return None if best is None else f"{best[0]}+{address - best[1]:#x}"
+
+
 def receive(connection):
     while True:
         byte = connection.recv(1)
@@ -269,6 +278,15 @@ def run(args):
                     report["registers"] = {name: hex(value) for name, value in values.items()}
                     report["system_registers"] = read_system_registers(connection)
                     report["stop_symbols"] = [name for name, address in stops.items() if address == values["pc"]]
+                    # Name the code and the faulting instruction's site, so a stop that is not a
+                    # breakpoint explains itself in the report instead of only in a log.
+                    report["pc_symbol"] = nearest_symbol(names, values["pc"])
+                    try:
+                        elr = int(report["system_registers"].get("elr_el1", "0"), 16)
+                        report["fault_elr_symbol"] = nearest_symbol(names, elr) if elr else None
+                    except ValueError:
+                        report["fault_elr_symbol"] = None
+                    report["fault_far"] = report["system_registers"].get("far_el1")
                     report["wfe_event_index"] = int.from_bytes(read_memory(connection, names["_arm64_eventi"], 4), "little")
                     report["clock_info_bytes"] = read_memory(connection, names["_gPEClockFrequencyInfo"], 0x58).hex()
                     report["stack_bytes"] = read_memory(connection, values["sp"], 256).hex()
