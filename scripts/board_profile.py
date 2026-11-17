@@ -16,7 +16,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-PROFILES = ("bringup", "target")
+PROFILES = ("bringup", "target", "qemu")
 
 
 def fail(message: str):
@@ -24,7 +24,7 @@ def fail(message: str):
     raise SystemExit(1)
 
 
-def resolve_profile(board_path: Path) -> dict:
+def resolve_profile(board_path: Path, profile: str | None = None) -> dict:
     path = Path(board_path)
     if not path.is_file():
         fail(f"{path} is missing; run from the device repository")
@@ -39,7 +39,8 @@ def resolve_profile(board_path: Path) -> dict:
         fail(f"{path} [payload] has no dram_size; the ADT's /memory node needs the figure the "
              "firmware reports, not the marketing one")
 
-    profile = adt.get("profile")
+    if profile is None:
+        profile = adt.get("profile")
     if profile not in PROFILES:
         fail(f"{path} [payload.adt] profile is {profile!r}; the stagers need one of "
              f"{', '.join(PROFILES)} so they cannot disagree about the CPU count")
@@ -57,6 +58,9 @@ def resolve_profile(board_path: Path) -> dict:
         "cpu_regs": values.get("cpu_regs"),
         "psci_method": values.get("psci_method"),
         "owned_memory_size": values.get("owned_memory_size"),
+        # Only an emulated profile names these; the phone's machine has them fixed in the generator.
+        "gic_distributor": values.get("gic_distributor"),
+        "gic_cpu_interface": values.get("gic_cpu_interface"),
     }
     for key in ("cpu_regs", "psci_method"):
         if resolved[key] in (None, ""):
@@ -66,19 +70,19 @@ def resolve_profile(board_path: Path) -> dict:
             resolved[key] = int(resolved[key])
 
     cpus = [part for part in str(resolved["cpu_regs"]).split(",") if part.strip()]
-    if profile == "bringup":
+    if profile in ("bringup", "qemu"):
         # Both conditions are hardware facts this port has not established, and the ADT is what
         # the kernel believes. Claiming either one moves the failure from "one CPU came up" to
-        # "something in the boot chain lied", which is not a debuggable state.
+        # "something in the boot chain lied", which is not a debuggable state. The qemu profile is
+        # the bring-up shape placed on an emulated machine, so the same rules apply to it.
         if len(cpus) != 1:
-            fail(f"{path} [payload.adt.profiles.bringup] lists {len(cpus)} CPUs; no secondary-CPU "
-                 "path has been qualified on this SoC, so the bring-up profile stages the boot "
-                 "CPU alone")
+            fail(f"{path} [payload.adt.profiles.{profile}] lists {len(cpus)} CPUs; no secondary-CPU "
+                 "path has been qualified on this SoC, so this profile stages the boot CPU alone")
         if resolved["psci_method"] != "none":
-            fail(f"{path} [payload.adt.profiles.bringup] sets psci_method "
+            fail(f"{path} [payload.adt.profiles.{profile}] sets psci_method "
                  f"{resolved['psci_method']!r}; no PSCI/HVC conduit has been qualified "
-                 "(docs/native-bringup.md), so the bring-up profile publishes none")
+                 "(docs/native-bringup.md), so this profile publishes none")
         if resolved["owned_memory_size"] is None:
-            fail(f"{path} [payload.adt.profiles.bringup] has no owned_memory_size; DarwinBoot "
+            fail(f"{path} [payload.adt.profiles.{profile}] has no owned_memory_size; DarwinBoot "
                  "needs an ownership bound to clamp the firmware memory map to")
     return resolved

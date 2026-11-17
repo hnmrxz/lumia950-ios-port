@@ -925,11 +925,11 @@ jobs:
               --crypto-post --finish-iokit
 
       - name: How far past IOKit the kernel gets (observation, not a gate)
-        # Measured on run 44001882741: after IOKit returns, the kernel takes a data abort with
-        # ESR_EL1 0x96000010 at a device address, from inside ArmCpu::mapGic(). The ADT points the
-        # GIC at the Lumia's SoC addresses and QEMU's virt machine has no device there, so this is
-        # a property of the emulation rather than of the kernel. The step records the fault; the
-        # gate above is what has to stay green.
+        # The bring-up ADT points the GIC at the Lumia's SoC addresses, and run 44001882741 showed
+        # ArmCpu::mapGic() taking a data abort there because QEMU's virt has no device at those
+        # addresses. board.toml [payload.adt.profiles.qemu] moves the interrupt controller to
+        # 0x08000000 for this copy only, so the run can continue past mapGic and expose the next
+        # blocker. The staged artifact and the handset profile are not touched.
         continue-on-error: true
         run: |
           image=$(find out/kernel -name 'mach.development.bcm2837.unstripped' -print -quit || true)
@@ -938,7 +938,7 @@ jobs:
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
               --output out/xnu-entry-bsd --timeout 240 \
-              --crypto-post --finish-iokit --finish-bsd
+              --crypto-post --finish-iokit --finish-bsd --adt-profile qemu
 
       - name: The report says emulation and nothing more
         if: always()

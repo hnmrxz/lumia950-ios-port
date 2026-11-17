@@ -205,6 +205,11 @@ def adt_command(profile: dict, spec: dict, adt: Path, args: argparse.Namespace) 
     dram_base = args.dram_base if args.dram_base is not None else profile.get("dram_base")
     if dram_base is not None:
         command += ["--dram-base", hex(dram_base)]
+    # Only an emulated profile carries these; on the phone the generator's defaults are the SoC's.
+    if profile.get("gic_distributor"):
+        command += ["--gic-distributor", str(profile["gic_distributor"])]
+    if profile.get("gic_cpu_interface"):
+        command += ["--gic-cpu-interface", str(profile["gic_cpu_interface"])]
     command += ["--unique-chip-id", args.unique_chip_id]
     if args.trustcache:
         command.append("--trust-cache")

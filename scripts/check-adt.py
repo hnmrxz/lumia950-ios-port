@@ -238,6 +238,12 @@ def _check_profile(root: Node, errors: list[str], profile: str) -> None:
         if chosen is not None and chosen.value("darwinboot-memory-size") is None:
             errors.append("/chosen/darwinboot-memory-size is absent in the bring-up profile: "
                           "DarwinBoot has no ownership bound to clamp the firmware map to")
+    elif profile == "qemu":
+        # The emulated profile keeps the bring-up shape: one CPU, no conduit, an ownership bound.
+        if psci is not None:
+            errors.append("/psci is present in the qemu profile, which keeps the bring-up shape")
+        if chosen is not None and chosen.value("darwinboot-memory-size") is None:
+            errors.append("/chosen/darwinboot-memory-size is absent in the qemu profile")
     elif profile == "target":
         if cpus is not None and len(cpus.children) > 1 and psci is None:
             errors.append("/psci is absent in the target profile, which is the only profile that "
@@ -695,7 +701,7 @@ def main() -> int:
     parser.add_argument("--dump", action="store_true", help="print the decoded tree")
     parser.add_argument("--allow-missing-identity", action="store_true",
                         help="downgrade the chip-id/unique-chip-id error to a note")
-    parser.add_argument("--profile", choices=("bringup", "target"),
+    parser.add_argument("--profile", choices=("bringup", "target", "qemu"),
                         help="require the tree to match this board.toml profile; the stagers pass "
                              "the resolved profile so a tree cannot contradict what staged it")
     parser.add_argument("--self-test", action="store_true")

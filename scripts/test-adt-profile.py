@@ -78,6 +78,22 @@ class BoardProfileTests(unittest.TestCase):
         self.assertNotIn("owned_memory_size", adt)
         self.assertIn("bringup", adt["profiles"])
         self.assertIn("target", adt["profiles"])
+        self.assertIn("qemu", adt["profiles"])
+
+    def test_the_qemu_profile_moves_the_interrupt_controller(self):
+        profile = resolve_profile(ROOT / "board.toml", "qemu")
+        self.assertEqual(profile["profile"], "qemu")
+        self.assertEqual(profile["cpu_regs"], "0")
+        self.assertEqual(profile["psci_method"], "none")
+        self.assertEqual(profile["gic_distributor"], "0x08000000:0x10000")
+        self.assertEqual(profile["gic_cpu_interface"], "0x08010000:0x10000")
+
+    def test_the_phone_profiles_leave_the_gic_to_the_generator(self):
+        # The phone's GIC addresses are the generator's defaults; only an emulated profile names
+        # them, so a staged handset tree cannot accidentally get QEMU's addresses.
+        self.assertIsNone(resolve_profile(ROOT / "board.toml", "bringup").get("gic_distributor"))
+        self.assertIsNone(resolve_profile(ROOT / "board.toml", "target").get("gic_cpu_interface"))
+
 
     def test_the_target_profile_still_records_the_madt_topology(self):
         board = (ROOT / "board.toml").read_text().replace('profile = "bringup"',
@@ -153,6 +169,32 @@ class StagerAgreementTests(unittest.TestCase):
         self.assertEqual(native_flags["--cpu-regs"], "0")
         self.assertEqual(native_flags["--psci-method"], "none")
         self.assertEqual(native_flags["--dram-size"], hex(0xAF600000))
+
+    def test_both_stagers_emit_the_gic_windows_for_an_emulated_profile(self):
+        profile = resolve_profile(ROOT / "board.toml", "qemu")
+        spec = STAGE.board_section()
+        with tempfile.TemporaryDirectory() as temporary:
+            staged = STAGE.adt_command(profile, spec, Path(temporary) / "a.adt",
+                                       argparse.Namespace(chip_id=None, dram_base=None,
+                                                          unique_chip_id=CHIP,
+                                                          trustcache=None, data=None))
+            native = NATIVE.adt_command(profile, Path(temporary) / "a.adt", CHIP)
+        staged_flags, native_flags = parse_flags(staged), parse_flags(native)
+        for flags in (staged_flags, native_flags):
+            flags.pop("--output", None)
+            flags.pop("--unique-chip-id", None)
+        self.assertEqual(staged_flags, native_flags)
+        self.assertEqual(native_flags["--gic-distributor"], "0x08000000:0x10000")
+        self.assertEqual(native_flags["--gic-cpu-interface"], "0x08010000:0x10000")
+
+    def test_the_bringup_staging_carries_no_gic_override(self):
+        # A staged handset tree must not get the emulator's addresses by accident.
+        profile = resolve_profile(ROOT / "board.toml", "bringup")
+        with tempfile.TemporaryDirectory() as temporary:
+            command = NATIVE.adt_command(profile, Path(temporary) / "a.adt", CHIP)
+        flags = parse_flags(command)
+        self.assertNotIn("--gic-distributor", flags)
+        self.assertNotIn("--gic-cpu-interface", flags)
 
     def test_stage_kernel_honours_a_chip_id_override_without_duplicating_the_flag(self):
         profile = resolve_profile(ROOT / "board.toml")

@@ -191,6 +191,19 @@ def run(args):
             raise ValueError("expected the explicit non-autoboot bring-up menu")
         config.write_text(text)
         endpoint = directory / "gdb.sock"
+        if args.adt_profile:
+            # The staged tree carries the bring-up ADT. The emulated machine needs the interrupt
+            # controller where it actually put one, so the copy gets that profile; the artifact is
+            # not modified and the handset profile is untouched.
+            profile = STAGE.resolve_profile(STAGE.ROOT / "board.toml", args.adt_profile)
+            adt = esp / "EFI/UniXNU/Payloads/kernel.macho.adt"
+            subprocess.run(STAGE.adt_command(profile, adt, "1122334455667788"),
+                           check=True, cwd=STAGE.ROOT)
+            subprocess.run([sys.executable, str(STAGE.ROOT / "scripts/check-adt.py"), str(adt),
+                            "--profile", args.adt_profile], check=True, cwd=STAGE.ROOT)
+            report["adt_profile"] = args.adt_profile
+            report["gic_windows"] = {"distributor": profile["gic_distributor"],
+                                     "cpu_interface": profile["gic_cpu_interface"]}
         command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", "1",
             "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
             "-monitor", "none", "-nic", "none", "-no-reboot", "-device", "ramfb", "-S",
@@ -341,6 +354,10 @@ def main():
     parser.add_argument("--firmware", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--qemu", default="qemu-system-aarch64")
+    parser.add_argument("--adt-profile",
+                        help="regenerate the ADT in the ESP copy from this board.toml profile "
+                             "(for example qemu, whose GIC sits at 0x08000000); the staged tree "
+                             "itself is left as it was")
     parser.add_argument("--timeout", default=90, type=float)
     parser.add_argument("--finish-vm", action="store_true", help="Also require a real return to the saved VM caller; stop on intervening faults")
     parser.add_argument("--crypto-post", action="store_true", help="After VM, observe the actual source provider return and KERN_SUCCESS status; no overrides")

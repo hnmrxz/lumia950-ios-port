@@ -38,6 +38,11 @@ def adt_command(profile, adt, unique_chip_id):
         command += ["--chip-id", hex(profile["chip_id"])]
     if profile.get("dram_base") is not None:
         command += ["--dram-base", hex(profile["dram_base"])]
+    # Only an emulated profile carries these; on the phone the generator's defaults are the SoC's.
+    if profile.get("gic_distributor"):
+        command += ["--gic-distributor", str(profile["gic_distributor"])]
+    if profile.get("gic_cpu_interface"):
+        command += ["--gic-cpu-interface", str(profile["gic_cpu_interface"])]
     command += ["--unique-chip-id", unique_chip_id]
     return command
 

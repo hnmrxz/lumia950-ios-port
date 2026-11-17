@@ -57,6 +57,18 @@ DRAM_BASE = 0
 TIMEBASE_FREQUENCY = 19_200_000
 GIC_DISTRIBUTOR = (0xF9000000, 0x1000)
 GIC_CPU_INTERFACE = (0xF9002000, 0x1000)
+
+
+def parse_window(value: str) -> tuple[int, int]:
+    """'ADDR:SIZE' in hex or decimal, for a device window the emulated SoC may place elsewhere."""
+    try:
+        address, size = value.replace(",", ":").split(":")
+        window = (int(address, 0), int(size, 0))
+    except ValueError:
+        raise SystemExit(f"--gic window {value!r} is not ADDR:SIZE")
+    if window[0] <= 0 or window[1] <= 0:
+        raise SystemExit(f"--gic window {value!r} has a zero or negative part")
+    return window
 SDHCI_WINDOWS = ((0xF9824900, 0x1A0), (0xF9824000, 0x800))
 SDHCI_INTERRUPTS = (123, 138)
 # The GPU. Qualcomm's msm-3.10 device tree for this SoC (msm8992-gpu.dtsi and
@@ -207,6 +219,8 @@ def build_tree(
     persistent_data: bool = False,
     text_fixups: tuple[str, ...] = (),
     seed: bytes | None = None,
+    gic_distributor: tuple[int, int] = GIC_DISTRIBUTOR,
+    gic_cpu_interface: tuple[int, int] = GIC_CPU_INTERFACE,
 ) -> bytes:
     """Encode the whole tree. Every input is explicit so a test can pin it."""
     if osenvironment not in OSENVIRONMENTS:
@@ -255,6 +269,11 @@ def build_tree(
         placeholders.append(("TrustCache", bytes(16)))
     chosen_children = [node("memory-map", placeholders)]
 
+    # The interrupt controller windows are a parameter because an emulated machine places them
+    # elsewhere: QEMU's virt has a GICv2 distributor at 0x08000000 and its CPU interface at
+    # 0x08010000, and ArmCpu::mapGic() takes a data abort if the ADT points at the Lumia's SoC
+    # addresses there. The default stays the phone's.
+    gic_windows = (gic_distributor, gic_cpu_interface)
     intc = node(
         "intc",
         [
@@ -263,7 +282,7 @@ def build_tree(
             ("AAPL,phandle", u32(1)),
             ("#address-cells", u32(0)),
             ("#interrupt-cells", u32(3)),
-            ("reg", b"".join(u64(address) + u64(size) for address, size in (GIC_DISTRIBUTOR, GIC_CPU_INTERFACE))),
+            ("reg", b"".join(u64(address) + u64(size) for address, size in gic_windows)),
         ],
     )
     sdhci = node(
@@ -364,6 +383,13 @@ def main() -> int:
                         help="32-bit platform identity seed")
     parser.add_argument("--owned-memory-size", type=lambda value: int(value, 0),
                         help="contiguous window request, 256 MiB to 8 GiB in 2 MiB steps")
+    parser.add_argument("--gic-distributor", type=parse_window, default=GIC_DISTRIBUTOR,
+                        metavar="ADDR:SIZE",
+                        help="GIC distributor window (default: the Lumia's %#x)" % GIC_DISTRIBUTOR[0])
+    parser.add_argument("--gic-cpu-interface", type=parse_window, default=GIC_CPU_INTERFACE,
+                        metavar="ADDR:SIZE",
+                        help="GIC CPU interface window (default: the Lumia's %#x)"
+                             % GIC_CPU_INTERFACE[0])
     parser.add_argument("--root-match-volume-uuid", type=uuid.UUID)
     parser.add_argument("--psci-method", choices=["hvc", "smc", "none"], default="hvc")
     parser.add_argument("--osenvironment", choices=OSENVIRONMENTS, default="main")
@@ -414,6 +440,8 @@ def main() -> int:
         trust_cache=args.trust_cache or args.owner_trust_cache,
         persistent_data=args.persistent_data,
         text_fixups=tuple(args.text_fixup),
+        gic_distributor=args.gic_distributor,
+        gic_cpu_interface=args.gic_cpu_interface,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(tree)

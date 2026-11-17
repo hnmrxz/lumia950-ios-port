@@ -173,3 +173,14 @@ owned_memory_size = 0x20000000
 cpu_regs = "0,1,2,3,0x100,0x101"
 psci_method = "hvc"
 owned_memory_size = 0x20000000
+
+# The same single-CPU shape as bring-up, with the interrupt controller where an emulated machine
+# puts it. QEMU's virt has a GICv2 distributor at 0x08000000 and a CPU interface at 0x08010000, and
+# ArmCpu::mapGic() takes a data abort if the ADT names the Lumia's SoC addresses there. This profile
+# exists for scripts/test-native-xnu-entry.py only: it is never staged for the phone.
+[payload.adt.profiles.qemu]
+cpu_regs = "0"
+psci_method = "none"
+owned_memory_size = 0x20000000
+gic_distributor = "0x08000000:0x10000"
+gic_cpu_interface = "0x08010000:0x10000"
