@@ -25,6 +25,7 @@ SELF_CONTAINED = (
     "test-build-manifest.py",
     "test-check-phase.py",
     "test-checkpoints.py",
+    "test-compare-xnu-reports.py",
     "test-doc-references.py",
     "test-evidence.py",
     "test-gpu-tools.py",

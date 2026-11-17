@@ -945,6 +945,20 @@ jobs:
               --output out/xnu-entry-bsd --timeout 240 \
               --crypto-post --finish-iokit --finish-bsd --adt-profile qemu
 
+      - name: What the emulated boot changed between the two runs
+        if: always()
+        # The gate reaches IOKit; the observation asks for bsd_init. Printing the difference makes
+        # the artifact readable without opening two JSON files, and the comparator is the same one a
+        # kernel change is judged with locally.
+        run: |
+          gate=out/xnu-entry/report.json
+          observed=out/xnu-entry-bsd/report.json
+          if [ -f "$gate" ] && [ -f "$observed" ]; then
+            python3 scripts/compare-xnu-reports.py "$gate" "$observed" || true
+          else
+            echo "one of the reports is missing; nothing to compare"
+          fi
+
       - name: The report says emulation and nothing more
         if: always()
         run: |

@@ -202,6 +202,19 @@ starting from:
 | `fault_far` | the address the faulting access touched |
 | `system_registers.esr_el1` | `0x96000010` is a synchronous external abort on a data access |
 
+## Comparing two runs
+
+A kernel change is judged by the difference between two reports, not by one:
+
+```bash
+python3 scripts/compare-xnu-reports.py out/before/report.json out/after/report.json \
+    --require-milestones iokit_return,bsd_init_entry
+```
+
+It prints the milestones gained and lost plus the fields that moved (stop symbol, panic text, ADT
+profile, crypto status), exits 3 when the later run lost a milestone or missed a required one, and
+exits 0 otherwise. The CI job prints the same comparison between its gate and observation runs.
+
 ## The next thing to measure
 
 The qemu profile answered one question and opened another: `mapGic` is behind us, and the boot CPU
