@@ -872,3 +872,78 @@ jobs:
           path: out/stage/**
           if-no-files-found: error
           retention-days: 3
+
+  xnu-entry-qemu:
+    # The kernel job links an image and the prelink merges kexts into it; until this job existed,
+    # nothing had executed it. This runs the real source kernel under QEMU with GDB breakpoints on
+    # real symbols and requires it to reach arm_vm_init, then the source crypto provider, then
+    # PE_init_iokit. Emulation only: it is not a handset boot and does not claim one.
+    needs: [payload, kernel, stage, efi-preflight]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'both'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-kernel
+          path: out/kernel
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-stage
+          path: out/stage
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install QEMU and the AArch64 UEFI firmware
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-arm qemu-efi-aarch64
+          firmware=$(ls /usr/share/AAVMF/AAVMF_CODE.fd /usr/share/qemu-efi-aarch64/QEMU_EFI.fd 2>/dev/null | head -1 || true)
+          [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware found"; exit 1; }
+          echo "LUMIA_AAVMF=$firmware" >> "$GITHUB_ENV"
+          qemu-system-aarch64 --version
+
+      - name: The real kernel executes to arm_vm_init in QEMU
+        # --crypto-post and --finish-iokit are the fixture's strongest assertions: the source
+        # crypto provider has to return KERN_SUCCESS after VM setup, and IOKit has to initialize
+        # after it. They are what "the kernel boots" means here.
+        run: |
+          image=$(find out/kernel -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          [ -n "$image" ] || { echo "::error::the kernel artifact has no unstripped source kernel"; exit 1; }
+          config=$(find out/stage -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
+          [ -n "$config" ] || { echo "::error::the stage artifact has no menu configuration"; exit 1; }
+          esp=${config%/EFI/UniXNU/unixnu.toml}
+          python3 scripts/test-native-xnu-entry.py \
+              --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
+              --output out/xnu-entry --timeout 240 --crypto-post --finish-iokit
+
+      - name: The report says emulation and nothing more
+        if: always()
+        run: |
+          if [ -f out/xnu-entry/report.json ]; then
+            python3 - <<'PY'
+          import json
+          report = json.load(open("out/xnu-entry/report.json"))
+          assert report["emulator_only"] is True
+          assert report["handset_boot_observed"] is False
+          assert report["ios_userspace_booted"] is False
+          print("milestones:", report.get("milestones"))
+          print("stop symbols:", report.get("stop_symbols"))
+          PY
+          else
+            echo "no report.json; the serial log is the evidence"
+            tail -40 out/xnu-entry/serial.log || true
+          fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: lumia950-xnu-entry
+          path: out/xnu-entry/**
+          if-no-files-found: warn
+          retention-days: 7
