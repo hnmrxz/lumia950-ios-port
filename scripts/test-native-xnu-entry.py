@@ -211,6 +211,9 @@ def run(args):
             stops[name] = names[name]
             watched[name] = False
     watched_by_address = {names[name]: name for name in watched}
+    for address in args.break_at:
+        value = int(address, 16)
+        stops[f"@0x{value:x}"] = value
     reads = []
     for spec in args.read:
         name, _, size = spec.partition(":")
@@ -451,6 +454,10 @@ def main():
     parser.add_argument("--watch", action="append", default=[], metavar="SYMBOL",
                         help="record whether this symbol is reached at all (one shot, retired on "
                              "the first hit); repeatable")
+    parser.add_argument("--break-at", action="append", default=[], metavar="ADDRESS",
+                        help="set a breakpoint at a raw kernel virtual address and stop there; "
+                             "the registers in the report then hold the values at that point "
+                             "(for example a function's return value in x0)")
     parser.add_argument("--read", action="append", default=[], metavar="SYMBOL[:BYTES]",
                         help="dump the bytes at a symbol when the run stops; repeatable")
     parser.add_argument("--adt-profile",

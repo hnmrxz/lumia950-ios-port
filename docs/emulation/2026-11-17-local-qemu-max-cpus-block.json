@@ -58,9 +58,9 @@
       "u32": 1
     }
   },
-  "finding": "With the qemu ADT profile the kernel reaches PE_init_iokit and then the bootstrap thread blocks in ml_wait_max_cpus() on max_cpus_lock while the boot CPU idles. The value read at _max_cpus_initialized (2) is not a CPU count: in XNU it is MAX_CPUS_WAIT, the waiter's own state. The loop exits only when ml_set_max_cpus() sets MAX_CPUS_SET, and the caller of that is IOCPUInterruptController in iokit/Kernel/IOCPU.cpp -- so the wait is for the platform interrupt controller to register. That never happens because ArmCpu's GIC bring-up stops inside prepareDistributor(): ArmCpu::start ran, gicv2::Controller::prepareDistributor ran, prepareLocal never did (the || in prepareGic short-circuits on the first false), so enableLocal, enableGic and initCPU never run, no CPU interrupt source exists, and no IRQ or FIQ is ever delivered.",
+  "finding": "The stall is one failed check inside the GIC bring-up. ArmCpu::prepareGic() calls gicv2::Controller::prepareDistributor(); prepareDistributor() returned 0 (read from x0 at its return site), so || short-circuited and prepareLocal(), enableLocal(), enableGic() and initCPU() never ran. With no CPU interrupt source, IOCPUInterruptController never registers, ml_set_max_cpus() is never called, and the bootstrap thread sleeps forever in ml_wait_max_cpus() while the boot CPU idles. No IRQ or FIQ is ever delivered (_fleh_irq and _fleh_fiq are never entered). The controller state at that moment names the check: lastError = 4 = InvalidCpuTarget, bound = 1, distributed = 0, so the failure is the CPU-target probe, which ORs GICD_ITARGETSR 0x800..0x81f and rejects a zero result. QEMU's GICv2 returns zero there, and per the GICv2 architecture those registers are read-as-zero for the banked SGI/PPI range, so the probe may be wrong on the handset too.",
   "not_proven": [
-    "which condition inside prepareDistributor() returns false (its fail/verify helpers are inlined in the kernel build, so no symbol shows it)",
+    "whether the same ITARGETSR read returns zero on the handset, which decides between 'port bug' and 'emulator difference'",
     "XNU entry or iOS userland on a handset",
     "anything about the eMMC, display or GPU on real hardware"
   ],
@@ -68,6 +68,7 @@
     "ArmCpu::start": true,
     "ArmCpu::prepareGic": true,
     "gicv2::Controller::prepareDistributor": true,
+    "prepareDistributor returned": 0,
     "gicv2::Controller::prepareLocal": false,
     "gicv2::Controller::enableLocal": false,
     "ArmCpu::enableGic": false,
@@ -76,8 +77,23 @@
     "_fleh_fiq": false
   },
   "sources": {
-    "ml_wait_max_cpus": "osfmk/arm/machine_routines_common.c at xnu-8796.141.3 (1b191cb58250d0705d8a51287127505aa4bc0789): the loop is while (max_cpus_initialized != MAX_CPUS_SET), with MAX_CPUS_SET 0x1 and MAX_CPUS_WAIT 0x2",
+    "ml_wait_max_cpus": "osfmk/arm/machine_routines_common.c at xnu-8796.141.3 (1b191cb58250d0705d8a51287127505aa4bc0789): the loop is while (max_cpus_initialized != MAX_CPUS_SET), MAX_CPUS_SET 0x1, MAX_CPUS_WAIT 0x2",
     "ml_set_max_cpus_caller": "iokit/Kernel/IOCPU.cpp: IOCPUInterruptController calls ml_set_max_cpus(numSources)",
-    "prepare_gic": "drivers/NativeGicV2/ArmCpu.patch: the GICv2 branch is mapGic -> prepareDistributor -> prepareLocal, and ArmCpu::start calls enableLocal afterwards"
+    "prepare_gic": "drivers/NativeGicV2/ArmCpu.patch: the GICv2 branch is mapGic -> prepareDistributor -> prepareLocal, and ArmCpu::start calls enableLocal afterwards",
+    "cpu_target_probe": "drivers/NativeGicV2/GicV2Core.cpp prepareDistributor(): for (offset = 0x800; offset < 0x820; offset += 4) targets |= read(...); if (!target || (target & (target - 1))) fail(Error::InvalidCpuTarget)"
+  },
+  "controller_state_at_failure": {
+    "_note": "__ZL3gV2, the ArmCpu instance; layout decoded from drivers/NativeGicV2/GicV2Core.h",
+    "distBytes": "0x10000",
+    "interfaceBytes": "0x10000",
+    "interrupts": 288,
+    "interfaceIdentity": "0x2043b",
+    "distributorPeripheralId": "0x2b",
+    "bound": true,
+    "distributed": false,
+    "local": false,
+    "target": 0,
+    "lastError": "4 (InvalidCpuTarget)",
+    "registerFailure": "cleared, because fail() clears it and this failure came from fail()"
   }
 }

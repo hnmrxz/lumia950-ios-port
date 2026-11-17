@@ -109,8 +109,27 @@ citations for each step.
 
 The next question is therefore narrow: **which condition inside `prepareDistributor()` returns
 false.** Its `fail()` and `verify()` helpers are inlined in the kernel build, so they have no
-symbols; the way in is the controller's own state (`__ZL6gGicV2`: `bound`, `distributed`, `target`,
-`lastError`) and the raw GIC registers it read.
+symbols; instead the fixture stops at the instruction after the call (`--break-at`, using the
+return address it captured) and reads the controller's own state from `__ZL3gV2`:
+
+```
+x0 at the return site          0        (prepareDistributor returned false)
+bound                          1
+distributed                    0
+interrupts                     288      (GICD_TYPER)
+distributor PIDR2              0x2b     (GICv2, revision 3)
+lastError                      4        (InvalidCpuTarget)
+```
+
+So the failing check is the CPU-target probe: it ORs `GICD_ITARGETSR` 0x800..0x81f and rejects a
+zero result. QEMU's GICv2 returns zero there, and per the GICv2 architecture those registers read
+as zero for the banked SGI/PPI range — which means the probe may be wrong on the handset too, not
+only in emulation. That is now the first question to answer: read `GICD_ITARGETSR0` on the phone
+(or from the WOA GIC driver's behaviour) and decide whether ArmCpu should take the target from
+`MPIDR_EL1`/`GICD_TYPER` rather than from those registers.
+
+`docs/emulation/2026-11-17-local-qemu-max-cpus-block.json` is the trimmed report, with the source
+citations for each step.
 
 ## Reading a report
 
