@@ -284,10 +284,23 @@ run on a phone.
 What both consumers do with that cell is the same, which is why one zero controls both: the platform
 expert maps `soc_phys + reg[0]` (`pe_identify_machine.c`), and `ArmCpu::mapGic()` maps
 `bus[1] + regions[0]` (`drivers/NativeGicV2/ArmCpu.patch`, where `bus` is `/arm-io/ranges` and
-`regions` is the controller's `reg`). A child's `reg` is therefore an **offset** from that base, and
-this tree's zero is what lets it hold absolute addresses. Making the PE path live would mean a
-`ranges` base plus rewritten child `reg` values — one experiment for a phone, or for the emulator
-with a dedicated ADT profile.
+`regions` is the controller's `reg`). A child's `reg` is therefore an **offset** from that base.
+
+That was measured, not assumed. The `qemu-relative` profile (`ranges[1] = 0x08000000`, GIC windows
+written as offsets 0 and 0x10000) makes `gSocPhys` non-zero and the log says so:
+
+```
+pe_arm_map_interrupt_controller: soc_phys:  0x8000000
+pe_arm_map_interrupt_controller: failed to find the interrupt-controller.
+```
+
+Two things follow. The boot still reaches `bsd_init` with the same milestones, so ArmCpu really does
+add that cell — a non-zero base maps the same controller. And the platform expert stops one step
+later for a different reason: it looks the controller up by
+`SecureDTFindEntry("interrupt-controller", "master")`, i.e. it wants a node whose `interrupt-controller`
+property is the string `"master"`, while this tree publishes a valueless boolean property. That is the
+next thing to try: the property value, and a `device_type = "timer"` node, in the same experimental
+profile.
 
 ## The kernel's own log
 

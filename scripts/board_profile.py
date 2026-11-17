@@ -16,7 +16,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-PROFILES = ("bringup", "target", "qemu")
+PROFILES = ("bringup", "target", "qemu", "qemu-relative")
 
 
 def fail(message: str):
@@ -61,6 +61,7 @@ def resolve_profile(board_path: Path, profile: str | None = None) -> dict:
         # Only an emulated profile names these; the phone's machine has them fixed in the generator.
         "gic_distributor": values.get("gic_distributor"),
         "gic_cpu_interface": values.get("gic_cpu_interface"),
+        "soc_base": values.get("soc_base"),
     }
     for key in ("cpu_regs", "psci_method"):
         if resolved[key] in (None, ""):
@@ -70,7 +71,7 @@ def resolve_profile(board_path: Path, profile: str | None = None) -> dict:
             resolved[key] = int(resolved[key])
 
     cpus = [part for part in str(resolved["cpu_regs"]).split(",") if part.strip()]
-    if profile in ("bringup", "qemu"):
+    if profile in ("bringup", "qemu", "qemu-relative"):
         # Both conditions are hardware facts this port has not established, and the ADT is what
         # the kernel believes. Claiming either one moves the failure from "one CPU came up" to
         # "something in the boot chain lied", which is not a debuggable state. The qemu profile is

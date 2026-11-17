@@ -184,3 +184,16 @@ psci_method = "none"
 owned_memory_size = 0x20000000
 gic_distributor = "0x08000000:0x10000"
 gic_cpu_interface = "0x08010000:0x10000"
+
+# The same tree as qemu, with /arm-io/ranges[1] holding the SoC base and the GIC
+# windows written as offsets from it. It exists to measure whether the platform
+# expert maps the controller itself when gSocPhys is non-zero
+# (pexpert/arm/pe_identify_machine.c); ArmCpu adds the same cell, so the mapping
+# should land on the same address either way.
+[payload.adt.profiles.qemu-relative]
+cpu_regs = "0"
+psci_method = "none"
+owned_memory_size = 0x20000000
+gic_distributor = "0x08000000:0x10000"
+gic_cpu_interface = "0x08010000:0x10000"
+soc_base = 0x08000000

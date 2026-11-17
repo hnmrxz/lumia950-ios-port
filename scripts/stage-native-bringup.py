@@ -43,6 +43,8 @@ def adt_command(profile, adt, unique_chip_id):
         command += ["--gic-distributor", str(profile["gic_distributor"])]
     if profile.get("gic_cpu_interface"):
         command += ["--gic-cpu-interface", str(profile["gic_cpu_interface"])]
+    if profile.get("soc_base"):
+        command += ["--soc-base", hex(profile["soc_base"])]
     command += ["--unique-chip-id", unique_chip_id]
     return command
 

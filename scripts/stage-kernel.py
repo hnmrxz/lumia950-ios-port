@@ -210,6 +210,8 @@ def adt_command(profile: dict, spec: dict, adt: Path, args: argparse.Namespace) 
         command += ["--gic-distributor", str(profile["gic_distributor"])]
     if profile.get("gic_cpu_interface"):
         command += ["--gic-cpu-interface", str(profile["gic_cpu_interface"])]
+    if profile.get("soc_base"):
+        command += ["--soc-base", hex(profile["soc_base"])]
     command += ["--unique-chip-id", args.unique_chip_id]
     if args.trustcache:
         command.append("--trust-cache")

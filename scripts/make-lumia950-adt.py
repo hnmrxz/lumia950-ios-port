@@ -221,6 +221,7 @@ def build_tree(
     seed: bytes | None = None,
     gic_distributor: tuple[int, int] = GIC_DISTRIBUTOR,
     gic_cpu_interface: tuple[int, int] = GIC_CPU_INTERFACE,
+    soc_base: int = 0,
 ) -> bytes:
     """Encode the whole tree. Every input is explicit so a test can pin it."""
     if osenvironment not in OSENVIRONMENTS:
@@ -273,6 +274,13 @@ def build_tree(
     # elsewhere: QEMU's virt has a GICv2 distributor at 0x08000000 and its CPU interface at
     # 0x08010000, and ArmCpu::mapGic() takes a data abort if the ADT points at the Lumia's SoC
     # addresses there. The default stays the phone's.
+    if soc_base:
+        # A child's reg is an offset from /arm-io/ranges[1], so a non-zero base has to be
+        # subtracted from the windows this node publishes.
+        if gic_distributor[0] < soc_base or gic_cpu_interface[0] < soc_base:
+            raise SystemExit(f"--soc-base {soc_base:#x} is above a GIC window")
+        gic_distributor = (gic_distributor[0] - soc_base, gic_distributor[1])
+        gic_cpu_interface = (gic_cpu_interface[0] - soc_base, gic_cpu_interface[1])
     gic_windows = (gic_distributor, gic_cpu_interface)
     intc = node(
         "intc",
@@ -333,7 +341,7 @@ def build_tree(
             ("#size-cells", u32(2)),
             # Identity window over the whole 4 GiB peripheral space. Children
             # use absolute SoC addresses, so an offset is the address.
-            ("ranges", u64(0) + u64(0) + u64(1 << 32)),
+            ("ranges", u64(0) + u64(soc_base) + u64(1 << 32)),
         ],
         [intc, sdhci, kgsl, mdss],
     )
@@ -383,6 +391,10 @@ def main() -> int:
                         help="32-bit platform identity seed")
     parser.add_argument("--owned-memory-size", type=lambda value: int(value, 0),
                         help="contiguous window request, 256 MiB to 8 GiB in 2 MiB steps")
+    parser.add_argument("--soc-base", type=lambda value: int(value, 0), default=0,
+                        help="write this as /arm-io/ranges[1] and publish the GIC windows "
+                             "as offsets from it; the default zero is what lets the tree "
+                             "hold absolute addresses")
     parser.add_argument("--gic-distributor", type=parse_window, default=GIC_DISTRIBUTOR,
                         metavar="ADDR:SIZE",
                         help="GIC distributor window (default: the Lumia's %#x)" % GIC_DISTRIBUTOR[0])
@@ -442,6 +454,7 @@ def main() -> int:
         text_fixups=tuple(args.text_fixup),
         gic_distributor=args.gic_distributor,
         gic_cpu_interface=args.gic_cpu_interface,
+        soc_base=args.soc_base,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(tree)
