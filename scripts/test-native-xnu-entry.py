@@ -261,7 +261,8 @@ def run(args):
                                 raise ValueError("could not retire the return breakpoint")
                             if report["arm_vm_init_return_observed"] and \
                                 (not args.crypto_post or report["source_crypto_bootstrap_return_observed"]) and \
-                                (not args.finish_iokit or report["iokit_return_observed"]):
+                                (not args.finish_iokit or report["iokit_return_observed"]) and \
+                                (not args.finish_bsd or report.get("bsd_init_entry_observed")):
                                 break
                         else:
                             break
