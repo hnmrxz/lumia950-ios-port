@@ -541,7 +541,10 @@ def _check_arm_io(arm_io: Node, errors: list[str], notes: list[str]) -> None:
                              "pe_arm_get_soc_base_phys() returns 0 and the platform expert does not "
                              "map the interrupt controller or timer itself (XNU logs "
                              "'failed to initialize gSocPhys == 0'); children carry absolute "
-                             "addresses and ArmCpu maps them")
+                             "addresses and ArmCpu maps them. Both consumers add this cell to a "
+                             "child's reg (pe_identify_machine.c: soc_phys + reg[0]; "
+                             "ArmCpu mapGic: bus[1] + regions[0]), so a child's reg is an offset "
+                             "from it and the zero here is what makes absolute regs work")
 
     sdhci = next((child for child in arm_io.children
                   if (child.value("compatible") or b"").find(b"qcom,sdhci-msm-v4") >= 0), None)

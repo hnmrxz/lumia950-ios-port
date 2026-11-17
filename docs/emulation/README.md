@@ -281,6 +281,14 @@ Whether the handset needs the PE-level mapping (a `ranges` base with relative ch
 ArmCpu's own is still open: the emulator says the current arrangement boots this far, and nothing has
 run on a phone.
 
+What both consumers do with that cell is the same, which is why one zero controls both: the platform
+expert maps `soc_phys + reg[0]` (`pe_identify_machine.c`), and `ArmCpu::mapGic()` maps
+`bus[1] + regions[0]` (`drivers/NativeGicV2/ArmCpu.patch`, where `bus` is `/arm-io/ranges` and
+`regions` is the controller's `reg`). A child's `reg` is therefore an **offset** from that base, and
+this tree's zero is what lets it hold absolute addresses. Making the PE path live would mean a
+`ranges` base plus rewritten child `reg` values — one experiment for a phone, or for the emulator
+with a dedicated ADT profile.
+
 ## The kernel's own log
 
 A machine with no console still records what happened: XNU's `printf` goes through `msgbuf` as well
