@@ -30,6 +30,22 @@
       ]
     },
     {
+      "id": "kernel-log-qemu",
+      "what": "The kernel's own msgbuf readable under QEMU: the FIPS POST passing, the DarwinBoot framebuffer adopted as the kernel's screen, and one processor registered",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/emulation/README.md"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json"
+        }
+      ],
+      "note": "read with the fixture's --dump-dmesg on 2026-11-17 (8976 characters). This is the content the log transport has to carry on hardware; it does not show that a handset can produce or export it."
+    },
+    {
       "id": "xnu-bsd-init-qemu",
       "what": "The linked kernel entering bsd_init under QEMU with a multiprocessor emulated machine, then panicking because the pthread kext never registers",
       "label": "QEMU-tested",
