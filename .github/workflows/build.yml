@@ -225,6 +225,7 @@ jobs:
           python3 scripts/test-native-bringup.py
           python3 scripts/test-native-install.py
           python3 scripts/test-xnu-entry-flags.py
+          python3 scripts/test-xnu-entry-adt.py
           python3 -m py_compile scripts/test-native-xnu-entry.py
 
       - name: The kernel stage composes with the menu stage

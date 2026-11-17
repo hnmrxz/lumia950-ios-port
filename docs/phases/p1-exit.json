@@ -26,7 +26,7 @@
       "status": "met",
       "path": "docs/ci/RUNS.md",
       "verified_by": "scripts/test-native-xnu-entry.py",
-      "note": "Run 44003233713 (job xnu-entry-qemu): the linked kernel boots through the menu and DarwinBoot under QEMU and reaches arm_vm_init, the source crypto POST (status 0), PE_init_iokit and kernel_bootstrap, with the report archived. Emulation only: emulator_only true, handset_boot_observed false. Past IOKit it faults in ArmCpu::mapGic() because the ADT points the GIC at Lumia addresses QEMU does not emulate; the next step is a QEMU-shaped ADT profile."
+      "note": "Run 44003233713 (job xnu-entry-qemu): the linked kernel boots through the menu and DarwinBoot under QEMU and reaches arm_vm_init, the source crypto POST (status 0), PE_init_iokit and kernel_bootstrap, with the report archived. Emulation only: emulator_only true, handset_boot_observed false. Past IOKit it faults in ArmCpu::mapGic() because the ADT points the GIC at Lumia addresses QEMU does not emulate; board.toml [payload.adt.profiles.qemu] and the fixture's --adt-profile were added for that, and are waiting on a run: every job stopped starting before its first step on 2026-11-17 (docs/ci/RUNS.md)."
     },
     {
       "id": "P1.4",

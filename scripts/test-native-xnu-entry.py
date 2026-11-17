@@ -9,6 +9,7 @@ import shutil
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import time
 import xml.etree.ElementTree as ET
@@ -44,6 +45,29 @@ def nearest_symbol(names, address):
         if value <= address and (best is None or value > best[1]):
             best = (name, value)
     return None if best is None else f"{best[0]}+{address - best[1]:#x}"
+
+
+def apply_adt_profile(esp, name):
+    """Regenerate the ADT inside an ESP *copy* from a board.toml profile.
+
+    The staged artifact carries the bring-up ADT, whose GIC sits at the Lumia's SoC addresses. The
+    emulated machine put its own GICv2 at 0x08000000, so the copy needs the qemu profile -- the
+    artifact and the handset profile are never touched. This runs the profile checker on the result
+    as well, so a profile that produces an invalid tree fails here rather than as a QEMU fault.
+
+    Returns the metadata worth recording in the report.
+    """
+    profile = STAGE.resolve_profile(STAGE.ROOT / "board.toml", name)
+    adt = esp / "EFI/UniXNU/Payloads/kernel.macho.adt"
+    if not adt.exists():
+        raise ValueError(f"{adt} is missing; the ESP is not a staged bring-up tree")
+    subprocess.run(STAGE.adt_command(profile, adt, "1122334455667788"),
+                   check=True, cwd=STAGE.ROOT)
+    subprocess.run([sys.executable, str(STAGE.ROOT / "scripts/check-adt.py"), str(adt),
+                    "--profile", name], check=True, cwd=STAGE.ROOT)
+    return {"adt_profile": name,
+            "gic_windows": {"distributor": profile.get("gic_distributor"),
+                            "cpu_interface": profile.get("gic_cpu_interface")}}
 
 
 def receive(connection):
@@ -192,18 +216,7 @@ def run(args):
         config.write_text(text)
         endpoint = directory / "gdb.sock"
         if args.adt_profile:
-            # The staged tree carries the bring-up ADT. The emulated machine needs the interrupt
-            # controller where it actually put one, so the copy gets that profile; the artifact is
-            # not modified and the handset profile is untouched.
-            profile = STAGE.resolve_profile(STAGE.ROOT / "board.toml", args.adt_profile)
-            adt = esp / "EFI/UniXNU/Payloads/kernel.macho.adt"
-            subprocess.run(STAGE.adt_command(profile, adt, "1122334455667788"),
-                           check=True, cwd=STAGE.ROOT)
-            subprocess.run([sys.executable, str(STAGE.ROOT / "scripts/check-adt.py"), str(adt),
-                            "--profile", args.adt_profile], check=True, cwd=STAGE.ROOT)
-            report["adt_profile"] = args.adt_profile
-            report["gic_windows"] = {"distributor": profile["gic_distributor"],
-                                     "cpu_interface": profile["gic_cpu_interface"]}
+            report.update(apply_adt_profile(esp, args.adt_profile))
         command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", "1",
             "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
             "-monitor", "none", "-nic", "none", "-no-reboot", "-device", "ramfb", "-S",
