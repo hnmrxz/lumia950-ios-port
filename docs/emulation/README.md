@@ -143,9 +143,26 @@ registration, not the link.
 
 `docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json` is the trimmed report.
 
-The next question: **why the pthread kext does not start.** It is a built-in kext, so either its
-personality never matches in the emulated machine or the port's kext set does not start it before
-`bsd_init` runs.
+The next question: **why the pthread kext does not start.** The answer is in the kernel artifact,
+not in the emulator: `out/lumia950/kernel/kernel.json` lists exactly the nine components the
+prelink merged, and the pthread kext is not one of them.
+
+```
+com.apple.AppleFSCompression.AppleFSCompressionTypeZlib  com.apple.driver.AppleEffaceableStorage
+com.apple.filesystems.apfs                              com.apple.iokit.CoreAnalyticsFamily
+com.apple.iokit.IOCryptoAcceleratorFamily                com.apple.iokit.IOStorageFamily
+com.apple.kec.corecrypto                                com.apple.kext.CoreTrust
+com.apple.security.AppleImage4
+```
+
+`board.toml [kernel.prelink] roots` names four of those, and the prelink adds what they declare as
+libraries. The pthread kext is nobody's library dependency, so it is not in the closure, its start
+routine never runs, `pthread_kext_register()` is never called, and `_pthread_functions` stays NULL.
+
+The fix is a `roots` entry, and it cannot be guessed: the component name has to be read from the
+iOS 16.7.16 kernelcache's component list. The kernel build that reads that cache runs on CI macOS,
+which currently does not start, so this is the one item on the critical path that is genuinely
+blocked — the diagnosis is complete, the last step is a one-line board change plus a rebuild.
 
 ## Reading a report
 

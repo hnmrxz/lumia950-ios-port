@@ -47,7 +47,8 @@
     "observed_at": "_panic",
     "x0_format_pointer": "0xfffffff0070c55ea",
     "format": "pthread kernel extension not loaded (function table is NULL). @%s:%d",
-    "reading": "bsd_init calls pthread_init(); it panics unless the pthread kext has called pthread_kext_register() to fill _pthread_functions"
+    "reading": "bsd_init calls pthread_init(); it panics unless the pthread kext has called pthread_kext_register() to fill _pthread_functions",
+    "format_captured_automatically": "The fixture now reads the panic format string from x0 itself and records it as panic_format, so a run explains its own panic without a separate --read-at."
   },
   "finding": "A multiprocessor emulated machine gets past the GIC target probe: gicv2::Controller::prepareLocal is reached (it was not with --smp 1), the kernel enters bsd_init -- a milestone this port had never reached -- and then panics with 'pthread kernel extension not loaded (function table is NULL)'. The linked image does contain _pthread_functions, _pthread_kext_register and the pthread kext symbols, so the gap is that the kext never starts and registers, not that it is missing from the link.",
   "corrected_earlier_reading": "QEMU's hw/intc/arm_gic.c returns 0 for the whole target register range only when num_cpu == 1 ('For uniprocessor GICs these RAZ/WI'); with two or more CPUs it reports cm for the banked SGI/PPI range. The handset GIC is multiprocessor, so the ArmCpu probe is probably correct on hardware: the earlier note that it 'may be wrong on the handset too' was wrong.",
@@ -55,5 +56,22 @@
     "XNU entry or iOS userland on a handset",
     "that the pthread kext can be started on this port (its dependencies are unexamined)",
     "anything about the eMMC, display or GPU on real hardware"
-  ]
+  ],
+  "prelink_closure": {
+    "_note": "from out/lumia950/kernel/kernel.json in the kernel artifact of run 44003233713",
+    "components": [
+      "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
+      "com.apple.driver.AppleEffaceableStorage",
+      "com.apple.filesystems.apfs",
+      "com.apple.iokit.CoreAnalyticsFamily",
+      "com.apple.iokit.IOCryptoAcceleratorFamily",
+      "com.apple.iokit.IOStorageFamily",
+      "com.apple.kec.corecrypto",
+      "com.apple.kext.CoreTrust",
+      "com.apple.security.AppleImage4"
+    ],
+    "pthread_component": null,
+    "reading": "board.toml [kernel.prelink] roots names four kernelcache components; the prelink adds what those declare as libraries. The pthread kext is not a library of any of them, so it is not in the closure, its start routine never runs, pthread_kext_register() is never called, and _pthread_functions stays NULL."
+  },
+  "next_action": "Add the pthread kext to [kernel.prelink] roots. Its kernelcache component name is unknown here and must be read from the iOS 16.7.16 kernelcache's component list, not guessed: the kernel build runs on CI macOS, which currently does not start. The image already contains _pthread_kext_register and _pthread_functions (the xnu shims), so nothing else is missing from the link."
 }

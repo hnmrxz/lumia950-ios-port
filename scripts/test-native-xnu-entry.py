@@ -399,6 +399,14 @@ def run(args):
                     except ValueError:
                         report["fault_elr_symbol"] = None
                     report["fault_far"] = report["system_registers"].get("far_el1")
+                    if "_panic" in report["stop_symbols"]:
+                        # panic(fmt, ...) takes its format string in x0. Reading it makes every
+                        # panic self-describing in the report instead of a symbol name alone.
+                        try:
+                            raw = read_memory(connection, values["x0"], 160)
+                            report["panic_format"] = raw.split(b"\0")[0].decode("utf-8", "replace")
+                        except ValueError as error:
+                            report["panic_format"] = f"unreadable: {error}"
                     report["wfe_event_index"] = int.from_bytes(read_memory(connection, names["_arm64_eventi"], 4), "little")
                     report["clock_info_bytes"] = read_memory(connection, names["_gPEClockFrequencyInfo"], 0x58).hex()
                     report["stack_bytes"] = read_memory(connection, values["sp"], 256).hex()
