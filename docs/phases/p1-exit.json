@@ -23,9 +23,10 @@
       "id": "P1.3",
       "requirement": "The XNU early-boot QEMU fixture runs in CI and archives its report; today scripts/test-native-xnu-entry.py and test-handoff-qemu.py are only py_compile'd.",
       "evidence": "artifact",
-      "status": "open",
+      "status": "met",
+      "path": "docs/ci/RUNS.md",
       "verified_by": "scripts/test-native-xnu-entry.py",
-      "note": "Running it needs a staged tree, which the stage job now produces; the CI step is not written yet."
+      "note": "Run 44003233713 (job xnu-entry-qemu): the linked kernel boots through the menu and DarwinBoot under QEMU and reaches arm_vm_init, the source crypto POST (status 0), PE_init_iokit and kernel_bootstrap, with the report archived. Emulation only: emulator_only true, handset_boot_observed false. Past IOKit it faults in ArmCpu::mapGic() because the ADT points the GIC at Lumia addresses QEMU does not emulate; the next step is a QEMU-shaped ADT profile."
     },
     {
       "id": "P1.4",

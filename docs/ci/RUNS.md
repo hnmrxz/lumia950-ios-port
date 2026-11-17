@@ -15,6 +15,44 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [43891763434](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43891763434) | `2d6cfda` | dispatch `target=both` | all six jobs | success | 11m08s |
 | [43992258242](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43992258242) | `107a506` | push | validate, efi-preflight, gicv2-emulation, installer-windows, kernel | success | 9m20s |
 | [43993637318](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43993637318) | `107a506` | dispatch `target=both` | all seven jobs, including the installer-precondition step in `stage` | success | 7m10s |
+| [44003233713](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/44003233713) | `44930b9` | dispatch `target=both` | all eight jobs, including `xnu-entry-qemu` | success | 10m30s |
+
+The last row is the definitive one. In addition to the three artifacts it is the first run in which
+**the linked kernel was executed**: `xnu-entry-qemu` boots the same run's kernel through the
+firmware menu and DarwinBoot under QEMU and reads its progress with GDB breakpoints on real
+symbols.
+
+## What the emulator run establishes
+
+Gate (`out/xnu-entry/report.json`), all six milestones in order:
+
+```
+arm_vm_init_entry, arm_vm_init_return, source_crypto_bootstrap_entry,
+source_crypto_bootstrap_return, iokit_entry, iokit_return
+```
+
+- the source crypto provider returned with status 0 (KERN_SUCCESS) after VM setup;
+- PE_init_iokit was entered and returned;
+- the architectural counter is 0x124f800 = 19,200,000 Hz, the Lumia device-tree frequency;
+- `wfe_event_index` is 4, as the fixture requires;
+- the last PC is `_kernel_bootstrap_thread+0x224`, i.e. the bootstrap thread is running.
+
+Observation (`out/xnu-entry-bsd/report.json`, `continue-on-error`), seven milestones — the six
+above plus `kernel_bootstrap_entry` — and then:
+
+```
+stop: _fleh_synchronous   pc: _fleh_synchronous+0x0
+fault at: ArmCpu::mapGic()+0x444   far: 0xfffffff0b5c2ffe8   esr_el1: 0x96000010
+```
+
+ESR 0x96000010 is a synchronous external abort on a data access. The ADT points the GIC at the
+Lumia's SoC addresses; QEMU's `virt` machine has no device there, so `ArmCpu::mapGic()` faults as
+soon as it programs the interrupt controller. That is a property of the emulation, not a kernel
+regression — and it is the next thing worth attacking: an ADT profile that maps QEMU's GIC
+(0x08000000) would let the run continue past `mapGic` and expose the next blocker.
+
+The fixture now names the code it stopped in (`pc_symbol`) and the faulting site
+(`fault_elr_symbol`) in the report, so a future run explains itself without reading a log.
 
 The last row is the definitive one: the head commit builds validate, efi-preflight, gicv2-emulation,
 installer-windows, payload, kernel and stage, so all three artifacts come from one commit and one

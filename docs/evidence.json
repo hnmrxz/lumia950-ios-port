@@ -74,6 +74,16 @@
       ]
     },
     {
+      "id": "xnu-early-boot-qemu",
+      "what": "The linked kernel executing under QEMU: arm_vm_init, the source crypto POST (status 0), PE_init_iokit and kernel_bootstrap",
+      "label": "QEMU-tested",
+      "evidence": [
+        {"label": "source-reviewed", "path": "scripts/test-native-xnu-entry.py"},
+        {"label": "QEMU-tested", "path": "docs/ci/RUNS.md"}
+      ],
+      "note": "Run 44003233713, job xnu-entry-qemu. Emulation only: the report itself says emulator_only true and handset_boot_observed false, and a CI step asserts those fields. It is not XNU-entry-tested, which requires the handset."
+    },
+    {
       "id": "source-kernel-image",
       "what": "The linked source kernel: XNU 16.x plus NativeMdss, NativeAdreno418 and NativeLegacyDisplay, prelinked against the pinned 16.7.16 kernelcache",
       "label": "kernel-linked",
