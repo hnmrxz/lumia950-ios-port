@@ -37,6 +37,16 @@ metadata sidecars after creation; verification caught this before any phone
 writes. Keeping the exact original sidecar bytes inside the archive prevents
 macOS from treating them as live metadata while retaining them for recovery.
 
+`--restore BACKUP` is the rollback half: it takes the files from that backup's
+`EFIESP.tar`, refuses unless the archive matches `before.json` byte for byte, and
+writes the original files back. A name the stage would have created but the backup
+does not contain is removed instead, so an install can be undone without leaving
+`EFI/UniXNU` behind. It is a dry run unless `--apply` is given, it uses the same
+measured-volume identity as the install (without the pre-install boot-hash refusal,
+because the volume legitimately carries the installation by then), and it verifies
+every restored file after the write. What it is not is a rehearsal: P2.2 asks for an
+install → boot → restore cycle on the handset, and only the phone can supply that.
+
 `scripts/update-native-bringup.py` updates an **exactly matched previous stage**,
 not an arbitrary existing EFI directory. Both stages must pass the same hashes,
 source-kernel integrity checks and explicit-choice menu contract. Only the

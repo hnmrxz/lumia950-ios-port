@@ -16,7 +16,7 @@
       "requirement": "The real GPT is enumerated read-only and backed up to independent media, and a restore from that backup has been rehearsed once (install -> boot -> restore -> Windows boots again).",
       "evidence": "hardware",
       "status": "open",
-      "note": "The backup half exists in scripts/install-native-bringup.py; there is no --restore and no rehearsal. This is the rollback evidence P2 used to claim without owning the write."
+      "note": "The backup half exists in scripts/install-native-bringup.py, and --restore now puts the recorded EFIESP files back (archive checked against before.json first, install-created files removed, final readback) with host tests on both branches. What is still missing is the rehearsal: install -> boot -> restore -> Windows boots again needs the phone."
     },
     {
       "id": "P2.3",

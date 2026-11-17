@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 import tempfile
 import tarfile
 import time
@@ -181,7 +182,7 @@ def stage_files(stage):
         # A tree staged on a laptop carries the operator's hash, not the run that produced the
         # kernel. That is allowed (the device is a research device) but it must be visible.
         print("warning: this stage carries no build-manifest provenance; the kernel hash is an "
-              "operator claim, not a record of the build that produced it")
+              "operator claim, not a record of the build that produced it", file=sys.stderr)
     result = {}
     for name, expected in manifest["files"].items():
         source = stage / name
@@ -290,6 +291,76 @@ def install(args):
     print("Verified FAT-file installation only. BCD, BootShim, UEFI, Windows and partitions preserved. Disk remains mounted.")
 
 
+def restore(args):
+    """Put the phone's EFIESP files back exactly as the verified backup recorded them.
+
+    The install only ever writes the files a stage names, so the rollback only has to revisit those
+    names: a name that was in the backup is written back from the archive, and one that was not is a
+    file the install created, so it is removed. Anything else on the volume is not touched, and the
+    archive is checked against before.json before a single byte is written.
+    """
+    backup = args.restore.resolve()
+    before_path, archive_path = backup / "before.json", backup / "EFIESP.tar"
+    if not before_path.is_file() or not archive_path.is_file():
+        raise ValueError(f"{backup} is not a backup this installer made: before.json and "
+                         "EFIESP.tar are both required")
+    recorded = json.loads(before_path.read_text())
+    originals = recorded.get("files") or {}
+    if not originals:
+        raise ValueError(f"{before_path} records no files; nothing can be restored from it")
+    # measured_phone, not phone_identity: the rollback runs on a volume that already carries the
+    # installation, so the pre-install boot hashes and the EFI/UniXNU refusal do not apply here.
+    volume, _ = measured_phone(args.volume_uuid, args.partition_uuid)
+    names = stage_files(args.stage.resolve())
+    by_folded = {name.casefold(): name for name in originals}
+    plan = {}
+    for name in names:
+        original = by_folded.get(name.casefold())
+        plan[name] = ({"action": "restore", "bytes": originals[original]["bytes"]}
+                      if original else {"action": "delete"})
+    summary = {"mode": "restore", "apply": args.apply, "phone": volume["DeviceIdentifier"],
+               "backup": str(backup), "plan": plan}
+    if not args.apply:
+        print(json.dumps(summary, indent=2))
+        return
+    with tarfile.open(archive_path, "r:") as archive:
+        for name, entry in plan.items():
+            target = phone_file(name)
+            if entry["action"] == "delete":
+                if target.exists():
+                    target.unlink()
+                continue
+            original = by_folded[name.casefold()]
+            data = archive.extractfile(original).read()
+            if digest(data) != originals[original]["sha256"]:
+                raise ValueError(f"{archive_path} does not match {before_path} for {original}; "
+                                 "the phone is untouched")
+            write_verified(target, data)
+    sync()
+    for name, entry in plan.items():
+        target = phone_file(name)
+        if entry["action"] == "delete":
+            if target.exists():
+                raise ValueError(f"restore left {name} behind")
+            continue
+        if digest(target.read_bytes()) != originals[by_folded[name.casefold()]]["sha256"]:
+            raise ValueError(f"restored {name} does not match the backup")
+    for name in plan:
+        parent = phone_file(name).parent
+        while parent != PHONE and PHONE in parent.parents and parent.is_dir() and \
+                not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+    summary.update(restored=sorted(name for name, entry in plan.items()
+                                   if entry["action"] == "restore"),
+                   removed=sorted(name for name, entry in plan.items()
+                                  if entry["action"] == "delete"),
+                   all_restored_files_match=True)
+    print(json.dumps(summary, indent=2))
+    print("Restored the files this stage replaced; other volume contents were never written by the "
+          "installer and were not touched.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Reversible file-only installer for the measured Lumia; dry-run unless --apply")
     parser.add_argument("--stage", required=True, type=Path)
@@ -305,6 +376,10 @@ def main():
                              "partition GUID, optional but compared when given")
     parser.add_argument("--backup-root", type=Path,
                         help="where the verified backup goes; default: a separate volume")
+    parser.add_argument("--restore", type=Path,
+                        help="roll back to this backup instead of installing: the files are taken "
+                             "from EFIESP.tar, checked against before.json first, and the files the "
+                             "stage would have created are removed")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
 
@@ -328,7 +403,10 @@ def main():
         if args.backup_root is None:
             args.backup_root = BACKUP_VOLUME / "Lumia950-backups"
     try:
-        install(args)
+        if args.restore is not None:
+            restore(args)
+        else:
+            install(args)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"error: {error}\n")
 

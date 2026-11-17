@@ -105,6 +105,54 @@ class NativeInstallTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             INSTALL.install(self.args)
 
+    def test_restore_puts_the_original_files_back(self):
+        # P2.2 asks for a rehearsed rollback; this is the code half, exercised on a fake volume.
+        self.run_install()
+        backup = next(self.args.backup_root.iterdir())
+        self.assertNotEqual(self.contents(self.phone), self.before)
+        restore = argparse.Namespace(stage=self.stage, volume_uuid="expected-volume",
+                                     partition_uuid="expected-partition", restore=backup, apply=True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            INSTALL.restore(restore)
+        self.assertEqual(self.contents(self.phone), self.before)
+
+    def test_restore_dry_run_writes_nothing(self):
+        self.run_install()
+        installed = self.contents(self.phone)
+        backup = next(self.args.backup_root.iterdir())
+        restore = argparse.Namespace(stage=self.stage, volume_uuid="expected-volume",
+                                     partition_uuid="expected-partition", restore=backup, apply=False)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            INSTALL.restore(restore)
+        self.assertEqual(self.contents(self.phone), installed)
+        summary = json.loads(output.getvalue())
+        self.assertEqual(summary["mode"], "restore")
+        self.assertEqual(summary["plan"]["EFI/UniXNU/UniXNU.efi"]["action"], "delete")
+        self.assertEqual(summary["plan"]["EFI/BOOT/BOOTAA64.EFI"]["action"], "restore")
+
+    def test_restore_refuses_an_archive_that_disagrees_with_before_json(self):
+        self.run_install()
+        backup = next(self.args.backup_root.iterdir())
+        with tarfile.open(backup / "EFIESP.tar", "w") as archive:
+            member = tarfile.TarInfo("EFI/boot/BOOTAA64.EFI")
+            data = b"not what before.json recorded"
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+        restore = argparse.Namespace(stage=self.stage, volume_uuid="expected-volume",
+                                     partition_uuid="expected-partition", restore=backup, apply=True)
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            with contextlib.redirect_stdout(io.StringIO()):
+                INSTALL.restore(restore)
+
+    def test_restore_refuses_something_that_is_not_a_backup(self):
+        directory = self.root / "not-a-backup"
+        directory.mkdir()
+        restore = argparse.Namespace(stage=self.stage, volume_uuid="expected-volume",
+                                     partition_uuid="expected-partition", restore=directory, apply=True)
+        with self.assertRaisesRegex(ValueError, "is not a backup this installer made"):
+            INSTALL.restore(restore)
+
     def test_backup_then_menu_replacement_preserves_other_files(self):
         self.run_install()
         backup = next(self.args.backup_root.iterdir())
