@@ -127,6 +127,77 @@ def read_dmesg(connection, names):
             "text": text.rstrip(b"\0").decode("utf-8", "replace")}
 
 
+SCREEN_LINE = re.compile(r"initialize_screen: b=([0-9A-Fa-f]+), w=([0-9A-Fa-f]+), "
+                         r"h=([0-9A-Fa-f]+), r=([0-9A-Fa-f]+), d=([0-9A-Fa-f]+)")
+
+
+def screen_geometry(dmesg_text):
+    """The framebuffer the kernel adopted, from its own initialize_screen line."""
+    for line in dmesg_text.splitlines():
+        match = SCREEN_LINE.search(line)
+        if match:
+            base, width, height, row, depth = (int(value, 16) for value in match.groups())
+            if base and width and height and row:
+                # The kernel logs d=0 when the depth is not set; 32 bpp is what the row width says.
+                return {"base": base, "width": width, "height": height, "row_bytes": row,
+                        "bpp": depth or 32}
+    return None
+
+
+def framebuffer_bytes(connection, geometry):
+    return read_chunked(connection, geometry["base"], geometry["row_bytes"] * geometry["height"],
+                        chunk=32768)
+
+
+def write_ppm(path, data, geometry):
+    """A PPM is enough to look at the screen and needs no image library."""
+    width, height, row, bpp = (geometry["width"], geometry["height"],
+                               geometry["row_bytes"], geometry["bpp"])
+    if bpp != 32:
+        raise ValueError(f"only 32 bpp framebuffers are written, not {bpp}")
+    lines = [f"P6\n{width} {height}\n255\n".encode()]
+    for y in range(height):
+        pixels = data[y * row:y * row + width * 4]
+        lines.append(bytes(component for index in range(0, len(pixels), 4)
+                           for component in (pixels[index + 2], pixels[index + 1], pixels[index])))
+    path.write_bytes(b"".join(lines))
+
+
+def monitor_command(port, command, timeout=10.0):
+    """Send one HMP command to QEMU's monitor and return everything it printed."""
+    with socket.create_connection(("127.0.0.1", port), timeout=timeout) as connection:
+        connection.settimeout(timeout)
+        output = b""
+        deadline = time.monotonic() + timeout
+        while b"(qemu)" not in output and time.monotonic() < deadline:
+            try:
+                chunk = connection.recv(4096)
+            except TimeoutError:
+                break
+            if not chunk:
+                break
+            output += chunk
+        connection.sendall(command.encode() + b"\n")
+        output = b""
+        while b"(qemu)" not in output and time.monotonic() < deadline:
+            try:
+                chunk = connection.recv(4096)
+            except TimeoutError:
+                break
+            if not chunk:
+                break
+            output += chunk
+    return output.decode("utf-8", "replace")
+
+
+def save_physical_memory(port, address, size, path):
+    """QEMU writes the bytes itself: the GDB stub speaks virtual addresses, pmemsave does not."""
+    output = monitor_command(port, f"pmemsave {address:#x} {size} {path}")
+    if not path.exists() or path.stat().st_size != size:
+        raise ValueError(f"pmemsave produced no {size}-byte file: {output.strip()}")
+    return path.read_bytes()
+
+
 def read_chunked(connection, address, size, chunk=4096):
     """Read a large region: the GDB stub refuses a single packet the size of a message buffer."""
     data = b""
@@ -349,9 +420,15 @@ def run(args):
             gdb = f"tcp:127.0.0.1:{port}"
         else:
             gdb = f"unix:{endpoint},server=on,wait=off"
+        # A monitor socket is how physical memory is read (pmemsave): the GDB stub speaks virtual
+        # addresses, and the framebuffer the kernel logs is a physical one.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(("127.0.0.1", 0))
+            monitor_port = probe.getsockname()[1]
         command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", str(args.smp),
             "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
-            "-monitor", "none", "-nic", "none", "-no-reboot", "-device", "ramfb", "-S",
+            "-monitor", f"tcp:127.0.0.1:{monitor_port},server=on,wait=off", "-nic", "none",
+            "-no-reboot", "-device", "ramfb", "-S",
             "-gdb", gdb,
             "-drive", f"if=none,id=boot,format=raw,readonly=on,file=fat:ro:{esp}",
             "-device", "virtio-blk-pci,drive=boot"]
@@ -498,6 +575,48 @@ def run(args):
                             if debug_text:
                                 text += "\n--- debug buffer ---\n" + debug_text
                             (output / "dmesg.txt").write_text(text + "\n")
+                            if args.dump_framebuffer:
+                                # initialize_screen logs the framebuffer's physical base, and the
+                                # GDB stub speaks virtual addresses, so this only works when a
+                                # kernel maps it and logs the mapping. Record the reason instead of
+                                # losing the log over it.
+                                try:
+                                    geometry = screen_geometry(text)
+                                    if geometry is None:
+                                        report["framebuffer"] = ("no initialize_screen line in "
+                                                                 "the kernel log")
+                                    else:
+                                        pixels = save_physical_memory(
+                                            monitor_port, geometry["base"],
+                                            geometry["row_bytes"] * geometry["height"],
+                                            output / "framebuffer.bin")
+                                        write_ppm(output / "framebuffer.ppm", pixels, geometry)
+                                        counts = {}
+                                        for index in range(0, len(pixels) - 3, 4 * 64):
+                                            key = pixels[index:index + 3]
+                                            counts[key] = counts.get(key, 0) + 1
+                                        top = sorted(counts.items(),
+                                                     key=lambda item: -item[1])[:4]
+                                        report["framebuffer"] = {
+                                            "base": hex(geometry["base"]),
+                                            "width": geometry["width"],
+                                            "height": geometry["height"],
+                                            "row_bytes": geometry["row_bytes"],
+                                            "bpp": geometry["bpp"],
+                                            "bytes": len(pixels),
+                                            "sha256": hashlib.sha256(pixels).hexdigest(),
+                                            "top_colours_bgr": [
+                                                {"bgr": colour.hex(), "samples": count}
+                                                for colour, count in top],
+                                        }
+                                except ValueError as error:
+                                    report["framebuffer"] = {
+                                        "geometry": screen_geometry(text),
+                                        "unreadable": str(error),
+                                        "why": "initialize_screen logs a physical base; the GDB "
+                                               "stub reads virtual addresses, so the screen is only "
+                                               "readable once the kernel maps it and logs that",
+                                    }
                             report["dmesg"] = {"magic": hex(dmesg["magic"]), "size": dmesg["size"],
                                                "bufx": dmesg["bufx"], "bufr": dmesg["bufr"],
                                                "chars": len(text),
@@ -640,6 +759,10 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--dump-framebuffer", action="store_true",
+                        help="with --dump-dmesg, also save the screen the kernel adopted as "
+                             "framebuffer.ppm (the geometry comes from its initialize_screen line). "
+                             "This is the surface a framebuffer console would write on")
     parser.add_argument("--panic-settle", type=float, default=0.0, metavar="SECONDS",
                         help="when --dump-dmesg stops at a panic, let it print for this long before "
                              "reading the buffer. Measured at 0 on this kernel: panic output goes to "

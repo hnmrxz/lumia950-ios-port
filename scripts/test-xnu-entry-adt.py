@@ -214,5 +214,39 @@ class DebugBufferTests(unittest.TestCase):
         self.assertEqual(FIXTURE.read_debug_buffer(None, {}), "")
 
 
+class ScreenTests(unittest.TestCase):
+    """The framebuffer geometry comes from the kernel's own initialize_screen line."""
+
+    LINE = "[    7.079863]: initialize_screen: b=6C7A0000, w=00000320, h=00000258, r=00000C80, d=00000000"
+
+    def test_the_geometry_is_read_from_the_log(self):
+        geometry = FIXTURE.screen_geometry(self.LINE)
+        self.assertEqual(geometry["base"], 0x6C7A0000)
+        self.assertEqual(geometry["width"], 800)
+        self.assertEqual(geometry["height"], 600)
+        self.assertEqual(geometry["row_bytes"], 3200)
+        # The kernel logs d=0 when it does not know the depth; the row width implies 32 bpp.
+        self.assertEqual(geometry["bpp"], 32)
+
+    def test_a_log_without_the_line_yields_nothing(self):
+        self.assertIsNone(FIXTURE.screen_geometry("no screen here"))
+
+    def test_a_ppm_swaps_bgr_to_rgb_and_drops_the_row_padding(self):
+        geometry = {"base": 0, "width": 2, "height": 1, "row_bytes": 12, "bpp": 32}
+        pixels = bytes([1, 2, 3, 0, 4, 5, 6, 0, 9, 9, 9, 9])
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "screen.ppm"
+            FIXTURE.write_ppm(path, pixels, geometry)
+            data = path.read_bytes()
+        self.assertTrue(data.startswith(b"P6\n2 1\n255\n"))
+        self.assertEqual(data.split(b"\n", 3)[3], bytes([3, 2, 1, 6, 5, 4]))
+
+    def test_a_non_32bpp_framebuffer_is_refused(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError, "32 bpp"):
+                FIXTURE.write_ppm(pathlib.Path(temporary) / "x.ppm", b"", {"width": 1, "height": 1,
+                                                                          "row_bytes": 2, "bpp": 16})
+
+
 if __name__ == "__main__":
     unittest.main()

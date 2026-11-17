@@ -226,6 +226,24 @@ starting from:
 | `fault_far` | the address the faulting access touched |
 | `system_registers.esr_el1` | `0x96000010` is a synchronous external abort on a data access |
 
+## The screen, as the machine left it
+
+`--dump-framebuffer` (with `--dump-dmesg`) saves what the display controller actually holds. The
+base comes from the kernel's own `initialize_screen` line, which is a **physical** address, so the
+bytes are read with QEMU's monitor (`pmemsave`) rather than through the GDB stub — GDB speaks
+virtual addresses and refuses that page.
+
+The result is `framebuffer.ppm` plus a colour histogram in the report, and the first one looked like
+this (`2026-11-17-qemu-boot-screen.png`):
+
+![The emulated boot screen](2026-11-17-qemu-boot-screen.png)
+
+It shows what the chain really rendered, not what a log claims: the UniXNU menu reading
+"Native Lumia 950", the entries, the DarwinBoot verbose lines, the green bar across the top, and
+"Booting Experimental XNU kernel - no iOS userspace in 1 s". That is also the surface a framebuffer
+console would draw on, and the reason the colour histogram lists `00ff00` (the bar) next to the
+dark background.
+
 ## The kernel's own log
 
 A machine with no console still records what happened: XNU's `printf` goes through `msgbuf` as well

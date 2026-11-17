@@ -30,6 +30,22 @@
       ]
     },
     {
+      "id": "boot-screen-qemu",
+      "what": "The emulated display as the machine left it: the UniXNU menu, the DarwinBoot verbose lines and the green hand-off bar, read from the framebuffer physical memory",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/emulation/README.md"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/emulation/2026-11-17-qemu-boot-screen.png"
+        }
+      ],
+      "note": "Dumped with the fixture on 2026-11-17 (--dump-framebuffer via the QEMU monitor). It shows what the chain rendered before XNU ran; it is not evidence that XNU owns the framebuffer or that a handset renders the same."
+    },
+    {
       "id": "kernel-log-qemu",
       "what": "The kernel's own msgbuf readable under QEMU: the FIPS POST passing, the DarwinBoot framebuffer adopted as the kernel's screen, and one processor registered",
       "label": "QEMU-tested",
