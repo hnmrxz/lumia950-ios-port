@@ -98,5 +98,16 @@ class AdtProfileTests(unittest.TestCase):
         self.assertIsNone(captured["adt_profile"])
 
 
+class BsdProviderTests(unittest.TestCase):
+    def test_a_kernel_without_the_source_pthread_component_is_named(self):
+        # --finish-bsd must refuse with the reason rather than run into the panic.
+        missing = FIXTURE.missing_bsd_providers({"_pthread_functions": 1, "_bsd_init": 2})
+        self.assertEqual(missing, ["_pthread_start", "_source_pthread_bootstrap"])
+
+    def test_a_kernel_with_both_providers_passes(self):
+        names = {"_pthread_start": 1, "_source_pthread_bootstrap": 2, "_bsd_init": 3}
+        self.assertEqual(FIXTURE.missing_bsd_providers(names), [])
+
+
 if __name__ == "__main__":
     unittest.main()

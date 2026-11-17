@@ -48,6 +48,12 @@ def nearest_symbol(names, address):
     return None if best is None else f"{best[0]}+{address - best[1]:#x}"
 
 
+def missing_bsd_providers(names):
+    """The symbols a kernel needs before bsd_init can return, and which one are absent."""
+    return [symbol for symbol in ("_pthread_start", "_source_pthread_bootstrap")
+            if symbol not in names]
+
+
 def choose_transport(kind):
     """'unix' where the emulator can share a socket file, 'tcp' where it cannot (Windows)."""
     if kind == "auto":
@@ -196,6 +202,15 @@ def run(args):
     if args.finish_iokit:
         stops["_PE_init_iokit"] = names["_PE_init_iokit"]
     if args.finish_bsd:
+        # Say why instead of letting the run panic: a kernel without the source pthread component
+        # panics inside bsd_init with "pthread kernel extension not loaded (function table is NULL)".
+        missing = missing_bsd_providers(names)
+        if missing:
+            raise ValueError(
+                f"the kernel has no {', '.join(missing)}: CONFIG_XNU_SOURCE_PTHREAD did not reach "
+                "the link, so bsd_init panics before a root volume is mounted "
+                "(docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json); check it with "
+                "scripts/check-kernel-link.py --config configs/lumia950_defconfig")
         # The BSD subsystem starting is the last thing this port can observe before a root volume
         # is required: kernel_bootstrap calls bsd_init, and bsd_init never returns to a caller.
         stops["_kernel_bootstrap"] = names["_kernel_bootstrap"]
