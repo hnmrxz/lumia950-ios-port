@@ -5,7 +5,7 @@ import importlib.util
 import io
 import hmac
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import shutil
 import tempfile
 import tarfile
@@ -390,10 +390,12 @@ class WindowsBackendTests(NativeInstallTests):
     def test_a_backup_on_the_phone_drive_is_refused(self):
         current = INSTALL.PHONE
         try:
-            INSTALL.PHONE = Path("E:/")
+            # PureWindowsPath: the drive is part of the path, so the rule holds on any host.
+            INSTALL.PHONE = PureWindowsPath("E:/")
             # The real function, not the permissive stub the flow tests install.
-            self.assertFalse(self.real_backup_root_ok(Path("E:/backups"), {}))
-            self.assertTrue(self.real_backup_root_ok(Path("D:/backups"), {}))
+            self.assertFalse(self.real_backup_root_ok(PureWindowsPath("E:/backups"), {}))
+            self.assertTrue(self.real_backup_root_ok(PureWindowsPath("D:/backups"), {}))
+            self.assertFalse(self.real_backup_root_ok(Path("/tmp/backups"), {}))
         finally:
             INSTALL.PHONE = current
 

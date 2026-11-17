@@ -150,7 +150,11 @@ def measured_phone_windows(partition_uuid):
 def backup_root_ok(backup_root, whole):
     """The backup has to survive the phone: a different volume by construction."""
     if HOST == "windows":
-        return backup_root.drive.casefold() != Path(PHONE).drive.casefold()
+        # A path without a drive cannot be shown to be a different volume, so it is refused
+        # rather than guessed at.
+        backup_drive = (backup_root.drive or "").casefold()
+        phone_drive = (PHONE.drive or "").casefold()
+        return bool(backup_drive) and bool(phone_drive) and backup_drive != phone_drive
     return backup_root.is_relative_to(BACKUP_VOLUME.resolve()) and \
         disk_info(BACKUP_VOLUME)["ParentWholeDisk"] != whole["DeviceIdentifier"]
 
