@@ -82,20 +82,35 @@ The fixture now has two probes for that situation, and they named the blocker:
 --read  _real_ncpus             = 1
 ```
 
-The bootstrap thread blocks in **`ml_wait_max_cpus()`** on `max_cpus_lock`, the boot CPU runs the
-idle thread (`_processor_idle` → `_idle_thread`), and **no interrupt is delivered at all**, so
-nothing can wake it. `docs/emulation/2026-11-17-local-qemu-max-cpus-block.json` is the trimmed
-report.
+The 2 is not a CPU count: in `osfmk/arm/machine_routines_common.c` the loop is
+`while (max_cpus_initialized != MAX_CPUS_SET)` with `MAX_CPUS_SET 0x1` and `MAX_CPUS_WAIT 0x2`, so
+the value says "one thread is asleep waiting". It is woken only by `ml_set_max_cpus()`, whose caller
+is `IOCPUInterruptController` in `iokit/Kernel/IOCPU.cpp` — the wait is for the platform interrupt
+controller to register.
 
-Two readings are possible and the next run should separate them:
+That never happens, and three more watches show why:
 
-1. `max_cpus_initialized` (2) will never reach whatever `ml_wait_max_cpus` waits for because the
-   ADT declares one CPU, so the wait is for CPUs that do not exist here;
-2. or the interrupt path never delivers the timer tick that would advance the wait.
+```
+ArmCpu::start                     hit
+ArmCpu::prepareGic                hit
+gicv2::Controller::prepareDistributor  hit
+gicv2::Controller::prepareLocal   never
+gicv2::Controller::enableLocal    never
+ArmCpu::enableGic / initCPU       never
+```
 
-Either way the next blocker is the CPU-count and interrupt bring-up, not storage — and both are
-measurable locally: `--read _machine_info`, `--watch _ml_set_max_cpus`, and an interrupt-entry
-watch after the block.
+`prepareGic()` is `mapGic -> prepareDistributor -> prepareLocal` (see `drivers/NativeGicV2/ArmCpu.patch`),
+and `||` short-circuits: `prepareDistributor()` returned false, so everything after it — the CPU
+interface, the local IRQ enable, the CPU registration — never ran. No CPU interrupt source exists,
+so no IRQ is ever delivered, so nothing wakes the sleeping thread, and `bsd_init` is never entered.
+
+`docs/emulation/2026-11-17-local-qemu-max-cpus-block.json` is the trimmed report, with the source
+citations for each step.
+
+The next question is therefore narrow: **which condition inside `prepareDistributor()` returns
+false.** Its `fail()` and `verify()` helpers are inlined in the kernel build, so they have no
+symbols; the way in is the controller's own state (`__ZL6gGicV2`: `bound`, `distributed`, `target`,
+`lastError`) and the raw GIC registers it read.
 
 ## Reading a report
 

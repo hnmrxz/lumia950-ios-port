@@ -214,9 +214,10 @@ def run(args):
     reads = []
     for spec in args.read:
         name, _, size = spec.partition(":")
+        name, _, offset = name.partition("+")
         if name not in names:
             raise ValueError(f"--read {name} is not a symbol in this kernel")
-        reads.append((name, int(size or "8", 0)))
+        reads.append((name, int(offset or "0", 0), int(size or "8", 0)))
     output = args.output.resolve()
     if output.exists():
         raise ValueError("use a new output directory to preserve earlier evidence")
@@ -317,7 +318,8 @@ def run(args):
                             watched[name] = True
                             # Record where it was reached from, so "a thread blocked" can become
                             # "this call blocked", without a second instrumented build.
-                            details = {"pc": hex(values["pc"]), "x30": hex(values["x30"])}
+                            details = {"pc": hex(values["pc"]), "x30": hex(values["x30"]),
+                                       "args": [hex(values[f"x{index}"]) for index in range(4)]}
                             try:
                                 details["stack"] = read_memory(connection, values["sp"], 256).hex() if values["sp"] else ""
                             except ValueError:
@@ -375,11 +377,12 @@ def run(args):
                         # Globals the kernel keeps its state in, read at the stop. This is how a
                         # "blocked on a lock" observation becomes a number.
                         report["read"] = {}
-                        for name, size in reads:
+                        for name, offset, size in reads:
                             try:
-                                report["read"][name] = read_memory(connection, names[name], size).hex()
+                                report["read"][f"{name}+{offset:#x}"] = read_memory(
+                                    connection, names[name] + offset, size).hex()
                             except ValueError as error:
-                                report["read"][name] = f"unreadable: {error}"
+                                report["read"][f"{name}+{offset:#x}"] = f"unreadable: {error}"
                     try:
                         elr = int(report["system_registers"].get("elr_el1", "0"), 16)
                         report["fault_elr_symbol"] = nearest_symbol(names, elr) if elr else None

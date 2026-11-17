@@ -58,10 +58,26 @@
       "u32": 1
     }
   },
-  "finding": "With the qemu ADT profile the kernel reaches PE_init_iokit, then the bootstrap thread blocks in ml_wait_max_cpus() on max_cpus_lock while the boot CPU goes idle; over the whole run no IRQ or FIQ is ever taken (_fleh_irq and _fleh_fiq are never entered), so nothing can wake it. max_cpus_initialized is 2 while real_ncpus is 1.",
+  "finding": "With the qemu ADT profile the kernel reaches PE_init_iokit and then the bootstrap thread blocks in ml_wait_max_cpus() on max_cpus_lock while the boot CPU idles. The value read at _max_cpus_initialized (2) is not a CPU count: in XNU it is MAX_CPUS_WAIT, the waiter's own state. The loop exits only when ml_set_max_cpus() sets MAX_CPUS_SET, and the caller of that is IOCPUInterruptController in iokit/Kernel/IOCPU.cpp -- so the wait is for the platform interrupt controller to register. That never happens because ArmCpu's GIC bring-up stops inside prepareDistributor(): ArmCpu::start ran, gicv2::Controller::prepareDistributor ran, prepareLocal never did (the || in prepareGic short-circuits on the first false), so enableLocal, enableGic and initCPU never run, no CPU interrupt source exists, and no IRQ or FIQ is ever delivered.",
   "not_proven": [
+    "which condition inside prepareDistributor() returns false (its fail/verify helpers are inlined in the kernel build, so no symbol shows it)",
     "XNU entry or iOS userland on a handset",
-    "that the block is caused by the CPU count rather than the missing interrupt delivery, or the other way round",
     "anything about the eMMC, display or GPU on real hardware"
-  ]
+  ],
+  "measured_on_2026_11_17": {
+    "ArmCpu::start": true,
+    "ArmCpu::prepareGic": true,
+    "gicv2::Controller::prepareDistributor": true,
+    "gicv2::Controller::prepareLocal": false,
+    "gicv2::Controller::enableLocal": false,
+    "ArmCpu::enableGic": false,
+    "ArmCpu::initCPU": false,
+    "_fleh_irq": false,
+    "_fleh_fiq": false
+  },
+  "sources": {
+    "ml_wait_max_cpus": "osfmk/arm/machine_routines_common.c at xnu-8796.141.3 (1b191cb58250d0705d8a51287127505aa4bc0789): the loop is while (max_cpus_initialized != MAX_CPUS_SET), with MAX_CPUS_SET 0x1 and MAX_CPUS_WAIT 0x2",
+    "ml_set_max_cpus_caller": "iokit/Kernel/IOCPU.cpp: IOCPUInterruptController calls ml_set_max_cpus(numSources)",
+    "prepare_gic": "drivers/NativeGicV2/ArmCpu.patch: the GICv2 branch is mapGic -> prepareDistributor -> prepareLocal, and ArmCpu::start calls enableLocal afterwards"
+  }
 }
