@@ -13,9 +13,13 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [43887531094](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43887531094) | `1c08cab` | dispatch `target=both` | validate, efi-preflight, gicv2-emulation, payload, kernel, **stage** | success | 11m08s |
 | [43890111246](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43890111246) | `2d6cfda` | push | validate, efi-preflight, gicv2-emulation, kernel | success | 8m20s |
 | [43891763434](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43891763434) | `2d6cfda` | dispatch `target=both` | all six jobs | success | 11m08s |
+| [43992258242](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43992258242) | `107a506` | push | validate, efi-preflight, gicv2-emulation, installer-windows, kernel | success | 9m20s |
+| [43993637318](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43993637318) | `107a506` | dispatch `target=both` | all seven jobs, including the installer-precondition step in `stage` | success | 7m10s |
 
 The last row is the definitive one: the head commit builds validate, efi-preflight, gicv2-emulation,
-payload, kernel and stage, so all three artifacts come from one commit and one run.
+installer-windows, payload, kernel and stage, so all three artifacts come from one commit and one
+run, and the `stage` job also proved that the installer accepts that tree (`install preconditions
+ok: 8 files, 15566029 bytes`).
 
 ## What the runs establish
 
@@ -26,6 +30,8 @@ The kernel line (every push to `main`):
   device-identifier scan, the doc-reference scan, the action pins and the reproducibility test;
 - efi-preflight builds `LumiaGpuProbe` and `LumiaGpuPower` and runs the QEMU refusal cases;
 - gicv2-emulation runs the pinned ArmCpu patch preparation and the timer/SGI/SPI fixtures;
+- installer-windows runs the installer suite on a real Windows filesystem, which is where the
+  Windows backend would run for a deployment;
 - the kernel job compiles XNU on macOS, builds the eight archives, links, prelinks against the
   pinned 16.7.16 kernelcache, **reads the symbol table** and writes `out/build-manifest.json`.
 
@@ -35,22 +41,24 @@ The kernel line (every push to `main`):
 - `lumia950-stage`: the deployable tree, 7 files — `BOOTAA64.EFI`, `UniXNU.efi`, the menu, the
   loader, `LumiaGpuPower.efi`, the stripped kernel (15,260,776 B) and its ADT (11,352 B) — with
   `native-bringup.json` naming `build_manifest_sha256`, `build_repo_commit`, the pinned framework
-  ref, `adt_profile` `bringup` and `secondary_cpu_conduit_qualified` false.
+  ref, `adt_profile` `bringup` and `secondary_cpu_conduit_qualified` false. The job then feeds that
+  tree to the installer's own `stage_files()` and gets `8 files, 15566029 bytes` back.
+
+No CI job writes to a phone: a hosted runner has no USB path to one. See README, "部署".
 
 ## Artifact hashes
 
-Run 43891763434 on `2d6cfda` (the head commit; this is the set to deploy from):
+Run 43993637318 on `107a506` (the head commit; deploy from this one):
 
 | Value | SHA-256 |
 |---|---|
-| `native-bringup.json` → `build_manifest_sha256` | `13dfb9c787c6b956d169790141093d7768d015663be314f4bb65c924f8e6b69c` |
-| `native-bringup.json` → `native_kernel_sha256` | `fbdbeac137baf82ebaa90ae02a58550e4fb2d4073b26f477670913d46a11f253` |
-| `native-bringup.json` → `stripped_kernel_sha256` (what the phone would read) | `8850ff3fd0764bff3edd89500717dabf7b290a3da8c180af4c85a1c2a461b660` |
+| `native-bringup.json` → `build_manifest_sha256` | `7351a2bb1844fd26d9a4c3b8c784d56bcfc5877be63b0b6cbf359fe58c06e307` |
+| `native-bringup.json` → `native_kernel_sha256` | `c3b576a45be802c572fb12efeffd332d37c008b86482b8485caa9f0d68be47e9` |
+| `native-bringup.json` → `stripped_kernel_sha256` (what the phone would read) | `c8837797526049f3fd353954f3e1b1ec19b3bdc8c59bf74eb3ab694d9d8cbbfa` |
 | every file in the staged tree | in `native-bringup.json` → `files` |
 
-Run 43887531094 on `1c08cab` produced the same seven-file tree with
-`native_kernel_sha256` `f52d20cb…` and `stripped_kernel_sha256` `7897d486…`; the difference is the
-same class of non-determinism this page measures below.
+Earlier runs on `2d6cfda` and `1c08cab` produced the same seven-file layout with different hashes;
+the difference is the class of non-determinism this page measures below.
 
 The staged tree's `adt_profile` is `bringup`, `adt_dram_size` is `2942304256` (0xAF600000, the
 measured 2806 MiB), `secondary_cpu_conduit_qualified` is false and `handset_boot_observed` is
