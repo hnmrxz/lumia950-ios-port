@@ -67,6 +67,15 @@ UniXNU 主框架是单独的构建依赖：`https://github.com/UniXNU/UniXNU`。
 
 具体门槛见 [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md)，硬件资料见 [docs/HARDWARE-INVENTORY.md](docs/HARDWARE-INVENTORY.md)，路线图见 [docs/PORTING-ROADMAP.md](docs/PORTING-ROADMAP.md)。
 
+离线跑整套宿主测试只有一条命令：
+
+```bash
+python3 scripts/run-tests.py        # 22 个自包含测试；需要镜像/QEMU/抓取源码的 7 个会列出跳因
+python3 scripts/run-tests.py --list # 只看分类
+```
+
+这个脚本是「测试集」的唯一出处：新加 `scripts/test-*.py` 却没分类时 `scripts/test-run-tests.py` 会失败，所以不会被悄悄漏跑。
+
 ## 三种产物：各自的 stager 和 installer
 
 不要把任意一个 artifact 直接放到手机上。三条路径的守卫强度不同，只有第三条带备份和回滚。

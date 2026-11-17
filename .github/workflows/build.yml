@@ -221,11 +221,11 @@ jobs:
         run: python3 scripts/check-payload.py
 
       - name: Validate the source-only native bring-up contract
+        # One runner decides what the suite is, so a new scripts/test-*.py cannot be added and never
+        # run: scripts/test-run-tests.py fails when a test file is in neither list. Tests that need
+        # a built image, QEMU or fetched sources are skipped here and run by their own steps below.
         run: |
-          python3 scripts/test-native-bringup.py
-          python3 scripts/test-native-install.py
-          python3 scripts/test-xnu-entry-flags.py
-          python3 scripts/test-xnu-entry-adt.py
+          python3 scripts/run-tests.py
           python3 -m py_compile scripts/test-native-xnu-entry.py
 
       - name: The kernel stage composes with the menu stage
