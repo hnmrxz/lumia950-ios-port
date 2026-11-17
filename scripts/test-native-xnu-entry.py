@@ -216,26 +216,38 @@ def run(args):
         stops["_source_corecrypto14_bootstrap"] = names["_source_corecrypto14_bootstrap"]
     if args.finish_iokit:
         stops["_PE_init_iokit"] = names["_PE_init_iokit"]
+    if args.past_bsd:
+        args.finish_bsd = True
+    providers_missing = []
     if args.finish_bsd:
         # Say why instead of letting the run panic: a kernel without the source pthread component
         # panics inside bsd_init with "pthread kernel extension not loaded (function table is NULL)".
+        # --past-bsd asks for exactly that observation, so it records the condition instead of
+        # refusing.
         missing = missing_bsd_providers(names)
-        if missing:
+        if missing and not args.past_bsd:
             raise ValueError(
                 f"the kernel has no {', '.join(missing)}: CONFIG_XNU_SOURCE_PTHREAD did not reach "
                 "the link, so bsd_init panics before a root volume is mounted "
                 "(docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json); check it with "
-                "scripts/check-kernel-link.py --config configs/lumia950_defconfig")
+                "scripts/check-kernel-link.py --config configs/lumia950_defconfig, or use "
+                "--past-bsd to observe the panic instead")
+        if missing:
+            providers_missing = list(missing)
         # The BSD subsystem starting is the last thing this port can observe before a root volume
-        # is required: kernel_bootstrap calls bsd_init, and bsd_init never returns to a caller.
+        # is required: kernel_bootstrap calls bsd_init.
         stops["_kernel_bootstrap"] = names["_kernel_bootstrap"]
         stops["_bsd_init"] = names["_bsd_init"]
     watched = {}
-    if args.watch:
+    watch_names = list(args.watch)
+    if args.past_bsd:
+        # After bsd_init, the next thing worth seeing is whether a root volume is even attempted.
+        watch_names.append(checkpoint_symbols()["vfs_mountroot"])
+    if watch_names:
         # A one-shot "was this code reached?" probe: retire the breakpoint on the first hit so the
         # run can continue. It answers questions like "is any IRQ delivered at all?" without a
         # second instrumented build.
-        for name in args.watch:
+        for name in watch_names:
             if name not in names:
                 raise ValueError(f"--watch {name} is not a symbol in this kernel")
             stops[name] = names[name]
@@ -368,15 +380,17 @@ def run(args):
                             report["milestones"].append(milestone + "_entry")
                             if milestone == "arm_vm_init" and not args.finish_vm:
                                 break
-                            if milestone in ("kernel_bootstrap", "bsd_init"):
-                                # Neither returns to a caller this test can observe. The entry
-                                # breakpoint still has to be retired, or resuming re-triggers it
-                                # and the observation loop reads the same PC forever.
+                            if milestone == "kernel_bootstrap":
+                                # The bootstrap thread never returns to a caller this test can
+                                # observe. The entry breakpoint still has to be retired, or resuming
+                                # re-triggers it and the loop reads the same PC forever.
                                 if request(connection, f"z1,{current:x},4") != b"OK":
                                     raise ValueError("could not retire the entry breakpoint")
-                                if milestone == "bsd_init":
-                                    break
                                 continue
+                            if milestone == "bsd_init" and not args.past_bsd:
+                                if request(connection, f"z1,{current:x},4") != b"OK":
+                                    raise ValueError("could not retire the entry breakpoint")
+                                break
                             return_address = values["x30"]
                             report[milestone + "_return_target"] = hex(return_address)
                             returns[return_address] = milestone
@@ -395,7 +409,8 @@ def run(args):
                             if report["arm_vm_init_return_observed"] and \
                                 (not args.crypto_post or report["source_crypto_bootstrap_return_observed"]) and \
                                 (not args.finish_iokit or report["iokit_return_observed"]) and \
-                                (not args.finish_bsd or report.get("bsd_init_entry_observed")):
+                                (not args.finish_bsd or report.get("bsd_init_entry_observed")) and \
+                                (not args.past_bsd or report.get("bsd_init_return_observed")):
                                 break
                         else:
                             break
@@ -405,6 +420,21 @@ def run(args):
                     # Name the code and the faulting instruction's site, so a stop that is not a
                     # breakpoint explains itself in the report instead of only in a log.
                     report["pc_symbol"] = nearest_symbol(names, values["pc"])
+                    if providers_missing:
+                        # --past-bsd tolerates a kernel that cannot get past bsd_init; say so in the
+                        # report rather than letting the panic look like an emulator fault.
+                        report["pthread_providers_missing"] = list(providers_missing)
+                    if args.past_bsd:
+                        # The observation, not a gate: entering bsd_init was the requirement, and
+                        # what happened after it is the result.
+                        if report.get("bsd_init_return_observed"):
+                            report["past_bsd_outcome"] = "returned"
+                        elif "_panic" in report["stop_symbols"]:
+                            report["past_bsd_outcome"] = "panicked"
+                        elif report.get("observation_timed_out"):
+                            report["past_bsd_outcome"] = "timed_out"
+                        else:
+                            report["past_bsd_outcome"] = "stopped"
                     if watched:
                         report["watched"] = watched
                     if reads or args.read_at:
@@ -474,6 +504,11 @@ def run(args):
         raise ValueError(
             f"the kernel did not reach bsd_init: {report.get('stop_symbols') or report['milestones']}; "
             f"see {output}")
+    if args.past_bsd:
+        # This mode is an observation, not a gate: entering bsd_init is the requirement, and what
+        # happened after it is already recorded in past_bsd_outcome.
+        if report.get("past_bsd_outcome") is None:
+            raise ValueError(f"--past-bsd recorded no outcome; see {output}")
     milestone = "returned from arm_vm_init" if args.finish_vm else "reached arm_vm_init entry"
     if args.crypto_post:
         milestone += " and the real source-provider POST/bootstrap"
@@ -481,6 +516,8 @@ def run(args):
         milestone += " and PE_init_iokit"
     if args.finish_bsd:
         milestone += " and bsd_init"
+    if args.past_bsd:
+        milestone += f" (after bsd_init: {report.get('past_bsd_outcome')})"
     print(f"PASS: real source XNU passed clock/WFE/topology setup and {milestone}; {output}")
     print("EMULATION ONLY. Handset boot, iOS userspace and GPU rendering are not proven.")
 
@@ -497,6 +534,11 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--past-bsd", action="store_true",
+                        help="after bsd_init is entered keep observing: record bsd_init_return if it "
+                             "returns, watch _vfs_mountroot, and record the panic and its text if it "
+                             "does not. Implies --finish-bsd and tolerates a kernel without the "
+                             "pthread provider, because observing that panic is the point")
     parser.add_argument("--watch", action="append", default=[], metavar="SYMBOL",
                         help="record whether this symbol is reached at all (one shot, retired on "
                              "the first hit); repeatable")
@@ -524,6 +566,8 @@ def main():
     parser.add_argument("--finish-iokit", action="store_true", help="Also require actual IOKit initialization entry/return after the real crypto POST")
     parser.add_argument("--finish-bsd", action="store_true", help="Also require the kernel to enter bsd_init; that is the last milestone before a root volume is required")
     args = parser.parse_args()
+    if args.past_bsd:
+        args.finish_bsd = True
     if args.finish_bsd:
         args.finish_iokit = True
     if args.finish_iokit:

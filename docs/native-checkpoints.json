@@ -66,6 +66,20 @@
       "proves": "bsd_init was entered: the BSD subsystem is starting, which is the last checkpoint before a root volume is required. It needs the source pthread component registered (CONFIG_XNU_SOURCE_PTHREAD) or it panics on the first thread call.",
       "symbol": "_bsd_init",
       "fixture": "bsd_init_entry"
+    },
+    {
+      "id": "bsd_init_return",
+      "marker": "xnu:bsd_init:done",
+      "proves": "bsd_init returned, so the BSD subsystem finished starting and the boot continues toward a root volume.",
+      "symbol": "_bsd_init",
+      "fixture": "bsd_init_return"
+    },
+    {
+      "id": "mountroot",
+      "marker": "xnu:mountroot",
+      "proves": "vfs_mountroot was entered: the kernel is looking for a root volume, which is the first step after BSD starts.",
+      "symbol": "_vfs_mountroot",
+      "fixture": "vfs_mountroot_entry"
     }
   ]
 }

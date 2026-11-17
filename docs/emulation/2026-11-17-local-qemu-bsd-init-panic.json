@@ -80,5 +80,19 @@
     "framework_effect": "builds build/libpthread-kernel/libpthread_kernel.a and registers it: patches/xnu/source-pthread-bootstrap.patch adds STARTUP(EARLY_BOOT, STARTUP_RANK_SECOND, source_pthread_bootstrap), which calls pthread_start() so _pthread_functions is filled before bsd_init",
     "image_evidence": "the linked image contains _pthread_functions and _pthread_kext_register (the xnu shims) but neither pthread_start nor source_pthread_bootstrap, so the source component was never built or linked",
     "why_not_the_kext": "the prelink closure is roots plus their declared libraries; the pthread kext is nobody's library dependency, so it can never arrive that way"
+  },
+  "past_bsd_mode": {
+    "_note": "measured locally with --past-bsd against the same kernel artifact, the mode the CI observation step now uses",
+    "past_bsd_outcome": "panicked",
+    "pthread_providers_missing": [
+      "_pthread_start",
+      "_source_pthread_bootstrap"
+    ],
+    "further_milestones": [
+      "bsd_init_return",
+      "vfs_mountroot_entry"
+    ],
+    "vfs_mountroot_reached": false,
+    "reading": "The mode keeps observing after bsd_init instead of stopping at its entry, so a run reports whether bsd_init returns, whether vfs_mountroot is reached, and the panic text when it is not. With the current kernel the answer is: it enters bsd_init, never returns, never reaches mountroot, and panics on the pthread table."
   }
 }

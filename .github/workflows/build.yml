@@ -930,11 +930,12 @@ jobs:
               --crypto-post --finish-iokit
 
       - name: How far past IOKit the kernel gets (observation, not a gate)
-        # The bring-up ADT points the GIC at the Lumia's SoC addresses, and run 44001882741 showed
-        # ArmCpu::mapGic() taking a data abort there because QEMU's virt has no device at those
-        # addresses. board.toml [payload.adt.profiles.qemu] moves the interrupt controller to
-        # 0x08000000 for this copy only, so the run can continue past mapGic and expose the next
-        # blocker. The staged artifact and the handset profile are not touched.
+        # --smp 2 is required for the GIC target probe (QEMU returns zero for those registers on a
+        # uniprocessor GICv2), and [payload.adt.profiles.qemu] puts the interrupt controller where
+        # the emulated machine has one. --past-bsd keeps observing after bsd_init instead of
+        # stopping at its entry: it records whether bsd_init returns, whether _vfs_mountroot is
+        # reached, and the panic text if the kernel stops there. The staged artifact and the
+        # handset profile are not touched.
         continue-on-error: true
         run: |
           image=$(find out/kernel -name 'mach.development.bcm2837.unstripped' -print -quit || true)
@@ -943,7 +944,7 @@ jobs:
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
               --output out/xnu-entry-bsd --timeout 240 \
-              --crypto-post --finish-iokit --finish-bsd --adt-profile qemu
+              --crypto-post --finish-iokit --past-bsd --adt-profile qemu --smp 2
 
       - name: What the emulated boot changed between the two runs
         if: always()

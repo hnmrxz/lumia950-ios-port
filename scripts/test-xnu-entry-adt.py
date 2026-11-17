@@ -119,9 +119,9 @@ class CheckpointContractTests(unittest.TestCase):
             if fixture and fixture.endswith("_entry"):
                 expected[fixture.removesuffix("_entry")] = checkpoint["symbol"]
         self.assertEqual(FIXTURE.checkpoint_symbols(), expected)
-        # The milestones the gate and the --finish-* flags rely on must all be in that list.
+        # The milestones the gate and the --finish-*/--past-bsd flags rely on must all be in that list.
         for milestone in ("arm_vm_init", "source_crypto_bootstrap", "iokit",
-                          "kernel_bootstrap", "bsd_init"):
+                          "kernel_bootstrap", "bsd_init", "vfs_mountroot"):
             self.assertIn(milestone, expected, milestone)
 
     def test_every_observable_checkpoint_names_a_kernel_symbol(self):

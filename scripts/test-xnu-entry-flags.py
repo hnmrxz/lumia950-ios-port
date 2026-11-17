@@ -61,6 +61,18 @@ class FlagChainTests(unittest.TestCase):
         self.assertTrue(args["finish_iokit"])
         self.assertTrue(args["crypto_post"])
 
+    def test_past_bsd_implies_the_bsd_gate_and_therefore_the_rest(self):
+        # --past-bsd observes what happens after bsd_init, so it must also require reaching it.
+        args = self.parse("--past-bsd")
+        self.assertTrue(args["past_bsd"])
+        self.assertTrue(args["finish_bsd"])
+        self.assertTrue(args["finish_iokit"])
+        self.assertTrue(args["crypto_post"])
+
+    def test_past_bsd_is_off_unless_asked(self):
+        args = self.parse("--finish-bsd")
+        self.assertFalse(args["past_bsd"])
+
     def test_a_timeout_outside_the_bound_is_refused(self):
         with self.assertRaises(SystemExit) as caught:
             self.parse("--timeout", "1000")

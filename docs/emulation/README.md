@@ -160,6 +160,30 @@ The next question: **why the pthread kext does not start.** The answer is in the
 not in the emulator: `out/lumia950/kernel/kernel.json` lists exactly the nine components the
 prelink merged, and the pthread kext is not one of them.
 
+## Observing past bsd_init
+
+`--finish-bsd` stops as soon as `bsd_init` is entered, which is exactly where the interesting part
+begins once the pthread component is linked. `--past-bsd` is the observation mode for that:
+
+- it implies `--finish-bsd`, and tolerates a kernel without the pthread provider (observing that
+  panic is the point), recording `pthread_providers_missing`;
+- after the entry it keeps going: `bsd_init_return` if the function returns, `_vfs_mountroot` as a
+  watch, and the panic with its text if the kernel stops there;
+- the report carries `past_bsd_outcome`: `returned`, `panicked`, `timed_out` or `stopped`.
+
+Measured with the current kernel (local, 2026-11-17):
+
+```
+milestones            ... iokit_return, bsd_init_entry
+past_bsd_outcome      panicked
+panic_format          pthread kernel extension not loaded (function table is NULL). @%s:%d
+watched               _vfs_mountroot: False
+pthread_providers_missing  [_pthread_start, _source_pthread_bootstrap]
+```
+
+So the run now answers "and then what?" instead of stopping at the milestone. The CI observation
+step uses this mode.
+
 ```
 com.apple.AppleFSCompression.AppleFSCompressionTypeZlib  com.apple.driver.AppleEffaceableStorage
 com.apple.filesystems.apfs                              com.apple.iokit.CoreAnalyticsFamily
