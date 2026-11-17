@@ -143,6 +143,10 @@ def run(args):
         STAGE.crypto_contract(original)
     if args.finish_iokit and "_PE_init_iokit" not in names:
         raise ValueError("real IOKit initialization symbol is missing")
+    if args.finish_bsd:
+        for symbol in ("_kernel_bootstrap", "_bsd_init"):
+            if symbol not in names:
+                raise ValueError(f"{symbol} is missing; the BSD start cannot be observed")
     stops = {name: address for name, address in names.items() if
         name.startswith("___ubsan_handle_") or name in (
             "_arm_vm_init", "_panic", "_panic_with_options", "_fleh_synchronous", "_sleh_synchronous_sp1")}
@@ -150,6 +154,11 @@ def run(args):
         stops["_source_corecrypto14_bootstrap"] = names["_source_corecrypto14_bootstrap"]
     if args.finish_iokit:
         stops["_PE_init_iokit"] = names["_PE_init_iokit"]
+    if args.finish_bsd:
+        # The BSD subsystem starting is the last thing this port can observe before a root volume
+        # is required: kernel_bootstrap calls bsd_init, and bsd_init never returns to a caller.
+        stops["_kernel_bootstrap"] = names["_kernel_bootstrap"]
+        stops["_bsd_init"] = names["_bsd_init"]
     output = args.output.resolve()
     if output.exists():
         raise ValueError("use a new output directory to preserve earlier evidence")
@@ -199,9 +208,12 @@ def run(args):
                         entries[names["_source_corecrypto14_bootstrap"]] = "source_crypto_bootstrap"
                     if args.finish_iokit:
                         entries[names["_PE_init_iokit"]] = "iokit"
+                    if args.finish_bsd:
+                        entries[names["_kernel_bootstrap"]] = "kernel_bootstrap"
+                        entries[names["_bsd_init"]] = "bsd_init"
                     returns = {}
                     report["milestones"] = []
-                    for _ in range(8):
+                    for _ in range(12):
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             raise TimeoutError("native boot observation deadline expired")
@@ -223,6 +235,11 @@ def run(args):
                             report["milestones"].append(milestone + "_entry")
                             if milestone == "arm_vm_init" and not args.finish_vm:
                                 break
+                            if milestone in ("kernel_bootstrap", "bsd_init"):
+                                # Neither returns to a caller this test can observe.
+                                if milestone == "bsd_init":
+                                    break
+                                continue
                             return_address = values["x30"]
                             report[milestone + "_return_target"] = hex(return_address)
                             returns[return_address] = milestone
@@ -270,14 +287,22 @@ def run(args):
         raise ValueError(f"real source-provider initialization did not complete successfully: {report.get('stop_symbols')}; see {output}")
     if args.finish_iokit and not report["iokit_return_observed"]:
         raise ValueError(f"real IOKit initialization did not return: {report.get('stop_symbols')}; see {output}")
-    if args.finish_iokit and report["milestones"] != ["arm_vm_init_entry", "arm_vm_init_return",
-        "source_crypto_bootstrap_entry", "source_crypto_bootstrap_return", "iokit_entry", "iokit_return"]:
-        raise ValueError("IOKit must initialize after the actual successful source crypto bootstrap")
+    if args.finish_iokit:
+        expected = ["arm_vm_init_entry", "arm_vm_init_return", "source_crypto_bootstrap_entry",
+                    "source_crypto_bootstrap_return", "iokit_entry", "iokit_return"]
+        if report["milestones"][:len(expected)] != expected:
+            raise ValueError("IOKit must initialize after the actual successful source crypto bootstrap")
+    if args.finish_bsd and not report.get("bsd_init_entry_observed"):
+        raise ValueError(
+            f"the kernel did not reach bsd_init: {report.get('stop_symbols') or report['milestones']}; "
+            f"see {output}")
     milestone = "returned from arm_vm_init" if args.finish_vm else "reached arm_vm_init entry"
     if args.crypto_post:
         milestone += " and the real source-provider POST/bootstrap"
     if args.finish_iokit:
         milestone += " and PE_init_iokit"
+    if args.finish_bsd:
+        milestone += " and bsd_init"
     print(f"PASS: real source XNU passed clock/WFE/topology setup and {milestone}; {output}")
     print("EMULATION ONLY. Handset boot, iOS userspace and GPU rendering are not proven.")
 
@@ -293,7 +318,10 @@ def main():
     parser.add_argument("--finish-vm", action="store_true", help="Also require a real return to the saved VM caller; stop on intervening faults")
     parser.add_argument("--crypto-post", action="store_true", help="After VM, observe the actual source provider return and KERN_SUCCESS status; no overrides")
     parser.add_argument("--finish-iokit", action="store_true", help="Also require actual IOKit initialization entry/return after the real crypto POST")
+    parser.add_argument("--finish-bsd", action="store_true", help="Also require the kernel to enter bsd_init; that is the last milestone before a root volume is required")
     args = parser.parse_args()
+    if args.finish_bsd:
+        args.finish_iokit = True
     if args.finish_iokit:
         args.crypto_post = True
     if args.crypto_post:

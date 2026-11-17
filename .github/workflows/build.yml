@@ -224,6 +224,7 @@ jobs:
         run: |
           python3 scripts/test-native-bringup.py
           python3 scripts/test-native-install.py
+          python3 scripts/test-xnu-entry-flags.py
           python3 -m py_compile scripts/test-native-xnu-entry.py
 
       - name: The kernel stage composes with the menu stage
@@ -908,10 +909,11 @@ jobs:
           echo "LUMIA_AAVMF=$firmware" >> "$GITHUB_ENV"
           qemu-system-aarch64 --version
 
-      - name: The real kernel executes to arm_vm_init in QEMU
-        # --crypto-post and --finish-iokit are the fixture's strongest assertions: the source
-        # crypto provider has to return KERN_SUCCESS after VM setup, and IOKit has to initialize
-        # after it. They are what "the kernel boots" means here.
+      - name: The real kernel executes to bsd_init in QEMU
+        # --crypto-post, --finish-iokit and --finish-bsd are the fixture's strongest assertions:
+        # the source crypto provider returns KERN_SUCCESS after VM setup, IOKit initializes after
+        # it, and the kernel then enters bsd_init -- the last milestone before a root volume is
+        # required. They are what "the kernel boots this far" means here.
         run: |
           image=$(find out/kernel -name 'mach.development.bcm2837.unstripped' -print -quit || true)
           [ -n "$image" ] || { echo "::error::the kernel artifact has no unstripped source kernel"; exit 1; }
@@ -920,7 +922,8 @@ jobs:
           esp=${config%/EFI/UniXNU/unixnu.toml}
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
-              --output out/xnu-entry --timeout 240 --crypto-post --finish-iokit
+              --output out/xnu-entry --timeout 240 \
+              --crypto-post --finish-iokit --finish-bsd
 
       - name: The report says emulation and nothing more
         if: always()
