@@ -226,6 +226,31 @@ starting from:
 | `fault_far` | the address the faulting access touched |
 | `system_registers.esr_el1` | `0x96000010` is a synchronous external abort on a data access |
 
+## The kernel's own log
+
+A machine with no console still records what happened: XNU's `printf` goes through `msgbuf` as well
+as the console, so the text is in kernel memory. `--dump-dmesg` extracts it at the stop and writes
+`dmesg.txt` beside the report (`struct msgbuf` is a ring buffer, so `bufx`/`bufr` decide the order,
+and the buffer is read in 4 KiB packets because the GDB stub refuses one huge read).
+
+Measured locally on 2026-11-17 (8976 characters of a 128 KiB buffer), it answers questions the
+milestones cannot:
+
+- every `FIPSPOST_KEXT` test reports PASSED and `corecrypto_kext_start completed successfully`
+  before the panic — the crypto POST is in the kernel's own record, not only in the fixture's status
+  word;
+- `initialize_screen: b=6C7A0000, w=00000320, h=00000258, r=00000C80` — the kernel adopts the
+  DarwinBoot framebuffer as its screen, which is where a framebuffer console would write;
+- `ml_processor_register` registers exactly one processor (`cpu_number 0`), matching the single-CPU
+  ADT profile;
+- `pe_arm_init_debug: failed to initialize gSocPhys == 0` is logged during interrupt bring-up — a
+  warning worth following, not the stop;
+- the log ends at `mbinit: done`, inside the BSD start, where the pthread panic happens.
+
+On the emulator the log can simply be read out of memory. On a handset it still needs a way out,
+which is what `docs/decisions/0001-log-transport.md` is about: this is the content that transport
+has to carry.
+
 ## Comparing two runs
 
 A kernel change is judged by the difference between two reports, not by one:

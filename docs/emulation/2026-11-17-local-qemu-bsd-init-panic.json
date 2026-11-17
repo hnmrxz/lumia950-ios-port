@@ -94,5 +94,33 @@
     ],
     "vfs_mountroot_reached": false,
     "reading": "The mode keeps observing after bsd_init instead of stopping at its entry, so a run reports whether bsd_init returns, whether vfs_mountroot is reached, and the panic text when it is not. With the current kernel the answer is: it enters bsd_init, never returns, never reaches mountroot, and panics on the pthread table."
+  },
+  "kernel_log": {
+    "_note": "read from the kernel's own msgbuf with --dump-dmesg; the full text stays in the run artifact (dmesg.txt) and is not committed",
+    "chars": 8976,
+    "buffer_size": 131072,
+    "sha256": "0deafa0c94e74557325e24f8cd5fa58071cba3b464bc20429ff3e0588ba9c2c3",
+    "first_lines": [
+      "[    7.106641]:  vm_cache_geometry_colors: 16",
+      "[    7.117016]: kprintf initialized",
+      "[    7.120083]: initialize_screen: b=6C7A0000, w=00000320, h=00000258, r=00000C80, d=00000000",
+      "[    7.121574]: pe_arm_init_debug: failed to initialize gSocPhys == 0",
+      "[    7.123114]: Darwin Kernel Version 22.6.0: Tue Nov 17 02:38:00 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837"
+    ],
+    "last_lines": [
+      "[    7.603928]: [0]ml_processor_register>pset_find(cluster_id=0) returned pset 0",
+      "[    7.603985]: [0]ml_processor_register>cpu_id 0xfffffff56cd3d5c0 cluster_id 0 cpu_number 0 is type 0",
+      "[    7.606328]: MAC Framework successfully initialized",
+      "[    7.612632]: clock_initialize_calendar system does not have monotonic clock",
+      "[    7.625888]: mbinit: done [64 MB total pool size, (64/0) split]"
+    ],
+    "findings": [
+      "All FIPSPOST_KEXT tests report PASSED and 'corecrypto_kext_start completed successfully' before the panic: the source crypto POST is not only returning 0 to the fixture, it is in the kernel's own record.",
+      "initialize_screen reports the DarwinBoot framebuffer (0x6C7A0000, 800x600, row 3200) as the kernel's screen, so a framebuffer console has a place to write after ExitBootServices.",
+      "ml_processor_register registers exactly one processor, cpu_number 0, which matches the single-CPU ADT profile.",
+      "pe_arm_init_debug: failed to initialize gSocPhys == 0 is logged during interrupt controller bring-up. It is a warning, not the stop.",
+      "the log ends at 'mbinit: done', i.e. inside the BSD start, which is where the pthread panic happens."
+    ],
+    "why_it_matters": "This is the content the log transport (P1.1) exists to carry. On the emulator it can be read straight out of kernel memory; on a handset it still needs a way out, which is what the GOP-first decision record is about."
   }
 }

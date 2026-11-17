@@ -99,6 +99,43 @@ def apply_adt_profile(esp, name):
                             "cpu_interface": profile.get("gic_cpu_interface")}}
 
 
+MSG_MAGIC = 0x063061
+
+
+def read_dmesg(connection, names):
+    """Extract the kernel's own message buffer.
+
+    XNU's printf goes through msgbuf as well as the console, so on a machine with no console the
+    text still exists in kernel memory. `struct msgbuf` is {int magic, size, bufx, bufr; char *bufc}
+    and bufx/bufr walk a ring buffer, so a wrapped buffer is read as bufr..end + start..bufx.
+    """
+    pointer = int.from_bytes(read_memory(connection, names["_msgbufp"], 8), "little")
+    if pointer == 0:
+        pointer = names.get("_msgbuf", 0)
+    if pointer == 0:
+        raise ValueError("the kernel has no msgbuf pointer to read")
+    header = read_memory(connection, pointer, 24)
+    magic, size, bufx, bufr = (int.from_bytes(header[index:index + 4], "little")
+                               for index in range(0, 16, 4))
+    buffer = int.from_bytes(header[16:24], "little")
+    if not buffer or size <= 0 or size > 16 * 1024 * 1024 or bufx > size or bufr > size:
+        raise ValueError(f"msgbuf looks uninitialised: magic {magic:#x}, size {size}, "
+                         f"bufx {bufx}, bufr {bufr}, buffer {buffer:#x}")
+    data = read_chunked(connection, buffer, size)
+    text = data[bufr:bufx] if bufr <= bufx else data[bufr:] + data[:bufx]
+    return {"magic": magic, "size": size, "bufx": bufx, "bufr": bufr,
+            "text": text.rstrip(b"\0").decode("utf-8", "replace")}
+
+
+def read_chunked(connection, address, size, chunk=4096):
+    """Read a large region: the GDB stub refuses a single packet the size of a message buffer."""
+    data = b""
+    while len(data) < size:
+        length = min(chunk, size - len(data))
+        data += read_memory(connection, address + len(data), length)
+    return data
+
+
 def receive(connection):
     while True:
         byte = connection.recv(1)
@@ -424,6 +461,17 @@ def run(args):
                         # --past-bsd tolerates a kernel that cannot get past bsd_init; say so in the
                         # report rather than letting the panic look like an emulator fault.
                         report["pthread_providers_missing"] = list(providers_missing)
+                    if args.dump_dmesg:
+                        try:
+                            dmesg = read_dmesg(connection, names)
+                            text = dmesg.pop("text")
+                            (output / "dmesg.txt").write_text(text + "\n")
+                            report["dmesg"] = {"magic": hex(dmesg["magic"]), "size": dmesg["size"],
+                                               "bufx": dmesg["bufx"], "bufr": dmesg["bufr"],
+                                               "chars": len(text),
+                                               "sha256": hashlib.sha256(text.encode()).hexdigest()}
+                        except ValueError as error:
+                            report["dmesg"] = f"unreadable: {error}"
                     if args.past_bsd:
                         # The observation, not a gate: entering bsd_init was the requirement, and
                         # what happened after it is the result.
@@ -534,6 +582,10 @@ def main():
                              "POSIX, tcp on Windows)")
     parser.add_argument("--gdb-port", type=int, default=0,
                         help="loopback port for the tcp transport; 0 picks a free one")
+    parser.add_argument("--dump-dmesg", action="store_true",
+                        help="also extract the kernel's own message buffer (msgbuf) at the stop and "
+                             "write it to dmesg.txt; on a machine with no console this is the only "
+                             "text the kernel left behind")
     parser.add_argument("--past-bsd", action="store_true",
                         help="after bsd_init is entered keep observing: record bsd_init_return if it "
                              "returns, watch _vfs_mountroot, and record the panic and its text if it "

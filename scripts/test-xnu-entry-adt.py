@@ -131,5 +131,56 @@ class CheckpointContractTests(unittest.TestCase):
                 self.assertTrue(checkpoint.get("symbol"), checkpoint["id"])
 
 
+class DmesgTests(unittest.TestCase):
+    """The kernel's own message buffer is how a machine with no console reports anything."""
+
+    def read_with(self, layout, reads=None):
+        def fake_read(connection, address, size):
+            if reads is not None:
+                reads.append((address, size))
+            return bytes(layout.get(address + index, 0) for index in range(size))
+
+        original = FIXTURE.read_memory
+        FIXTURE.read_memory = fake_read
+        try:
+            return FIXTURE.read_dmesg(None, {"_msgbufp": 0x1000})
+        finally:
+            FIXTURE.read_memory = original
+
+    @staticmethod
+    def layout(text, size=16, bufx=None, bufr=0, magic=0x063061):
+        layout = {}
+        struct_address, buffer_address = 0x2000, 0x4000
+        layout.update({0x1000 + index: byte for index, byte in
+                       enumerate(struct_address.to_bytes(8, "little"))})
+        fields = [magic, size, len(text) if bufx is None else bufx, bufr]
+        header = b"".join(value.to_bytes(4, "little") for value in fields) + \
+            buffer_address.to_bytes(8, "little")
+        layout.update({struct_address + index: byte for index, byte in enumerate(header)})
+        layout.update({buffer_address + index: byte for index, byte in enumerate(text)})
+        return layout
+
+    def test_a_plain_buffer_is_read_as_text(self):
+        result = self.read_with(self.layout(b"hello kernel"))
+        self.assertEqual(result["text"], "hello kernel")
+        self.assertEqual(result["magic"], 0x063061)
+
+    def test_a_wrapped_buffer_is_reassembled_in_order(self):
+        # bufr 6, bufx 4 on a ten byte buffer means the text is data[6:] followed by data[:4].
+        result = self.read_with(self.layout(b"0123456789", size=10, bufx=4, bufr=6))
+        self.assertEqual(result["text"], "67890123")
+
+    def test_an_uninitialised_buffer_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "uninitialised"):
+            self.read_with(self.layout(b"", size=0))
+
+    def test_a_large_buffer_is_read_in_packets(self):
+        text = b"x" * 9000
+        reads = []
+        result = self.read_with(self.layout(text, size=0x20000), reads)
+        self.assertEqual(len(result["text"]), 9000)
+        self.assertTrue(all(size <= 4096 for _, size in reads), reads)
+
+
 if __name__ == "__main__":
     unittest.main()

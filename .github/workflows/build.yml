@@ -927,7 +927,7 @@ jobs:
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
               --output out/xnu-entry --timeout 240 \
-              --crypto-post --finish-iokit
+              --crypto-post --finish-iokit --dump-dmesg
 
       - name: How far past IOKit the kernel gets (observation, not a gate)
         # --smp 2 is required for the GIC target probe (QEMU returns zero for those registers on a
@@ -944,7 +944,7 @@ jobs:
           python3 scripts/test-native-xnu-entry.py \
               --kernel "$image" --esp "$esp" --firmware "$LUMIA_AAVMF" \
               --output out/xnu-entry-bsd --timeout 240 \
-              --crypto-post --finish-iokit --past-bsd --adt-profile qemu --smp 2
+              --crypto-post --finish-iokit --past-bsd --dump-dmesg --adt-profile qemu --smp 2
 
       - name: What the emulated boot changed between the two runs
         if: always()
