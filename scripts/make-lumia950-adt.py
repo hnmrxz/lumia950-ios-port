@@ -286,7 +286,7 @@ def build_tree(
         "intc",
         [
             ("compatible", string("qcom,msm-qgic2", "arm,gic-2")),
-            ("interrupt-controller", b""),
+            ("interrupt-controller", string("master")),
             ("AAPL,phandle", u32(1)),
             ("#address-cells", u32(0)),
             ("#interrupt-cells", u32(3)),
