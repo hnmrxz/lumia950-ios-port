@@ -168,6 +168,33 @@ class KernelLinkTests(unittest.TestCase):
                                "--archives-root", str(tree)))
         self.assertIn("no archive for NativeMdss", result.stderr)
 
+    def test_a_config_that_enables_the_pthread_provider_requires_it_in_the_image(self):
+        # Without it bsd_init panics before a root volume is mounted; measured in
+        # docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json
+        config = self.root / "lumia950_defconfig"
+        config.write_text("CONFIG_XNU_ARMCPU=y\nCONFIG_XNU_SOURCE_PTHREAD=y\n")
+        result = self._run(1, ("--symbols-from", str(self.dump()), "--expect", "NativeMdss",
+                               "--config", str(config)))
+        self.assertIn("CONFIG_XNU_SOURCE_PTHREAD=y", result.stderr)
+        self.assertIn("pthread kernel extension not loaded", result.stderr)
+
+    def test_the_pthread_provider_satisfies_the_config_check(self):
+        config = self.root / "lumia950_defconfig"
+        config.write_text("CONFIG_XNU_SOURCE_PTHREAD=y\n")
+        dump = self.root / "nm-pthread.txt"
+        dump.write_text(DUMP + "\n0000000000000001 T _pthread_start\n"
+                               "0000000000000002 T _source_pthread_bootstrap\n")
+        result = self._run(0, ("--symbols-from", str(dump), "--expect", "NativeMdss",
+                               "--config", str(config)))
+        self.assertIn("pthread_start", result.stdout)
+
+    def test_a_config_without_the_flag_asks_for_nothing_more(self):
+        config = self.root / "lumia950_defconfig"
+        config.write_text("CONFIG_XNU_ARMCPU=y\n")
+        result = self._run(0, ("--symbols-from", str(self.dump()), "--expect", "NativeMdss",
+                               "--config", str(config)))
+        self.assertNotIn("pthread_start", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

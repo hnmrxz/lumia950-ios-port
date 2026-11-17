@@ -686,7 +686,8 @@ jobs:
             echo "::error::no unstripped kernel image; the link has nothing to prove against"
             exit 1
           fi
-          python3 scripts/check-kernel-link.py --image "$image" --archives-root "$UNIXNU_OUT"
+          python3 scripts/check-kernel-link.py --image "$image" --archives-root "$UNIXNU_OUT" \
+              --config configs/lumia950_defconfig
 
       - name: Name the first compile error
         # util.run keeps a command's output in the log file and echoes only its last 30

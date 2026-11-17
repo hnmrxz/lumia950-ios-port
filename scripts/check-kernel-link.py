@@ -121,6 +121,12 @@ def main() -> int:
     parser.add_argument("--archives-root", type=Path,
                         help="also require lib<Component>.a under this directory; the archive "
                              "existing is the compile half, the symbol is the link half")
+    parser.add_argument("--config", type=Path,
+                        help="also prove the boot providers that this defconfig enables: with "
+                             "CONFIG_XNU_SOURCE_PTHREAD the image must carry pthread_start and "
+                             "source_pthread_bootstrap, or bsd_init panics on the phone with "
+                             "'pthread kernel extension not loaded' "
+                             "(docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json)")
     args = parser.parse_args()
 
     if args.symbols_from:
@@ -154,6 +160,22 @@ def main() -> int:
              "image has no symbol for it, so `kernel-linked` is not established and a phone would "
              "boot a kernel without that driver")
     counts = ", ".join(f"{name} {find(dump, name)}" for name in expected)
+    if args.config is not None:
+        if not args.config.is_file():
+            fail(f"{args.config} is missing; the configuration the image was built from is the "
+                 "only thing that says which boot providers must be in it")
+        enabled = {line.strip() for line in args.config.read_text().splitlines()
+                   if line.strip().startswith("CONFIG_")}
+        if "CONFIG_XNU_SOURCE_PTHREAD=y" in enabled:
+            providers = ("pthread_start", "source_pthread_bootstrap")
+            missing = [name for name in providers if not find(dump, name)]
+            if missing:
+                fail(f"{source} does not link {', '.join(missing)} although "
+                     f"{args.config.name} sets CONFIG_XNU_SOURCE_PTHREAD=y: the source pthread "
+                     "component did not reach the link, so the phone would boot a kernel whose "
+                     "bsd_init panics with 'pthread kernel extension not loaded (function table is "
+                     "NULL)' before any root volume is mounted")
+            counts += ", " + ", ".join(f"{name} {find(dump, name)}" for name in providers)
     if args.archives_root is not None:
         missing_archives = [name for name in expected
                             if not list(args.archives_root.rglob(f"lib{name}.a"))]
