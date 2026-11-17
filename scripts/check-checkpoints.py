@@ -42,6 +42,7 @@ def load_contract(path: Path) -> list[dict]:
         fail(f"{path}: checkpoints is missing or empty")
     seen: set[str] = set()
     markers: set[str] = set()
+    observable: dict[str, list[str]] = {}
     for index, checkpoint in enumerate(checkpoints):
         identity, marker = checkpoint.get("id"), checkpoint.get("marker")
         if not identity:
@@ -57,6 +58,14 @@ def load_contract(path: Path) -> list[dict]:
         markers.add(marker)
         if not str(checkpoint.get("proves") or "").strip():
             fail(f"{path}: {identity} does not say what it proves")
+        # A checkpoint the QEMU fixture records names the kernel symbol it breaks on. The list is
+        # what the fixture reads, so a typo here would silently stop observing a milestone.
+        if checkpoint.get("fixture") is not None:
+            symbol = checkpoint.get("symbol")
+            if not symbol or not str(symbol).strip():
+                fail(f"{path}: {identity} has a fixture milestone but no symbol; the fixture reads "
+                     "this field, so the milestone could never be set")
+            observable.setdefault(str(symbol), []).append(str(checkpoint["fixture"]))
     if transport == "undecided":
         print("note: the transport is still undecided, so no handset record can be produced yet",
               file=sys.stderr)

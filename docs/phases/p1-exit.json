@@ -15,9 +15,10 @@
       "id": "P1.2",
       "requirement": "The checkpoint set is a single machine-readable list (arm_vm_init, crypto self-test, PE_init_iokit and the rest the QEMU fixture already asserts) shared by the fixture, the transport and the handset record.",
       "evidence": "document",
-      "status": "open",
+      "status": "met",
       "verified_by": "scripts/check-checkpoints.py",
-      "note": "docs/native-checkpoints.json now holds the list and scripts/check-checkpoints.py judges a recorded log against it, including refusing a log that reaches a later marker while skipping an earlier one. The fixture still asserts its own hardcoded sequence, so 'shared by the fixture' is not true yet."
+      "note": "docs/native-checkpoints.json carries nine checkpoints, each with a marker, the kernel symbol it is observed on and the fixture milestone it maps to; scripts/test-native-xnu-entry.py builds every breakpoint from checkpoint_symbols() in that file, so a milestone cannot drift from the symbol that proves it. check-checkpoints.py refuses an observable checkpoint without a symbol, test-checkpoints.py covers the contract, and test-xnu-entry-adt.py pins the fixture mapping. The transport that would write the markers on a handset is P1.1 and stays open.",
+      "path": "docs/native-checkpoints.json"
     },
     {
       "id": "P1.3",

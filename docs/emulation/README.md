@@ -50,6 +50,19 @@ Windows has no emulator-side unix socket here, so the fixture speaks GDB over lo
 (`--gdb-transport auto` picks it: tcp on Windows, unix on POSIX). A gate run takes about ten
 seconds on TCG.
 
+Its breakpoints are not written in the script: every milestone it can record comes from
+`docs/native-checkpoints.json` (`checkpoint_symbols()`), the same list `check-checkpoints.py` judges
+a handset log against. Adding a milestone means adding it there, with the kernel symbol that proves
+it.
+
+## When a run refuses to start
+
+`--finish-bsd` checks the image for `_pthread_start` and `_source_pthread_bootstrap` first, because
+a kernel without them panics inside `bsd_init` instead of producing a boot result. That refusal
+names the configuration flag (`CONFIG_XNU_SOURCE_PTHREAD`) and
+`scripts/check-kernel-link.py --config configs/lumia950_defconfig`, which is the same check the
+kernel job runs before publishing an image.
+
 ## The qemu ADT profile
 
 `board.toml [payload.adt.profiles.qemu]` keeps the bring-up shape (one CPU, no PSCI conduit, an

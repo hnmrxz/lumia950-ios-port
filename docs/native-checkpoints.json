@@ -2,49 +2,70 @@
   "schema": "lumia950-xnu-checkpoint-v1",
   "transport": "undecided",
   "decision_record": "docs/decisions/0001-log-transport.md",
-  "note": "The milestone sequence scripts/test-native-xnu-entry.py already asserts in QEMU, written down as one list so a handset record can be judged against the same sequence. The transport that carries these markers on real hardware is not chosen yet: a GOP framebuffer console written after ExitBootServices, or a reserved RAM mailbox read back by a diagnostic EFI application. Until it exists, P1 cannot be judged, because a successful entry and a hang both look like a black screen.",
+  "note": "The milestone sequence scripts/test-native-xnu-entry.py asserts in QEMU, written down as one list so a handset record can be judged against the same sequence. `symbol` is the kernel symbol the fixture breaks on and `fixture` is the milestone name it records, so the list is the single source for both. The transport that carries `marker` on real hardware is not chosen yet: a GOP framebuffer console written after ExitBootServices, or a reserved RAM mailbox read back by a diagnostic EFI application. Until it exists, P1.1 cannot be judged, because a successful entry and a hang both look like a black screen.",
   "checkpoints": [
     {
       "id": "handoff",
       "marker": "xnu:handoff",
       "proves": "DarwinBoot transferred control to the kernel image at its entry point, with the ADT boot arguments it built.",
+      "symbol": null,
       "fixture": null
     },
     {
       "id": "arm_vm_init_entry",
       "marker": "xnu:arm_vm_init",
       "proves": "The kernel reached arm_vm_init, so the pmap and the early memory map are usable rather than merely parsed.",
+      "symbol": "_arm_vm_init",
       "fixture": "arm_vm_init_entry"
     },
     {
       "id": "arm_vm_init_return",
       "marker": "xnu:arm_vm_init:done",
       "proves": "arm_vm_init returned: the VM structures were built without a fault.",
+      "symbol": "_arm_vm_init",
       "fixture": "arm_vm_init_return"
     },
     {
       "id": "crypto_entry",
       "marker": "xnu:crypto",
       "proves": "The source corecrypto provider was entered after VM setup.",
+      "symbol": "_source_corecrypto14_bootstrap",
       "fixture": "source_crypto_bootstrap_entry"
     },
     {
       "id": "crypto_return",
       "marker": "xnu:crypto:done",
       "proves": "The provider returned and its POST ran; the fixture also reads its status word.",
+      "symbol": "_source_corecrypto14_bootstrap",
       "fixture": "source_crypto_bootstrap_return"
     },
     {
       "id": "iokit_entry",
       "marker": "xnu:iokit",
       "proves": "PE_init_iokit was entered: the platform expert is bringing up the driver tree.",
+      "symbol": "_PE_init_iokit",
       "fixture": "iokit_entry"
     },
     {
       "id": "iokit_return",
       "marker": "xnu:iokit:done",
-      "proves": "PE_init_iokit returned, which is the last checkpoint this port has a QEMU fixture for.",
+      "proves": "PE_init_iokit returned.",
+      "symbol": "_PE_init_iokit",
       "fixture": "iokit_return"
+    },
+    {
+      "id": "kernel_bootstrap",
+      "marker": "xnu:bootstrap",
+      "proves": "The bootstrap thread started and reached kernel_bootstrap, after IOKit came up.",
+      "symbol": "_kernel_bootstrap",
+      "fixture": "kernel_bootstrap_entry"
+    },
+    {
+      "id": "bsd_init",
+      "marker": "xnu:bsd_init",
+      "proves": "bsd_init was entered: the BSD subsystem is starting, which is the last checkpoint before a root volume is required. It needs the source pthread component registered (CONFIG_XNU_SOURCE_PTHREAD) or it panics on the first thread call.",
+      "symbol": "_bsd_init",
+      "fixture": "bsd_init_entry"
     }
   ]
 }

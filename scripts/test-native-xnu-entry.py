@@ -48,6 +48,21 @@ def nearest_symbol(names, address):
     return None if best is None else f"{best[0]}+{address - best[1]:#x}"
 
 
+def checkpoint_symbols():
+    """The milestone name the fixture records to the kernel symbol it breaks on.
+
+    docs/native-checkpoints.json is the single list: the fixture and the checkers read the same
+    file, so a milestone cannot drift from the symbol that is supposed to prove it.
+    """
+    document = json.loads((STAGE.ROOT / "docs/native-checkpoints.json").read_text())
+    mapping = {}
+    for checkpoint in document["checkpoints"]:
+        fixture = checkpoint.get("fixture")
+        if fixture and fixture.endswith("_entry") and checkpoint.get("symbol"):
+            mapping[fixture.removesuffix("_entry")] = checkpoint["symbol"]
+    return mapping
+
+
 def missing_bsd_providers(names):
     """The symbols a kernel needs before bsd_init can return, and which one are absent."""
     return [symbol for symbol in ("_pthread_start", "_source_pthread_bootstrap")
@@ -305,14 +320,15 @@ def run(args):
                     for address in sorted(set(stops.values())):
                         if request(connection, f"Z1,{address:x},4") != b"OK":
                             raise ValueError("QEMU refused a real instruction breakpoint")
-                    entries = {names["_arm_vm_init"]: "arm_vm_init"}
+                    milestones = checkpoint_symbols()
+                    entries = {names[milestones["arm_vm_init"]]: "arm_vm_init"}
                     if args.crypto_post:
-                        entries[names["_source_corecrypto14_bootstrap"]] = "source_crypto_bootstrap"
+                        entries[names[milestones["source_crypto_bootstrap"]]] = "source_crypto_bootstrap"
                     if args.finish_iokit:
-                        entries[names["_PE_init_iokit"]] = "iokit"
+                        entries[names[milestones["iokit"]]] = "iokit"
                     if args.finish_bsd:
-                        entries[names["_kernel_bootstrap"]] = "kernel_bootstrap"
-                        entries[names["_bsd_init"]] = "bsd_init"
+                        entries[names[milestones["kernel_bootstrap"]]] = "kernel_bootstrap"
+                        entries[names[milestones["bsd_init"]]] = "bsd_init"
                     returns = {}
                     report["milestones"] = []
                     for _ in range(12):

@@ -9,6 +9,7 @@ producing the phone's windows.
     python3 scripts/test-xnu-entry-adt.py
 """
 import importlib.util
+import json
 import pathlib
 import struct
 import subprocess
@@ -107,6 +108,27 @@ class BsdProviderTests(unittest.TestCase):
     def test_a_kernel_with_both_providers_passes(self):
         names = {"_pthread_start": 1, "_source_pthread_bootstrap": 2, "_bsd_init": 3}
         self.assertEqual(FIXTURE.missing_bsd_providers(names), [])
+
+
+class CheckpointContractTests(unittest.TestCase):
+    def test_the_fixture_takes_its_symbols_from_the_shared_list(self):
+        contract = json.loads((SCRIPTS.parent / "docs/native-checkpoints.json").read_text())
+        expected = {}
+        for checkpoint in contract["checkpoints"]:
+            fixture = checkpoint.get("fixture")
+            if fixture and fixture.endswith("_entry"):
+                expected[fixture.removesuffix("_entry")] = checkpoint["symbol"]
+        self.assertEqual(FIXTURE.checkpoint_symbols(), expected)
+        # The milestones the gate and the --finish-* flags rely on must all be in that list.
+        for milestone in ("arm_vm_init", "source_crypto_bootstrap", "iokit",
+                          "kernel_bootstrap", "bsd_init"):
+            self.assertIn(milestone, expected, milestone)
+
+    def test_every_observable_checkpoint_names_a_kernel_symbol(self):
+        contract = json.loads((SCRIPTS.parent / "docs/native-checkpoints.json").read_text())
+        for checkpoint in contract["checkpoints"]:
+            if checkpoint.get("fixture"):
+                self.assertTrue(checkpoint.get("symbol"), checkpoint["id"])
 
 
 if __name__ == "__main__":
