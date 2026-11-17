@@ -43,7 +43,7 @@ UniXNU 主框架是单独的构建依赖：`https://github.com/UniXNU/UniXNU`。
 
 ## GitHub Actions
 
-- 每次涉及 `board.toml`、`configs/`、`drivers/`、`scripts/`、`payload/`、`ci/`、`feeds.toml` 或 workflow 的 `main` 推送：Ubuntu 验证 + macOS XNU 构建。
+- 每次涉及 `board.toml`、`configs/`、`drivers/`、`scripts/`、`payload/`、`ci/`、`feeds.toml` 或 workflow 的 `main` 推送：Ubuntu 验证、EFI preflight、GICv2 模拟与 Windows 安装器测试。**macOS 的 XNU 构建改为手动**（`target=kernel` 或 `both`）：私有仓库的 macOS 分钟按 10 倍计费，一次推送触发它大约要花 90 分钟配额。
 - Pull Request：运行快速 Ubuntu 验证；重型 macOS kernel job 可手动触发，避免每个 PR 消耗长时间 runner。
 - `Actions → build → Run workflow` 可选 `payload`、`kernel` 或 `both`。
 - 默认 macOS runner 为 `macos-26`，可在仓库 `Settings → Secrets and variables → Actions → Variables` 中设置 `MACOS_RUNNER` 覆盖，例如 `macos-latest` 或 `macos-26-intel`。

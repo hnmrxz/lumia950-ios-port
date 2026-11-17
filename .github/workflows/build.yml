@@ -561,7 +561,10 @@ jobs:
   # The real compile. The kernel step needs macOS: Xcode and the iphoneos SDK.
   # Manual, because a first build takes a long time on a shared runner.
   kernel:
-    if: (github.event_name == 'workflow_dispatch' && (inputs.target == 'kernel' || inputs.target == 'both')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Manual only. A macOS minute bills as ten on a private repository, and this is the only job
+    # that needs Xcode; a push to main used to start it and spend roughly ninety minutes of quota
+    # every time. Run it with target=kernel or target=both.
+    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'kernel' || inputs.target == 'both')
     runs-on: ${{ vars.MACOS_RUNNER || 'macos-26' }}
     timeout-minutes: 360
     env:

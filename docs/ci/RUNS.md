@@ -120,6 +120,26 @@ inside the debug information and symbol tables, which are not loaded. That is th
 difference" `docs/phases/p0-exit.json` P0.3 accepts instead of two identical hashes. Making the
 banner reproducible would need a pinned build epoch; it is not attempted here.
 
+## 2026-11-17: every job failed before its first step
+
+Three runs, each with zero executed steps and no runner assigned:
+
+| Run | What it was | Result |
+|---|---|---|
+| 44005104042 | dispatch `target=both` on HEAD `2ac9d47` | every job failed, 0 steps |
+| 44005372524 | dispatch `target=payload` (Ubuntu only) on `2ac9d47` | every job failed, 0 steps |
+| 44005565141 | dispatch `target=payload` on a probe branch at `e463a61`, the last green commit | every job failed, 0 steps |
+
+The third one is the diagnostic: the last known-good commit fails identically, so neither the
+workflow file nor the scripts are the cause — the failure is account-level. The most likely cause
+is the Actions quota for this private repository: a macOS minute bills as ten, and roughly a dozen
+kernel builds plus stage jobs ran today. Confirm in **Settings → Billing and plans** rather than
+guessing further; the REST billing endpoint needs a token scope this session does not have.
+
+Until that is resolved, nothing in this file can be re-verified. The kernel job is now manual-only
+(see README), so a later push costs a couple of minutes of Ubuntu time instead of about ninety of
+macOS time.
+
 ## How to add a run
 
 ```sh

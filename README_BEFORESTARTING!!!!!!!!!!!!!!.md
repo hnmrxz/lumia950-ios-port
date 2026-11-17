@@ -39,7 +39,7 @@ upstream `main`; changing that pin requires revalidating the patch and driver AB
 | `gicv2-emulation` | every push, PR and dispatch | pinned ArmCpu patch preparation and standalone asynchronous timer/SGI/SPI exceptions in QEMU; not XNU or handset validation | `lumia950-gicv2-core-emulation` |
 | `efi-preflight` | every push, PR and dispatch | AArch64 EFI image build, mock report/clock tests, non-Lumia MMIO refusal and actual two-boot report persistence in QEMU; not XNU or handset GPU execution | `lumia950-efi-preflight` |
 | `payload` | dispatch with `target=payload` or `both` | `UniXNU.efi`, `DarwinBoot.efi` and the staged `out/payload` tree | `lumia950-payload` |
-| `kernel` | dispatch with `target=kernel` or `both`, **and every push to `main`** | **every driver compiles against the recorded XNU ABI with `-Werror`**, the kernel links, the pinned 16.7.16 kernelcache merges, and the linked image carries a symbol for each `[kernel] archives` component | `lumia950-kernel` |
+| `kernel` | dispatch with `target=kernel` or `both` (manual only: a macOS minute bills as ten on a private repository) | **every driver compiles against the recorded XNU ABI with `-Werror`**, the kernel links, the pinned 16.7.16 kernelcache merges, and the linked image carries a symbol for each `[kernel] archives` component | `lumia950-kernel` |
 | `stage` | dispatch with `target=both` | the deployable tree the installer consumes, assembled from this run's own payload, kernel and GPU artifacts; the kernel hash has to appear in this run's `build-manifest.json` | `lumia950-stage` |
 
 ## Run it even when you are not sure you need to

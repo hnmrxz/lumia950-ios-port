@@ -10,7 +10,7 @@
 | `payload` | Ubuntu | 手动 `target=payload` / `both` | UniXNU EFI menu、DarwinBoot、配置/文件树 | XNU kernel ABI 编译、kernel handoff |
 | `stage` | macOS | 手动 `target=both` | 由同一次 run 的 payload / kernel / GPU artifact 拼出的可部署树，kernel 哈希与 `build-manifest.json` 一致，并通过安装器的前置校验（manifest、七个文件哈希、菜单与 crypto 契约） | 真机写入；托管 runner 没有到手机的 USB 通路 |
 | `installer-windows` | windows-2022 | push / PR / dispatch | 安装器的 Windows 后端在真实 Windows 文件系统上的行为：卷识别、身份拒绝、原子写、备份、回读 | 真机写入；没有接手机的卷 |
-| `kernel` | macOS + Xcode | main 设备代码 push；或手动 `kernel` / `both` | xnu-8796 kernel build、设备 IOKit ABI compile、archive/link、iOS 16.7.16 kernelcache prelink report | XNU 真机执行、eMMC、屏幕、iOS root/userland |
+| `kernel` | macOS + Xcode | 手动 `kernel` / `both`（macOS 分钟按 10 倍计费，推送不再触发） | xnu-8796 kernel build、设备 IOKit ABI compile、archive/link、iOS 16.7.16 kernelcache prelink report | XNU 真机执行、eMMC、屏幕、iOS root/userland |
 
 ## Manual commands
 
