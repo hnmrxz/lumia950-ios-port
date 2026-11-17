@@ -236,7 +236,11 @@ def run(args):
                             if milestone == "arm_vm_init" and not args.finish_vm:
                                 break
                             if milestone in ("kernel_bootstrap", "bsd_init"):
-                                # Neither returns to a caller this test can observe.
+                                # Neither returns to a caller this test can observe. The entry
+                                # breakpoint still has to be retired, or resuming re-triggers it
+                                # and the observation loop reads the same PC forever.
+                                if request(connection, f"z1,{current:x},4") != b"OK":
+                                    raise ValueError("could not retire the entry breakpoint")
                                 if milestone == "bsd_init":
                                     break
                                 continue
@@ -288,10 +292,14 @@ def run(args):
     if args.finish_iokit and not report["iokit_return_observed"]:
         raise ValueError(f"real IOKit initialization did not return: {report.get('stop_symbols')}; see {output}")
     if args.finish_iokit:
+        # Order matters, contiguity does not: kernel_bootstrap may be entered between them, which
+        # is why the milestones are checked as a subsequence.
         expected = ["arm_vm_init_entry", "arm_vm_init_return", "source_crypto_bootstrap_entry",
                     "source_crypto_bootstrap_return", "iokit_entry", "iokit_return"]
-        if report["milestones"][:len(expected)] != expected:
-            raise ValueError("IOKit must initialize after the actual successful source crypto bootstrap")
+        observed = [m for m in report["milestones"] if m in expected]
+        if observed != expected:
+            raise ValueError(f"Iokit must initialize after the successful source crypto "
+                             f"bootstrap; observed {observed}")
     if args.finish_bsd and not report.get("bsd_init_entry_observed"):
         raise ValueError(
             f"the kernel did not reach bsd_init: {report.get('stop_symbols') or report['milestones']}; "
