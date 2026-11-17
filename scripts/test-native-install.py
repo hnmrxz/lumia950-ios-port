@@ -25,6 +25,8 @@ UPDATE_SPEC.loader.exec_module(UPDATE)
 
 
 class NativeInstallTests(unittest.TestCase):
+    HOST = "macos"
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -62,7 +64,8 @@ class NativeInstallTests(unittest.TestCase):
         self.whole = {"TotalSize": 31268536320, "MediaName": "Phone MMC Stor", "BusProtocol": "USB",
             "Internal": False, "DeviceIdentifier": "disk9"}
         for replacement in [patch.object(INSTALL, "PHONE", self.phone), patch.object(INSTALL, "BACKUP_VOLUME", self.ssd),
-            patch.object(INSTALL, "CRITICAL", self.critical), patch.object(INSTALL, "disk_info", self.disk_info),
+            patch.object(INSTALL, "HOST", self.HOST), patch.object(INSTALL, "CRITICAL", self.critical),
+            patch.object(INSTALL, "disk_info", self.disk_info),
             patch.object(INSTALL.time, "sleep", lambda _: None), patch.object(INSTALL.os, "sync", lambda: None, create=True),
             patch.object(UPDATE, "INSTALL", INSTALL)]:
             replacement.start()
@@ -80,6 +83,14 @@ class NativeInstallTests(unittest.TestCase):
         (self.stage / "native-bringup.json").write_text(json.dumps(self.manifest))
 
     def disk_info(self, device):
+        if self.HOST == "windows":
+            if str(device) == str(self.phone):
+                return {"DriveLetter": "E:", "FileSystemType": "FAT32", "Size": 33276416,
+                        "FreeSpace": 18 * 1024 * 1024, "Label": "EFIESP",
+                        "VolumeGuid": "expected-volume", "PartitionGuid": "expected-partition",
+                        "DiskNumber": 9, "DiskSize": 31268536320, "BusType": "USB",
+                        "MediaType": "Removable", "IsBoot": False}
+            raise AssertionError(f"unexpected volume query: {device}")
         if str(device) == str(self.phone):
             return self.volume.copy()
         if str(device) == str(self.ssd):
@@ -299,6 +310,105 @@ class NativeInstallTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid original backup inventory path"):
             self.run_update()
         self.assertEqual(self.contents(self.phone), self.before_update)
+
+
+class WindowsBackendTests(NativeInstallTests):
+    """The same guarantees through the Windows storage backend.
+
+    On Windows the volume GUID diskutil reports is the mount-manager GUID, not the FAT serial, so
+    the identity is the GPT partition GUID (when given), the size, FAT and the USB bus -- and then
+    the five boot-file hashes, which phone_identity() checks on both hosts.
+    """
+
+    HOST = "windows"
+
+    # The inherited fixture builds a diskutil-shaped volume dictionary and drives the update
+    # script, which talks to /Volumes by construction. Those cases stay in the macOS class; here
+    # they would test the fixture, not the Windows backend.
+    def _skip_macos_fixture(self):
+        self.skipTest("the inherited fixture is macOS-shaped (diskutil volumes and /Volumes paths)")
+
+    test_wrong_device_writes_nothing = _skip_macos_fixture
+    test_update_skips_macos_metadata_without_opening_it = _skip_macos_fixture
+    test_update_verifies_previous_stage_and_preserves_boot_chain = _skip_macos_fixture
+    test_update_backup_failure_keeps_every_phone_file = _skip_macos_fixture
+    test_update_low_space_releases_only_the_backed_up_experimental_kernel = _skip_macos_fixture
+    test_update_wrong_boot_flag_and_insufficient_space_refused = _skip_macos_fixture
+    test_update_rejects_foreign_or_escaping_original_inventory = _skip_macos_fixture
+
+    def setUp(self):
+        self.real_backup_root_ok = INSTALL.backup_root_ok
+        super().setUp()
+        # The inherited flows run on one temp drive, where a same-drive backup is correct to
+        # refuse; backup separation is tested directly below with drive letters that need not exist.
+        replacement = patch.object(INSTALL, "backup_root_ok", lambda root, whole: True)
+        replacement.start()
+        self.addCleanup(replacement.stop)
+
+    def windows_info(self, **overrides):
+        info = {"DriveLetter": "E:", "FileSystemType": "FAT32", "Size": 33276416,
+                "FreeSpace": 18 * 1024 * 1024, "Label": "EFIESP", "VolumeGuid": "expected-volume",
+                "PartitionGuid": "expected-partition", "DiskNumber": 9,
+                "DiskSize": 31268536320, "BusType": "USB", "MediaType": "Removable", "IsBoot": False}
+        info.update(overrides)
+        return info
+
+    def with_volume(self, info):
+        return patch.object(INSTALL, "disk_info", lambda device: info)
+
+    def test_a_non_fat_volume_is_refused(self):
+        with self.with_volume(self.windows_info(FileSystemType="NTFS")):
+            with self.assertRaisesRegex(ValueError, "not a FAT volume"):
+                INSTALL.measured_phone("expected-volume", "expected-partition")
+
+    def test_the_wrong_size_is_refused(self):
+        with self.with_volume(self.windows_info(Size=33280000)):
+            with self.assertRaisesRegex(ValueError, "not the measured 33276416"):
+                INSTALL.measured_phone("expected-volume", "expected-partition")
+
+    def test_a_non_usb_disk_is_refused(self):
+        with self.with_volume(self.windows_info(BusType="NVMe")):
+            with self.assertRaisesRegex(ValueError, "not USB"):
+                INSTALL.measured_phone("expected-volume", "expected-partition")
+
+    def test_the_boot_volume_is_refused(self):
+        with self.with_volume(self.windows_info(IsBoot=True)):
+            with self.assertRaisesRegex(ValueError, "boot volume"):
+                INSTALL.measured_phone("expected-volume", "expected-partition")
+
+    def test_a_partition_guid_mismatch_is_refused(self):
+        with self.with_volume(self.windows_info(PartitionGuid="another-partition")):
+            with self.assertRaisesRegex(ValueError, "partition GUID"):
+                INSTALL.measured_phone("expected-volume", "expected-partition")
+
+    def test_the_partition_guid_is_optional(self):
+        with self.with_volume(self.windows_info(PartitionGuid="anything")):
+            volume, whole = INSTALL.measured_phone("expected-volume", None)
+        self.assertEqual(volume["TotalSize"], 33276416)
+        self.assertEqual(whole["BusProtocol"], "USB")
+
+    def test_a_backup_on_the_phone_drive_is_refused(self):
+        current = INSTALL.PHONE
+        try:
+            INSTALL.PHONE = Path("E:/")
+            # The real function, not the permissive stub the flow tests install.
+            self.assertFalse(self.real_backup_root_ok(Path("E:/backups"), {}))
+            self.assertTrue(self.real_backup_root_ok(Path("D:/backups"), {}))
+        finally:
+            INSTALL.PHONE = current
+
+    def test_a_dry_run_reports_the_windows_volume_without_writing(self):
+        self.args.apply = False
+        self.run_install()
+        self.assertEqual(self.contents(self.phone), self.before)
+        self.assertFalse((self.phone / "EFI/UniXNU").exists())
+
+    def test_apply_installs_and_keeps_every_other_file(self):
+        self.run_install()
+        self.assertEqual((self.phone / "EFI/boot/BOOTAA64.EFI").read_bytes(), b"menu")
+        for name, data in self.before.items():
+            if name.casefold() != "efi/boot/bootaa64.efi":
+                self.assertEqual((self.phone / name).read_bytes(), data)
 
 
 if __name__ == "__main__":

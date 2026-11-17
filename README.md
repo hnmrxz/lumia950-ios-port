@@ -77,9 +77,52 @@ UniXNU 主框架是单独的构建依赖：`https://github.com/UniXNU/UniXNU`。
 | `lumia950-kernel`（**合并后的** kernel candidate） | CI `target=kernel` | `scripts/stage-kernel.py` | **不可**：`native-bringup.md` 明确它 "is not staged here"，runtime/ABI/relocation 未鉴定 | 只校验 Mach-O 头（magic/cputype/filetype），**无法区分** source-only 与合并内核 |
 | source-only 内核（CI `target=both` 的 `stage` job，或本地源码构建） | CI / 本地 | `scripts/stage-native-bringup.py` | 可（唯一带安装器的路径） | Mach-O 契约 + POST 完整性 + strip 前后运行时字节比对 + ADT/payload 双重校验；CI 路径额外要求 kernel 的 SHA-256 出现在本次 run 的 `build-manifest.json` 里 |
 
-上机只走第三条：`install-native-bringup.py`（macOS，默认 dry-run，身份核验 + 完整备份 + 原子写 +
-回读）。Windows 上没有等价路径；手动把文件拷进 EFIESP **没有身份校验、没有备份、不是原子写**，
-不要把 Windows 手工拷贝算作验收通过的安装。
+上机只走第三条：`install-native-bringup.py`（默认 dry-run，身份核验 + 完整备份 + 原子写 + 回读），
+macOS 与 Windows 两个后端都支持；详见下面的「部署」。手动把文件拷进 EFIESP 不算安装。
+
+## 部署（真机写入）：只能在插着手机的那台机器上做
+
+GitHub Actions 的托管 runner 是云虚拟机，**没有到手机的 USB 通路**，所以它不能安装——它能做的
+是产出产物并验证安装前置条件。写入必须发生在手机插着的那台机器上。
+
+### Windows
+
+手机进入大容量存储模式后，EFIESP 会以一个 FAT 卷出现（实测：33276416 字节、USB 总线）。
+
+```powershell
+# 1) 取产物（stage artifact 保留 3 天）
+gh run download 43891763434 --repo hnmrxz/lumia950-ios-port -n lumia950-stage -D out\stage
+
+# 2) dry-run：只打印计划，不写任何字节
+python scripts\install-native-bringup.py --host windows --phone E: --stage out\stage
+
+# 3) 确认后写入；备份必须落在另一个盘
+python scripts\install-native-bringup.py --host windows --phone E: --stage out\stage `
+    --backup-root D:\Lumia950-backups --apply
+```
+
+Windows 的身份校验：卷大小 33276416、FAT、USB 总线、非启动卷，加上可选的 GPT 分区 GUID
+（`Get-Partition .Guid`，用 `--partition-uuid` 比对）；随后 `phone_identity()` 再校验五个既有
+引导文件的 SHA-256。`--volume-uuid` 是 macOS 的 diskutil 字段（FAT 卷序列号），Windows 上没有
+等价值，传了会被忽略并提示。
+
+### macOS
+
+```sh
+python3 scripts/install-native-bringup.py --stage out/stage \
+  --volume-uuid <diskutil VolumeUUID> --partition-uuid <diskutil DiskUUID> \
+  --backup-root /Volumes/<另一个卷>/Lumia950-backups --apply
+```
+
+### CI 证明什么、不证明什么
+
+- `stage` job（macOS）在**真实产物**上跑安装器的前置校验：manifest schema、七个文件的哈希、
+  菜单契约、crypto 契约；
+- `installer-windows` job（windows-2022）在真实 Windows 文件系统上跑完整个安装器测试套件，
+  包括原子写、备份与回读；
+- **两者都不写真机**。没有 CI job 能代替"把手机插上"这一步。
+
+`scripts/update-native-bringup.py`（安装后的增量更新）目前仍只支持 macOS；Windows 路径覆盖首次安装。
 
 ## 旧章节索引
 

@@ -766,6 +766,22 @@ jobs:
           # checkout; this used to delete a path that never existed.
           rm -f "$RUNNER_TEMP/device/unixnu.lock"
 
+  installer-windows:
+    # The installer writes to a phone that has to be plugged into the machine running it. A hosted
+    # runner has no such path, so this job proves the Windows backend on a real Windows filesystem
+    # -- temporary volumes, atomic writes, backups -- and not a deployment.
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: The installer's Windows backend
+        run: python scripts/test-native-install.py
+
   stage:
     # The deployable tree, assembled from this run's own artifacts: the menu, the source-only
     # kernel and the GPU driver. Until this job existed nothing in CI produced the tree that the
@@ -828,6 +844,24 @@ jobs:
           assert manifest["secondary_cpu_conduit_qualified"] is False
           print(f"staged tree ok: kernel {manifest['native_kernel_sha256'][:16]}, "
                 f"profile {manifest['adt_profile']}, dram {manifest['adt_dram_size']:#x}")
+          PY
+
+      - name: The installer would accept this tree
+        # A hosted runner has no USB path to a handset, so it cannot install. What the macOS
+        # runner can prove is the installer's own preconditions on the exact artifact: the
+        # manifest schema, every staged file's hash, the menu contract and the crypto contract.
+        # The write happens on the machine the phone is plugged into.
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import pathlib
+          spec = importlib.util.spec_from_file_location(
+              "installer", "scripts/install-native-bringup.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          files = module.stage_files(pathlib.Path("out/stage"))
+          total = sum(len(data) for data in files.values())
+          print(f"install preconditions ok: {len(files)} files, {total} bytes")
           PY
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

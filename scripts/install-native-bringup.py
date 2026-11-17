@@ -22,6 +22,10 @@ SPEC.loader.exec_module(STAGE)
 
 PHONE = Path("/Volumes/EFIESP")
 BACKUP_VOLUME = Path("/Volumes/bludssd")
+# The host decides how a mounted volume is identified. macOS uses diskutil; Windows uses the
+# storage cmdlets, which expose the same two GUIDs (mount-manager volume GUID and GPT partition
+# GUID) plus the bus type. Read at call time, so a test can force either backend.
+HOST = "windows" if os.name == "nt" else "macos"
 FILES = {
     "EFI/BOOT/BOOTAA64.EFI", "EFI/UniXNU/UniXNU.efi", "EFI/UniXNU/Drivers/DarwinBoot.efi",
     "EFI/UniXNU/Drivers/LumiaGpuPower.efi", "EFI/UniXNU/Payloads/kernel.macho",
@@ -44,11 +48,63 @@ def phone_file(name):
     return PHONE / ("EFI/boot/BOOTAA64.EFI" if name.casefold() == "efi/boot/bootaa64.efi" else name)
 
 
+def sync():
+    """Flush pending writes. os.sync exists on POSIX and macOS only."""
+    if hasattr(os, "sync"):
+        os.sync()
+
+
+WINDOWS_VOLUME_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$path = '__PATH__'
+$letter = (Split-Path -Qualifier $path).TrimEnd(':')
+$partition = Get-Partition -DriveLetter $letter
+$volume = Get-Volume -DriveLetter $letter
+$disk = Get-Disk -Number $partition.DiskNumber
+function GuidOf($value) {
+  if ($null -eq $value) { return '' }
+  $text = [string]$value
+  $match = [regex]::Match($text, '\{[0-9a-fA-F-]{36}\}')
+  if ($match.Success) { return $match.Value.Trim('{','}') }
+  return $text.Trim('{','}')
+}
+[pscustomobject]@{
+  DriveLetter    = "${letter}:"
+  FileSystemType = [string]$volume.FileSystemType
+  Size           = [long]$volume.Size
+  FreeSpace      = [long]$volume.SizeRemaining
+  Label          = [string]$volume.FileSystemLabel
+  VolumeGuid     = GuidOf $volume.UniqueId
+  PartitionGuid  = GuidOf $partition.Guid
+  DiskNumber     = [int]$disk.Number
+  DiskSize       = [long]$disk.Size
+  BusType        = [string]$disk.BusType
+  MediaType      = [string]$disk.MediaType
+  IsBoot         = [bool]$disk.IsBoot
+} | ConvertTo-Json -Compress
+"""
+
+
+def windows_volume_info(path):
+    """Size, filesystem, bus and the two GUIDs of the volume a drive letter is mounted from."""
+    drive = Path(path).drive or str(path)
+    script = WINDOWS_VOLUME_SCRIPT.replace("__PATH__", drive.replace("'", "''"))
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ValueError(f"cannot read the volume at {path}: {(result.stderr or result.stdout).strip()}")
+    return json.loads(result.stdout)
+
+
 def disk_info(device):
+    if HOST == "windows":
+        return windows_volume_info(device)
     return plistlib.loads(subprocess.check_output(["diskutil", "info", "-plist", str(device)]))
 
 
 def measured_phone(volume_uuid, partition_uuid):
+    if HOST == "windows":
+        return measured_phone_windows(partition_uuid)
     volume = disk_info(PHONE)
     whole = disk_info("/dev/" + volume["ParentWholeDisk"])
     if volume.get("VolumeUUID") != volume_uuid or volume.get("DiskUUID") != partition_uuid or \
@@ -58,6 +114,45 @@ def measured_phone(volume_uuid, partition_uuid):
         whole.get("BusProtocol") != "USB" or whole.get("Internal"):
         raise ValueError("connected device is not the explicitly identified Lumia EFIESP")
     return volume, whole
+
+
+def measured_phone_windows(partition_uuid):
+    """The same identity, read through the Windows storage cmdlets.
+
+    The GPT partition GUID is the one diskutil calls DiskUUID and it is compared when the operator
+    supplies it. The mount-manager volume GUID is not the FAT serial number diskutil reports, so
+    --volume-uuid cannot be matched here; size, FAT and the USB bus are checked instead, and
+    phone_identity() then compares the five boot files' SHA-256 values, which is the strongest
+    part of the identity on either host.
+    """
+    info = disk_info(PHONE)
+    if info.get("FileSystemType") not in ("FAT", "FAT32"):
+        raise ValueError(f"{PHONE} is {info.get('FileSystemType')}, not a FAT volume")
+    if info.get("Size") != 33276416:
+        raise ValueError(f"{PHONE} is {info.get('Size')} bytes, not the measured 33276416")
+    if (info.get("BusType") or "").casefold() != "usb":
+        raise ValueError(f"{PHONE} is on a {info.get('BusType')} disk, not USB")
+    if info.get("IsBoot"):
+        raise ValueError(f"{PHONE} is the boot volume; that is not the phone")
+    if partition_uuid and str(info.get("PartitionGuid") or "").casefold() != partition_uuid.casefold():
+        raise ValueError(f"{PHONE} partition GUID is {info.get('PartitionGuid')}, not {partition_uuid}")
+    volume = {"DeviceIdentifier": f"Windows volume {info['DriveLetter']}",
+              "TotalSize": info["Size"], "FreeSpace": info["FreeSpace"],
+              "FilesystemType": "msdos", "MountPoint": str(PHONE), "Writable": True,
+              "VolumeUUID": info.get("VolumeGuid"), "DiskUUID": info.get("PartitionGuid"),
+              "ParentWholeDisk": f"disk{info['DiskNumber']}"}
+    whole = {"DeviceIdentifier": f"disk{info['DiskNumber']}", "TotalSize": info.get("DiskSize"),
+             "MediaName": info.get("Label"), "BusProtocol": info.get("BusType"),
+             "Internal": (info.get("MediaType") or "").casefold() == "fixed"}
+    return volume, whole
+
+
+def backup_root_ok(backup_root, whole):
+    """The backup has to survive the phone: a different volume by construction."""
+    if HOST == "windows":
+        return backup_root.drive.casefold() != Path(PHONE).drive.casefold()
+    return backup_root.is_relative_to(BACKUP_VOLUME.resolve()) and \
+        disk_info(BACKUP_VOLUME)["ParentWholeDisk"] != whole["DeviceIdentifier"]
 
 
 def phone_identity(volume_uuid, partition_uuid):
@@ -135,9 +230,8 @@ def install(args):
         print(json.dumps(summary, indent=2))
         return
     backup_root = args.backup_root.resolve()
-    if not backup_root.is_relative_to(BACKUP_VOLUME.resolve()) or \
-        disk_info(BACKUP_VOLUME)["ParentWholeDisk"] == whole["DeviceIdentifier"]:
-        raise ValueError("verified backup must go to the separate bludssd volume")
+    if not backup_root_ok(backup_root, whole):
+        raise ValueError("the verified backup has to go to a volume that is not the phone's")
     backup_root.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     backup = Path(tempfile.mkdtemp(prefix=f"native-bringup-{timestamp}-", dir=backup_root))
@@ -178,7 +272,7 @@ def install(args):
         if name != "EFI/BOOT/BOOTAA64.EFI" and phone_file(name).read_bytes() != data:
             raise ValueError("staged phone files changed; old fallback remains intact")
     write_verified(PHONE / "EFI/boot/BOOTAA64.EFI", files["EFI/BOOT/BOOTAA64.EFI"])
-    os.sync()
+    sync()
     time.sleep(2)
     for name, data in files.items():
         if phone_file(name).read_bytes() != data:
@@ -195,11 +289,40 @@ def install(args):
 def main():
     parser = argparse.ArgumentParser(description="Reversible file-only installer for the measured Lumia; dry-run unless --apply")
     parser.add_argument("--stage", required=True, type=Path)
-    parser.add_argument("--volume-uuid", required=True)
-    parser.add_argument("--partition-uuid", required=True)
-    parser.add_argument("--backup-root", type=Path, default=Path("/Volumes/bludssd/Lumia950-backups"))
+    parser.add_argument("--host", choices=("macos", "windows"),
+                        help="override the detected host (default: the platform this runs on)")
+    parser.add_argument("--phone", type=Path,
+                        help="the mounted EFIESP volume: a path on macOS (/Volumes/EFIESP), the "
+                             "drive on Windows (E:)")
+    parser.add_argument("--volume-uuid",
+                        help="macOS: the EFIESP volume UUID (diskutil VolumeUUID)")
+    parser.add_argument("--partition-uuid",
+                        help="macOS: the partition UUID (diskutil DiskUUID). Windows: the GPT "
+                             "partition GUID, optional but compared when given")
+    parser.add_argument("--backup-root", type=Path,
+                        help="where the verified backup goes; default: a separate volume")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
+
+    global HOST, PHONE, BACKUP_VOLUME
+    if args.host:
+        HOST = args.host
+    if args.phone:
+        PHONE = args.phone
+    if HOST == "windows":
+        if not args.phone:
+            parser.error("--phone is required on Windows: the drive the phone's EFIESP is mounted "
+                         "as, for example --phone E:")
+        if args.volume_uuid:
+            print("note: --volume-uuid is a macOS field; Windows identity uses the partition GUID "
+                  "(when given), the size, the FAT filesystem and the five boot-file hashes")
+        if args.backup_root is None:
+            args.backup_root = Path.home() / "Lumia950-backups"
+    else:
+        if not args.volume_uuid or not args.partition_uuid:
+            parser.error("--volume-uuid and --partition-uuid are required on macOS (diskutil info)")
+        if args.backup_root is None:
+            args.backup_root = BACKUP_VOLUME / "Lumia950-backups"
     try:
         install(args)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
