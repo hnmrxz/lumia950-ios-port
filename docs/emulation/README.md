@@ -262,6 +262,25 @@ It shows what the chain really rendered, not what a log claims: the UniXNU menu 
 console would draw on, and the reason the colour histogram lists `00ff00` (the bar) next to the
 dark background.
 
+**`gSocPhys == 0` has a cause, not a mystery.** The kernel logs
+`pe_arm_map_interrupt_controller: soc_phys: 0x0` and then
+`pe_arm_init_debug: failed to initialize gSocPhys == 0`, and that is where the platform expert
+stops. In `pexpert/arm/pe_identify_machine.c` (xnu-8796.141.3) `pe_arm_get_soc_base_phys()` takes the
+**second 64-bit cell of `/arm-io/ranges`** and returns it, treating zero as "unset", and
+`pe_arm_map_interrupt_controller()` returns immediately when it is zero — so `gPicBase` and
+`gTimerBase` are never mapped by the platform expert at all.
+
+This tree emits `ranges = <0 0 0x100000000>` and keeps **absolute** addresses in the children's
+`reg`, so that second cell is zero by construction. The interrupt controller is therefore mapped by
+ArmCpu and not by the PE, which is what the milestones show working (`ArmCpu::prepareGic` →
+`prepareDistributor` → `prepareLocal`) — but the PE-only paths that need `gSocPhys` (debug interface,
+`pe_serial`, the FIQ handlers) are inert. `scripts/check-adt.py` prints a note about it, because a
+warning in a log that nobody can explain is worse than one with a citation.
+
+Whether the handset needs the PE-level mapping (a `ranges` base with relative child addresses) or
+ArmCpu's own is still open: the emulator says the current arrangement boots this far, and nothing has
+run on a phone.
+
 ## The kernel's own log
 
 A machine with no console still records what happened: XNU's `printf` goes through `msgbuf` as well

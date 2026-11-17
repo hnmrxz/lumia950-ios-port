@@ -118,8 +118,8 @@
       "All FIPSPOST_KEXT tests report PASSED and 'corecrypto_kext_start completed successfully' before the panic: the source crypto POST is not only returning 0 to the fixture, it is in the kernel's own record.",
       "initialize_screen reports the DarwinBoot framebuffer (0x6C7A0000, 800x600, row 3200) as the kernel's screen, so a framebuffer console has a place to write after ExitBootServices.",
       "ml_processor_register registers exactly one processor, cpu_number 0, which matches the single-CPU ADT profile.",
-      "pe_arm_init_debug: failed to initialize gSocPhys == 0 is logged during interrupt controller bring-up. It is a warning, not the stop.",
-      "the log ends at 'mbinit: done', i.e. inside the BSD start, which is where the pthread panic happens."
+      "the log ends at 'mbinit: done', i.e. inside the BSD start, which is where the pthread panic happens.",
+      "pe_arm_init_debug: failed to initialize gSocPhys == 0 has a cause: pe_arm_get_soc_base_phys() reads the second 64-bit cell of /arm-io/ranges (pexpert/arm/pe_identify_machine.c) and this tree leaves it zero, so pe_arm_map_interrupt_controller() returns before mapping gPicBase or gTimerBase; ArmCpu maps the controller itself, which is the path the milestones show working."
     ],
     "why_it_matters": "This is the content the log transport (P1.1) exists to carry. On the emulator it can be read straight out of kernel memory; on a handset it still needs a way out, which is what the GOP-first decision record is about."
   },

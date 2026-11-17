@@ -527,6 +527,21 @@ def _check_arm_io(arm_io: Node, errors: list[str], notes: list[str]) -> None:
             errors.append("/arm-io/intc/reg does not describe whole address/size windows")
         if b"gic-2" in compatible or b"qgic2" in compatible:
             notes.append("/arm-io/intc is a GICv2; native ArmCpu integration needs an SDK build and handset IRQ validation")
+        # pe_arm_get_soc_base_phys() (pexpert/arm/pe_identify_machine.c) takes the second 64-bit
+        # cell of /arm-io/ranges as the SoC base and treats zero as "unset": with zero there,
+        # pe_arm_map_interrupt_controller() returns before it maps gPicBase or gTimerBase, and the
+        # kernel logs "pe_arm_init_debug: failed to initialize gSocPhys == 0". This tree keeps
+        # absolute addresses in the children's reg, so ArmCpu's own mapping is the path that works;
+        # say so instead of leaving the log line unexplained.
+        ranges = arm_io.value("ranges")
+        if ranges is not None and len(ranges) >= 16:
+            soc_base = struct.unpack("<Q", ranges[8:16])[0]
+            if soc_base == 0:
+                notes.append("/arm-io/ranges leaves the SoC base at zero, so "
+                             "pe_arm_get_soc_base_phys() returns 0 and the platform expert does not "
+                             "map the interrupt controller or timer itself (XNU logs "
+                             "'failed to initialize gSocPhys == 0'); children carry absolute "
+                             "addresses and ArmCpu maps them")
 
     sdhci = next((child for child in arm_io.children
                   if (child.value("compatible") or b"").find(b"qcom,sdhci-msm-v4") >= 0), None)
