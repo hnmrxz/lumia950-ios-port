@@ -663,16 +663,17 @@ jobs:
 
       - name: Use upstream's profile-driven pthread builder, on the Darwin 22 source
         # ci/libpthread holds upstream's builder verbatim; the pin's version builds the Darwin 23
-        # component by construction. The reference tree is fetched at the feed's revision, so the
-        # older one has to be fetched explicitly before the builder can check it out. This runs
-        # after the fetch step, so the reference tree exists by now.
+        # component by construction. The feed clones into out/feeds/libpthread-*, so that is where
+        # the reference tree is; the older revision is fetched and checked out here.
         run: |
           cp ci/libpthread/build-libpthread-kernel.py unixnu/scripts/build-libpthread-kernel.py
           cp ci/libpthread/kernel_target.py unixnu/scripts/kernel_target.py
-          reference=$(find "$GITHUB_WORKSPACE/out/feeds" "$GITHUB_WORKSPACE/unixnu/refer" "
-              -maxdepth 2 -type d -name 'libpthread*' -print -quit 2>/dev/null || true)
+          reference=""
+          for candidate in "$GITHUB_WORKSPACE"/out/feeds/libpthread* "$GITHUB_WORKSPACE"/unixnu/refer/libpthread; do
+            if [ -d "$candidate/.git" ]; then reference="$candidate"; break; fi
+          done
           if [ -z "$reference" ]; then
-            echo "::warning::no libpthread reference tree found yet; the builder will fetch or fail"
+            echo "::warning::no libpthread reference tree found; the builder will fetch or fail"
           else
             git -C "$reference" fetch -q --depth 1 origin "$UNIXNU_LIBPTHREAD_COMMIT" || true
             git -C "$reference" -c advice.detachedHead=false checkout -q "$UNIXNU_LIBPTHREAD_COMMIT"
