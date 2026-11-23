@@ -703,6 +703,12 @@ jobs:
         # that cache. Every stop fails the job now: there is no gate left to tolerate.
         run: |
           set +e
+          # The bootstrap pass links before any builder has produced the provider archives, and
+          # this port's patches reference two of their symbols. Weak stand-ins satisfy that pass;
+          # the strong definitions still win in the final link.
+          xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -c \
+              -o "$RUNNER_TEMP/kernel-provider-stubs.o" ci/stubs/kernel-provider-stubs.c
+          export XNU_EXTRA_LD_ARCHIVES="$RUNNER_TEMP/kernel-provider-stubs.o"
           cd unixnu
           python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tee "$GITHUB_WORKSPACE/kernel.log"
           status=${PIPESTATUS[0]}
