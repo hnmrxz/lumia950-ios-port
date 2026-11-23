@@ -685,6 +685,33 @@ jobs:
           git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
           echo "reference now at $(git -C "$reference" rev-parse HEAD)"
 
+      - name: Give the record pass weak stand-ins for the two provider symbols
+        # The bootstrap pass links before any builder has produced the provider archives, and this
+        # port's patches reference two of their symbols. The harness takes the archive list from
+        # CONFIG_XNU_EXTRA_LD_ARCHIVES and would override an exported variable, so the stub goes into
+        # the device copy of the defconfig instead. Weak definitions are replaced by the strong ones
+        # in the final link, and nothing in the records image calls them.
+        run: |
+          stub="$RUNNER_TEMP/kernel-provider-stubs.o"
+          xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -c \
+              -o "$stub" ci/stubs/kernel-provider-stubs.c
+          target=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit || true)
+          [ -n "$target" ] || { echo "::error::the device tree has no defconfig to extend"; exit 1; }
+          echo "defconfig: $target"
+          python3 - "$target" "$stub" <<'PY'
+          import pathlib, re, sys
+          path, stub = pathlib.Path(sys.argv[1]), sys.argv[2]
+          text = path.read_text()
+          line = [row for row in text.splitlines() if row.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES=")]
+          if not line:
+              text += f'\nCONFIG_XNU_EXTRA_LD_ARCHIVES="{stub}"\n'
+          else:
+              current = line[0].split("=", 1)[1].strip().strip('"')
+              text = text.replace(line[0], f'CONFIG_XNU_EXTRA_LD_ARCHIVES="{current} {stub}"', 1)
+          path.write_text(text)
+          print([row for row in text.splitlines() if row.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES=")][0])
+          PY
+
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
         # 16.7.16 image, and [kernel.prelink] pins the kernelcache the merge consumes. The
@@ -692,12 +719,6 @@ jobs:
         # that cache. Every stop fails the job now: there is no gate left to tolerate.
         run: |
           set +e
-          # The bootstrap pass links before any builder has produced the provider archives, and
-          # this port's patches reference two of their symbols. Weak stand-ins satisfy that pass;
-          # the strong definitions still win in the final link.
-          xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -c \
-              -o "$RUNNER_TEMP/kernel-provider-stubs.o" ci/stubs/kernel-provider-stubs.c
-          export XNU_EXTRA_LD_ARCHIVES="$RUNNER_TEMP/kernel-provider-stubs.o"
           cd unixnu
           python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tee "$GITHUB_WORKSPACE/kernel.log"
           status=${PIPESTATUS[0]}
