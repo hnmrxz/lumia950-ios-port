@@ -721,7 +721,7 @@ jobs:
               -e 's/^timeout = .*/timeout = 300/' "$esp/EFI/UniXNU/unixnu.toml"
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
-          python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
+          python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --past-bsd --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
 
       - name: Archive what the emulated boot reached
         if: always()
