@@ -565,6 +565,7 @@ jobs:
     # Manual only. A macOS minute bills as ten on a private repository, and this is the only job
     # that needs Xcode; a push to main used to start it and spend roughly ninety minutes of quota
     # every time. Run it with target=kernel or target=both.
+    needs: payload
     if: github.event_name == 'workflow_dispatch' && (inputs.target == 'kernel' || inputs.target == 'both')
     runs-on: ${{ vars.MACOS_RUNNER || 'macos-26' }}
     timeout-minutes: 360
@@ -609,6 +610,11 @@ jobs:
           brew install cmake ninja unifdef llvm mtools dtc
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix unifdef)/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: lumia950-payload
+          path: out/payload
 
       - name: Prepare the build copy
         # The committed board keeps example = true so nothing pretends this port is
@@ -688,6 +694,38 @@ jobs:
           fi
           python3 scripts/check-kernel-link.py --image "$image" --archives-root "$UNIXNU_OUT" \
               --config configs/lumia950_defconfig
+
+      - name: The emulated kernel boots through IOKit, in this job
+        # A public repository must not publish lumia950-kernel: it carries extensions merged out of
+        # an Apple kernelcache, which is why the artifact job refuses to upload it. So the QEMU
+        # assertion runs here, against the image this job just linked, and only the report is
+        # archived. The ESP is the payload artifact plus that image; the ADT comes from this
+        # repository's generator with the qemu profile's interrupt controller windows.
+        run: |
+          brew list qemu >/dev/null 2>&1 || brew install qemu
+          esp="$RUNNER_TEMP/esp"
+          rm -rf "$esp"
+          mkdir -p "$esp/EFI/UniXNU/Payloads"
+          # The artifact's own directory prefix is GitHub's business: locate the menu by name.
+          config=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
+          [ -n "$config" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
+          cp -R "${config%/EFI/UniXNU/unixnu.toml}/EFI/UniXNU/." "$esp/EFI/UniXNU/"
+          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit)
+          prelinked=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit)
+          cp "$prelinked" "$esp/EFI/UniXNU/Payloads/kernel.macho"
+          python3 scripts/make-lumia950-adt.py               --output "$esp/EFI/UniXNU/Payloads/kernel.macho.adt"               --dram-size 0xAF600000 --unique-chip-id 1122334455667788               --cpu-regs 0 --psci-method none --owned-memory-size 0x20000000               --gic-distributor 0x08000000:0x10000 --gic-cpu-interface 0x08010000:0x10000
+          firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
+          [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
+          python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
+
+      - name: Archive what the emulated boot reached
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lumia950-xnu-entry
+          path: out/xnu-entry/**
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Name the first compile error
         # util.run keeps a command's output in the log file and echoes only its last 30
