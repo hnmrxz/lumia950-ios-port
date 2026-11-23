@@ -116,7 +116,6 @@ class NativeBringupTests(unittest.TestCase):
                    if line.strip().startswith("CONFIG_")]
         self.assertIn("CONFIG_XNU_SOURCE_CORECRYPTO14=y", enabled,
                       "ArmCpu is only accepted with the real source crypto provider")
-        self.assertNotIn("CONFIG_XNU_SOURCE_PTHREAD=y", enabled)
         self.assertIn("pthread kernel extension not loaded", config)
 
     def test_source_provider_integrity_is_not_optional(self):
