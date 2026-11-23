@@ -732,6 +732,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Print what the archive builders said when they failed
+        if: failure()
+        # A builder that fails writes its compiler output to a log inside the run's output tree, and
+        # the workflow used to keep only a pointer to it. Print the matching lines so the next
+        # reader (and the next iteration on the pthread component) sees the error in the run log.
+        run: |
+          for log in $(find "$UNIXNU_OUT" -name 'archive-*.log' -o -name 'kernel.log' 2>/dev/null); do
+            matches=$(grep -n -m 5 -E 'error:|fatal error' "$log" || true)
+            if [ -n "$matches" ]; then
+              echo "=== $log"
+              echo "$matches"
+            fi
+          done
+
       - name: Name the first compile error
         # util.run keeps a command's output in the log file and echoes only its last 30
         # lines, which are the make recursion and not the cause. The first error line is.
