@@ -617,27 +617,28 @@ jobs:
           path: out/payload
 
       - name: Make the framework build print its kernel archive list
-        # The failing link is the only place that knows which archives reached it, and make does not
-        # print LD_KERNEL_ARCHIVES. This edits the framework checkout in place, after the 16.x patch
-        # step and before the build, so the next probe run says what it actually linked.
+        # The failing link is the only place that knows which archives and which device
+        # configuration reached it, and make prints neither LD_KERNEL_ARCHIVES nor the XNU_* flags.
+        # This edits the framework checkout in place, after the 16.x patch step and before the
+        # build, so a probe run says both.
         run: |
           python3 - <<'PY'
           import pathlib
           script = pathlib.Path("unixnu/scripts/build-xnu-4k-baseline.sh")
           text = script.read_text()
           needle = 'EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")'
-          if "echo LD_KERNEL_ARCHIVES" not in text and needle in text:
-              text = text.replace(needle, 'echo "LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES"\n' + needle, 1)
-              env_line = 'echo XNU_ENV SOURCE_CORECRYPTO14=${XNU_SOURCE_CORECRYPTO14:-unset} EXTRA_LD=${XNU_EXTRA_LD_ARCHIVES:-unset}'
-              if "XNU_ENV" not in text:
-                  text = text.replace(needle, env_line + "\n" + needle, 1)
-                       'EXTRA_LD=${XNU_EXTRA_LD_ARCHIVES:-unset} '
-                       'SOURCE_PTHREAD=${XNU_SOURCE_PTHREAD:-unset}"'
+          probes = (
+              'echo "LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES"',
+              'echo "XNU_ENV crypto=${XNU_SOURCE_CORECRYPTO14:-unset} pthread=${XNU_SOURCE_PTHREAD:-unset}"',
+          )
+          added = 0
+          for probe in probes:
+              if probe not in text and needle in text:
                   text = text.replace(needle, probe + "\n" + needle, 1)
+                  added += 1
+          if added:
               script.write_text(text)
-              print("added the archive echo")
-          else:
-              print("archive echo already present or anchor missing")
+          print(f"archive/env probes added: {added}")
           PY
 
       - name: Prepare the build copy
