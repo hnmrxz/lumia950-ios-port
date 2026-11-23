@@ -661,11 +661,9 @@ jobs:
           python3 unixnu fetch xnu libplatform libdispatch AvailabilityVersions \
               libpthread corecrypto-2023 IOStorageFamily -D "$RUNNER_TEMP/device"
 
-      - name: Use upstream's pthread builder on the Darwin 22 source, in the device tree too
-        # The pin's builder only knows the Darwin 23 component and refuses any other reference, and the
-        # build tree is copied from the device directory rather than from unixnu/, which is why an
-        # earlier copy into unixnu/scripts had no effect (run 45229634016 used the pin's builder).
-        # Both places are filled, and the reference is checked out at the annotated tag's commit.
+      - name: Use upstream's pthread builder, which accepts a named revision
+        # The pin's builder only knows the Darwin 23 component and this port runs the Darwin 22
+        # kernel. The build tree is copied from the device directory, so the builder goes into both.
         run: |
           for directory in unixnu/scripts "$RUNNER_TEMP/device/scripts"; do
             if [ -d "$directory" ]; then
@@ -674,18 +672,6 @@ jobs:
               echo "builder installed in $directory"
             fi
           done
-          reference=""
-          for candidate in "$GITHUB_WORKSPACE"/out/feeds/libpthread* "$GITHUB_WORKSPACE"/unixnu/refer/libpthread; do
-            if [ -d "$candidate/.git" ]; then reference="$candidate"; break; fi
-          done
-          if [ -z "$reference" ]; then
-            echo "::warning::no libpthread reference tree yet; the builder will fetch it"
-          else
-            git -C "$reference" fetch -q --depth 1 origin \
-                refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
-            git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
-            echo "reference now at $(git -C "$reference" rev-parse HEAD)"
-          fi
 
       - name: Build the tree once without the pthread component
         # build-libpthread-kernel.py needs compile records, and asking for them makes the driver run a
@@ -704,6 +690,17 @@ jobs:
           cp "$RUNNER_TEMP/defconfig.saved" "$config"
           cp "$RUNNER_TEMP/board.saved" "$board"
           echo "records and archives exist; the component can be built from them now"
+          # The builder reads refer/libpthread inside the build tree, and that clone only exists
+          # after this first build; the feed clone checked out earlier is a different tree.
+          reference="$UNIXNU_OUT/lumia950/tree/refer/libpthread"
+          if [ -d "$reference/.git" ]; then
+            git -C "$reference" fetch -q --depth 1 origin \
+                refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+            git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+            echo "tree reference now at $(git -C "$reference" rev-parse HEAD)"
+          else
+            echo "::error::the build tree has no pthread reference"; exit 1
+          fi
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
