@@ -715,6 +715,10 @@ jobs:
           python3 scripts/stage-kernel.py --kernel "$image" \
               --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}" \
               --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified
+          # stage-kernel.py renders the menu for the device route; the fixture turns it into
+          # the explicit-choice test menu and matches these two lines exactly, so set them here.
+          sed -i '' -e 's/^default = .*/default = "exit"/' \
+              -e 's/^timeout = .*/timeout = 300/' "$esp/EFI/UniXNU/unixnu.toml"
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
           python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
