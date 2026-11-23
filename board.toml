@@ -26,7 +26,6 @@ defconfig = "lumia950_defconfig"
 # platform expert that consumes the ADT; ArmCpu owns the CPU, timer and interrupt path;
 # NativeSdhci is this device's eMMC driver (see drivers/NativeSdhci and README.md).
 archives = [
-  "build-libpthread-kernel.py",
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
