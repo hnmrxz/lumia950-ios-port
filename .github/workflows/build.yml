@@ -669,7 +669,8 @@ jobs:
         run: |
           cp ci/libpthread/build-libpthread-kernel.py unixnu/scripts/build-libpthread-kernel.py
           cp ci/libpthread/kernel_target.py unixnu/scripts/kernel_target.py
-          reference=$(find "$GITHUB_WORKSPACE" -maxdepth 4 -type d -name 'libpthread*' -path '*refer*' -print -quit || true)
+          reference=$(find "$GITHUB_WORKSPACE/out/feeds" "$GITHUB_WORKSPACE/unixnu/refer" "
+              -maxdepth 2 -type d -name 'libpthread*' -print -quit 2>/dev/null || true)
           if [ -z "$reference" ]; then
             echo "::warning::no libpthread reference tree found yet; the builder will fetch or fail"
           else
