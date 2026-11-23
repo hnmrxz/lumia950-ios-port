@@ -711,8 +711,13 @@ jobs:
           [ -n "$config" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
           cp -R "${config%/EFI/UniXNU/unixnu.toml}/EFI/UniXNU/." "$esp/EFI/UniXNU/"
           image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit)
-          prelinked=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit)
-          cp "$prelinked" "$esp/EFI/UniXNU/Payloads/kernel.macho"
+
+          # The fixture accepts the source kernel, not the prelinked image: the latter carries
+          # populated __PRELINK segments, which its contract refuses by design. stage-kernel.py
+          # strips the source kernel the same way, so do that here.
+          stripped="${image%.unstripped}"
+          [ -f "$stripped" ] || { echo "::error::no stripped source kernel beside the image"; exit 1; }
+          cp "$stripped" "$esp/EFI/UniXNU/Payloads/kernel.macho"
           python3 scripts/make-lumia950-adt.py               --output "$esp/EFI/UniXNU/Payloads/kernel.macho.adt"               --dram-size 0xAF600000 --unique-chip-id 1122334455667788               --cpu-regs 0 --psci-method none --owned-memory-size 0x20000000               --gic-distributor 0x08000000:0x10000 --gic-cpu-interface 0x08010000:0x10000
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
