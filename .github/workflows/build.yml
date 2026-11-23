@@ -705,20 +705,14 @@ jobs:
           brew list qemu >/dev/null 2>&1 || brew install qemu
           esp="$RUNNER_TEMP/esp"
           rm -rf "$esp"
-          mkdir -p "$esp/EFI/UniXNU/Payloads"
-          # The artifact's own directory prefix is GitHub's business: locate the menu by name.
-          config=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
-          [ -n "$config" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
-          cp -R "${config%/EFI/UniXNU/unixnu.toml}/EFI/UniXNU/." "$esp/EFI/UniXNU/"
-          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit)
-
-          # The fixture accepts the source kernel, not the prelinked image: the latter carries
-          # populated __PRELINK segments, which its contract refuses by design. stage-kernel.py
-          # strips the source kernel the same way, so do that here.
-          stripped="${image%.unstripped}"
-          [ -f "$stripped" ] || { echo "::error::no stripped source kernel beside the image"; exit 1; }
-          cp "$stripped" "$esp/EFI/UniXNU/Payloads/kernel.macho"
-          python3 scripts/make-lumia950-adt.py               --output "$esp/EFI/UniXNU/Payloads/kernel.macho.adt"               --dram-size 0xAF600000 --unique-chip-id 1122334455667788               --cpu-regs 0 --psci-method none --owned-memory-size 0x20000000               --gic-distributor 0x08000000:0x10000 --gic-cpu-interface 0x08010000:0x10000
+          # stage-kernel.py is the project's own stager: it strips the source kernel the way the
+          # fixture's contract expects and renders the explicit-choice menu, so the ESP is built
+          # by the same code the device route uses instead of by hand.
+          menu=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
+          [ -n "$menu" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
+          python3 scripts/stage-kernel.py --kernel "$image" \
+              --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}/EFI/UniXNU" \
+              --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
           python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
