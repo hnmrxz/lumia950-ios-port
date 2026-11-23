@@ -661,6 +661,32 @@ jobs:
           python3 unixnu fetch xnu libplatform libdispatch AvailabilityVersions \
               libpthread corecrypto-2023 IOStorageFamily -D "$RUNNER_TEMP/device"
 
+      - name: Use upstream's pthread builder on the Darwin 22 source, in the device tree too
+        # The pin's builder only knows the Darwin 23 component and refuses any other reference, and the
+        # build tree is copied from the device directory rather than from unixnu/, which is why an
+        # earlier copy into unixnu/scripts had no effect (run 45229634016 used the pin's builder).
+        # Both places are filled, and the reference is checked out at the annotated tag's commit.
+        run: |
+          for directory in unixnu/scripts "$RUNNER_TEMP/device/scripts"; do
+            if [ -d "$directory" ]; then
+              cp ci/libpthread/build-libpthread-kernel.py "$directory/build-libpthread-kernel.py"
+              cp ci/libpthread/kernel_target.py "$directory/kernel_target.py"
+              echo "builder installed in $directory"
+            fi
+          done
+          reference=""
+          for candidate in "$GITHUB_WORKSPACE"/out/feeds/libpthread* "$GITHUB_WORKSPACE"/unixnu/refer/libpthread; do
+            if [ -d "$candidate/.git" ]; then reference="$candidate"; break; fi
+          done
+          if [ -z "$reference" ]; then
+            echo "::warning::no libpthread reference tree yet; the builder will fetch it"
+          else
+            git -C "$reference" fetch -q --depth 1 origin \
+                refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+            git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+            echo "reference now at $(git -C "$reference" rev-parse HEAD)"
+          fi
+
       - name: Build the tree once without the pthread component
         # build-libpthread-kernel.py needs compile records, and asking for them makes the driver run a
         # records pass that links without any provider archives (that pass cannot succeed while this
