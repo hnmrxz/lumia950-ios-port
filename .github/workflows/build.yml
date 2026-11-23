@@ -685,9 +685,10 @@ jobs:
           cp "$config" "$RUNNER_TEMP/defconfig.saved"
           sed -i '' '/^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
           sed -i '' '/build-libpthread-kernel.py/d' "$board"
-          if grep -q "SOURCE_PTHREAD" "$config"; then
-            echo "::error::the pthread flag survived the strip, so this build would need the archive";
-            grep -n "SOURCE_PTHREAD" "$config"; exit 1
+          if grep -qE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$config"; then
+            echo "::error::the pthread flag survived the strip, so this build would need the archive"
+            grep -nE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$config"
+            exit 1
           fi
           cd unixnu
           python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -12
