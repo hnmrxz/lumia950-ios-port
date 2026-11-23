@@ -576,7 +576,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # This port runs xnu-8796.141.3 (Darwin 22); the framework's feed pins the
       # Darwin 23 pthread source, which cannot link against this kernel.
-      UNIXNU_LIBPTHREAD_COMMIT: ea29c4ab45a49dd44d564a093b1c9ce9d58610bc
+      UNIXNU_LIBPTHREAD_COMMIT: ba8e1488a0e6848b710c5daad2e226f66cfed656
       PYTHONPATH: ${{ github.workspace }}/ci-tools
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
