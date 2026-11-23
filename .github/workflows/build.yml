@@ -713,7 +713,7 @@ jobs:
           menu=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
           [ -n "$menu" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
           python3 scripts/stage-kernel.py --kernel "$image" \
-              --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}/EFI/UniXNU" \
+              --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}" \
               --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
