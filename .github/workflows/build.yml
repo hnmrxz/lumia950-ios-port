@@ -663,8 +663,9 @@ jobs:
 
       - name: Use upstream's profile-driven pthread builder, on the Darwin 22 source
         # ci/libpthread holds upstream's builder verbatim; the pin's version builds the Darwin 23
-        # component by construction. The feed clones into out/feeds/libpthread-*, so that is where
-        # the reference tree is; the older revision is fetched and checked out here.
+        # component by construction. The feed's clone is shallow and only knows its own revision, so
+        # the Darwin 22 tag is fetched by name and any failure is loud: a silent fallback here is
+        # what kept the link building against the wrong source for two rounds.
         run: |
           cp ci/libpthread/build-libpthread-kernel.py unixnu/scripts/build-libpthread-kernel.py
           cp ci/libpthread/kernel_target.py unixnu/scripts/kernel_target.py
@@ -673,12 +674,16 @@ jobs:
             if [ -d "$candidate/.git" ]; then reference="$candidate"; break; fi
           done
           if [ -z "$reference" ]; then
-            echo "::warning::no libpthread reference tree found; the builder will fetch or fail"
-          else
-            git -C "$reference" fetch -q --depth 1 origin "$UNIXNU_LIBPTHREAD_COMMIT" || true
-            git -C "$reference" -c advice.detachedHead=false checkout -q "$UNIXNU_LIBPTHREAD_COMMIT"
-            echo "reference now at $(git -C "$reference" rev-parse HEAD)"
+            echo "::error::no libpthread reference tree found; the feed step should have cloned one"
+            exit 1
           fi
+          echo "reference: $reference"
+          git -C "$reference" remote -v
+          git -C "$reference" log -1 --oneline
+          git -C "$reference" fetch --depth 1 origin \
+              refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+          git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+          echo "reference now at $(git -C "$reference" rev-parse HEAD)"
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
