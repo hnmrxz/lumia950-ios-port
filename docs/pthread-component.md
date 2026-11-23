@@ -96,3 +96,19 @@ The next step is therefore to find where that revision actually comes from: the 
 == fetch https://github.com/apple-oss-distributions/libpthread.git c0e60fb5ecfc, so the driver is
 resolving it from its own feed data, not from the checkout. Setting that one value -- rather than
 fighting its result -- is what closes this.
+
+### One clone, moved, still refused
+
+Run 45241901405 settled where the reference lives: exactly one clone exists in the workspace,
+out/feeds/libpthread-67dc7894, and it **was** moved to the Darwin 22 commit:
+
+`
+pthread reference: .../out/feeds/libpthread-67dc7894 at c0e60fb5ecfc...
+  moved to ba8e1488a0e6848b710c5daad2e226f66cfed656
+`
+
+The builder still answered Unexpected libpthread source revision. The only remaining reading is that
+the second build fetches its own reference *after* this step and puts it back on the Darwin 23
+revision -- so the value to change is the driver's feed data, not any checkout. The next thing to find
+is that data: grep -rn libpthread-519 unixnu/ and grep -rn c0e60fb unixnu/ inside the framework
+clone, which needs one CI step or a local clone of UniXNU/UniXNU@1a01c2a.
