@@ -690,6 +690,15 @@ jobs:
           cp "$RUNNER_TEMP/defconfig.saved" "$config"
           cp "$RUNNER_TEMP/board.saved" "$board"
           echo "records and archives exist; the component can be built from them now"
+          # The second build re-reads the feed, which would put the reference back on the
+          # Darwin 23 revision and make the builder refuse it again (run 45237654171 did, even
+          # with the tree reference checked out). The feed entry itself is changed instead.
+          for feed in "$UNIXNU_OUT/lumia950/tree/feeds.toml" unixnu/feeds.toml; do
+            if [ -f "$feed" ] && grep -q "libpthread-519.120.4" "$feed"; then
+              sed -i '' 's/libpthread-519.120.4/libpthread-519.101.1/g' "$feed"
+              echo "feed pinned to the Darwin 22 pthread source: $feed"
+            fi
+          done
           # The builder reads refer/libpthread inside the build tree, and that clone only exists
           # after this first build; the feed clone checked out earlier is a different tree.
           reference="$UNIXNU_OUT/lumia950/tree/refer/libpthread"
