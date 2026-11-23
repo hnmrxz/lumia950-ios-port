@@ -25,6 +25,9 @@ sys.path.insert(0, str(SCRIPTS))
 def load(name, filename):
     spec = importlib.util.spec_from_file_location(name, SCRIPTS / filename)
     module = importlib.util.module_from_spec(spec)
+    # dataclasses looks the module up in sys.modules while the class body is processed;
+    # without this registration Python 3.12 raises AttributeError there.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 

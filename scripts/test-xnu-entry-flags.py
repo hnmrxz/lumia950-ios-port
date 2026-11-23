@@ -15,6 +15,9 @@ from pathlib import Path
 SCRIPT = Path(__file__).with_name("test-native-xnu-entry.py")
 SPEC = importlib.util.spec_from_file_location("xnu_entry", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
+# dataclasses looks the module up in sys.modules while the class body is processed;
+# without this registration Python 3.12 raises AttributeError there.
+sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 BASE = ["test-native-xnu-entry.py", "--kernel", "k", "--esp", "e", "--firmware", "f",
