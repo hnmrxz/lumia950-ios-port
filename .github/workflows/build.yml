@@ -699,17 +699,22 @@ jobs:
               echo "feed pinned to the Darwin 22 pthread source: $feed"
             fi
           done
-          # The builder reads refer/libpthread inside the build tree, and that clone only exists
-          # after this first build; the feed clone checked out earlier is a different tree.
-          reference="$UNIXNU_OUT/lumia950/tree/refer/libpthread"
-          if [ -d "$reference/.git" ]; then
-            git -C "$reference" fetch -q --depth 1 origin \
-                refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
-            git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
-            echo "tree reference now at $(git -C "$reference" rev-parse HEAD)"
-          else
-            echo "::error::the build tree has no pthread reference"; exit 1
-          fi
+          # The builder reads its source from a reference clone whose location was guessed wrong
+          # three times, so every clone in the workspace is listed and moved instead.
+          found=0
+          for candidate in $(find "$GITHUB_WORKSPACE" -maxdepth 6 -type d -name 'libpthread*' 2>/dev/null); do
+            [ -d "$candidate/.git" ] || continue
+            found=$((found + 1))
+            here=$(git -C "$candidate" rev-parse HEAD)
+            echo "pthread reference: $candidate at $here"
+            if [ "$here" = "c0e60fb5ecfc54cf379c261d3f9572cc22ded891" ]; then
+              git -C "$candidate" fetch -q --depth 1 origin \
+                  refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+              git -C "$candidate" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+              echo "  moved to $(git -C "$candidate" rev-parse HEAD)"
+            fi
+          done
+          [ "$found" -gt 0 ] || { echo "::error::no pthread reference clone found"; exit 1; }
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
