@@ -155,6 +155,15 @@ Run 45131803983 is green: `validate`, `kernel`, `efi-preflight`, `gicv2-emulatio
 
 **The price of a public repository:** the kernel job refuses to upload `lumia950-kernel` because it carries kernel extensions merged out of an Apple kernelcache, so `stage` and `xnu-entry-qemu` have no artifact to work from and stay skipped. CI can still build and gate the link; the QEMU assertion has to run locally against an artifact, or on a private repository.
 
+### 2026-11-23: the QEMU assertion runs in the kernel job (public repository)
+
+A public repository must not publish `lumia950-kernel` (it carries extensions merged out of an Apple kernelcache), so `stage` and `xnu-entry-qemu` had no artifact. The kernel job now runs the assertion in place: Homebrew QEMU, an ESP built with `scripts/stage-kernel.py` from the payload artifact and the image that job just linked, the ADT from this repository's generator with the qemu profile's windows, `--smp 2`, and only the report directory is archived as `lumia950-xnu-entry`.
+
+Run 45141721102 is the first green one: the kernel built, the QEMU gate reported
+`PASS: real source XNU passed clock/WFE/topology setup and returned from arm_vm_init and the real source-provider POST/bootstrap and PE_init_iokit`, and the report upload succeeded.
+
+Four failures were fixed on the way, each with its run number in the workflow: the job needed the payload artifact; the fixture refuses the prelinked image and wants the stager's own strip; `--menu-tree` takes the stage root; and the rendered menu has to be normalised to the explicit-choice test menu before the fixture rewrites it.
+
 ## How to add a run
 
 ```sh
