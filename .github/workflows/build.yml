@@ -702,12 +702,13 @@ jobs:
           import pathlib, re, sys
           path, stub = pathlib.Path(sys.argv[1]), sys.argv[2]
           text = path.read_text()
-          line = [row for row in text.splitlines() if row.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES=")]
-          if not line:
-              text += f'\nCONFIG_XNU_EXTRA_LD_ARCHIVES="{stub}"\n'
+          # The device copy may use CRLF, so anchor on the key instead of on a whole line:
+          # a splitlines() row would not match the text it came from.
+          key = 'CONFIG_XNU_EXTRA_LD_ARCHIVES="'
+          if key in text:
+              text = text.replace(key, key + stub + ' ', 1)
           else:
-              current = line[0].split("=", 1)[1].strip().strip('"')
-              text = text.replace(line[0], f'CONFIG_XNU_EXTRA_LD_ARCHIVES="{current} {stub}"', 1)
+              text += f'\n{key}{stub}"\n'
           path.write_text(text)
           print([row for row in text.splitlines() if row.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES=")][0])
           PY
