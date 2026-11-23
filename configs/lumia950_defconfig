@@ -21,15 +21,16 @@ CONFIG_XNU_NATIVE_MDSS=y
 # link expects the namespaced corecrypto archive that the builders above make.
 CONFIG_XNU_SOURCE_CORECRYPTO14=y
 
-# bsd_init calls pthread_init() before anything else in BSD, and thread creation
-# panics with "pthread kernel extension not loaded (function table is NULL)" unless
-# the source pthread component has registered its function table. The merged
-# kernelcache components do not carry the pthread kext (it is nobody's library
-# dependency, so the prelink closure never includes it), so the source component is
-# the only provider: this flag builds it and adds source_pthread_bootstrap(), which
-# runs as an EARLY_BOOT startup. Measured without it:
-# docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json.
-CONFIG_XNU_SOURCE_PTHREAD=y
+# bsd_init calls pthread_init() before anything else in BSD and panics with
+# "pthread kernel extension not loaded (function table is NULL)" unless the source pthread
+# component has registered its function table, and the merged kernelcache components do not
+# carry the pthread kext. The source component is therefore required, but enabling
+# CONFIG_XNU_SOURCE_PTHREAD=y does not build on this pin: its builder compiles libpthread
+# against the xnu-8796 compile records and fails, and the builder's own make run loses the
+# extra force-loaded archives, leaving the XNU link with undefined
+# _corecrypto_kext_start and _native_legacy_display_probe (runs 45129657068, 45130662811).
+# The flag stays off until the framework's libpthread line supports 8796; measured panic:
+# docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json
 
 # Run the archive builders of [kernel] archives. NativeSdhci is compiled by
 # scripts/build-arm-driver.py against the compile records of the XNU pass.

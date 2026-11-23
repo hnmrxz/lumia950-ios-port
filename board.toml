@@ -28,9 +28,6 @@ defconfig = "lumia950_defconfig"
 archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
-  # XNU's build asserts that the source pthread archive exists before it links;
-  # the builder compiles libpthread against the XNU compile records.
-  "build-libpthread-kernel.py",
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
   "build-arm-driver.py NativeSdhci",
