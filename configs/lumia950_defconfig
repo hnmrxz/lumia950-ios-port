@@ -29,8 +29,10 @@ CONFIG_XNU_SOURCE_CORECRYPTO14=y
 # against the xnu-8796 compile records and fails, and the builder's own make run loses the
 # extra force-loaded archives, leaving the XNU link with undefined
 # _corecrypto_kext_start and _native_legacy_display_probe (runs 45129657068, 45130662811).
-# The flag is on again to read the builder's compile error (run 45130662811 hid it);
-# measured panic:
+# Measured again on 2026-11-23 (run 45148280730): with the flag and its builder on, libpthread
+# compiles and the failure moves to the XNU link, which then cannot find
+# _corecrypto_kext_start or _native_legacy_display_probe. So the blocker is not a missing
+# builder but the link archive set the framework uses on this line; measured panic:
 # docs/emulation/2026-11-17-local-qemu-bsd-init-panic.json
 
 # Run the archive builders of [kernel] archives. NativeSdhci is compiled by
@@ -60,4 +62,3 @@ CONFIG_XNU_ARMVIRT_PLATFORM=n
 # The source-only early-boot image has no prelinked provider to initialize crypto.
 CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
 
-CONFIG_XNU_SOURCE_PTHREAD=y
