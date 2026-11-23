@@ -673,53 +673,35 @@ jobs:
             fi
           done
 
-      - name: Build the tree once without the pthread component
-        # build-libpthread-kernel.py needs compile records, and asking for them makes the driver run a
-        # records pass that links without any provider archives (that pass cannot succeed while this
-        # port's patches reference two of their symbols). Building once without the component creates
-        # records and archives; the component is then built from those records and linked.
+      - name: Prepare records and build the pthread component out of band
+        # The driver's own records pass cannot link (it runs before any builder exists) and its feed
+        # resolution re-fetches the Darwin 23 pthread source after every attempt to pin it, so neither
+        # can be used. What is left is the two parts that do work: one build without the component
+        # leaves records and archives, and upstream's builder turns the Darwin 22 sources into the
+        # archive the second build links.
         run: |
           config=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit)
           board=$(find "$RUNNER_TEMP/device" -name 'board.toml' -print -quit)
           cp "$config" "$RUNNER_TEMP/defconfig.saved"
-          cp "$board" "$RUNNER_TEMP/board.saved"
           sed -i '' '/^CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
           sed -i '' '/build-libpthread-kernel.py/d' "$board"
           cd unixnu
-          python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -15
+          python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -12
           cp "$RUNNER_TEMP/defconfig.saved" "$config"
-          cp "$RUNNER_TEMP/board.saved" "$board"
-          echo "records and archives exist; the component can be built from them now"
-          # The second build re-reads the feed, which would put the reference back on the
-          # Darwin 23 revision and make the builder refuse it again (run 45237654171 did, even
-          # with the tree reference checked out). The feed entry itself is changed instead.
-          # This step runs from inside the unixnu clone, so its feed file is relative.
-          for feed in "$UNIXNU_OUT/lumia950/tree/feeds.toml" feeds.toml; do
-            if [ -f "$feed" ] && grep -q "libpthread-519.120.4" "$feed"; then
-              sed -i '' 's/libpthread-519.120.4/libpthread-519.101.1/g' "$feed"
-              echo "feed pinned to the Darwin 22 pthread source: $feed"
-            fi
-            if [ -f "$feed" ] && grep -q "c0e60fb5ecfc54cf379c261d3f9572cc22ded891" "$feed"; then
-              sed -i '' 's/c0e60fb5ecfc54cf379c261d3f9572cc22ded891/ba8e1488a0e6848b710c5daad2e226f66cfed656/g' "$feed"
-              echo "feed commit pinned to the Darwin 22 pthread source: $feed"
-            fi
-          done
-          # The builder reads its source from a reference clone whose location was guessed wrong
-          # three times, so every clone in the workspace is listed and moved instead.
-          found=0
-          for candidate in $(find "$GITHUB_WORKSPACE" -maxdepth 6 -type d -name 'libpthread*' 2>/dev/null); do
-            [ -d "$candidate/.git" ] || continue
-            found=$((found + 1))
-            here=$(git -C "$candidate" rev-parse HEAD)
-            echo "pthread reference: $candidate at $here"
-            if [ "$here" = "c0e60fb5ecfc54cf379c261d3f9572cc22ded891" ]; then
-              git -C "$candidate" fetch -q --depth 1 origin \
-                  refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
-              git -C "$candidate" -c advice.detachedHead=false checkout -q libpthread-519.101.1
-              echo "  moved to $(git -C "$candidate" rev-parse HEAD)"
-            fi
-          done
-          [ "$found" -gt 0 ] || { echo "::error::no pthread reference clone found"; exit 1; }
+          echo "records and archives exist"
+
+          tree="$UNIXNU_OUT/lumia950/tree"
+          reference="$tree/refer/libpthread"
+          [ -d "$reference/.git" ] || { echo "::error::the build tree has no pthread reference"; exit 1; }
+          git -C "$reference" fetch -q --depth 1 origin \
+              refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+          git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+          echo "reference now at $(git -C "$reference" rev-parse HEAD)"
+          cp ci/libpthread/build-libpthread-kernel.py "$tree/scripts/build-libpthread-kernel.py"
+          cp ci/libpthread/kernel_target.py "$tree/scripts/kernel_target.py"
+          ( cd "$tree" && UNIXNU_LIBPTHREAD_COMMIT=ba8e1488a0e6848b710c5daad2e226f66cfed656 \
+              python3 scripts/build-libpthread-kernel.py )
+          ls -l "$tree/build/libpthread-kernel"
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
