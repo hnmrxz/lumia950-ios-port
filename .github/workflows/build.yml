@@ -685,17 +685,6 @@ jobs:
           git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
           echo "reference now at $(git -C "$reference" rev-parse HEAD)"
 
-      - name: Produce the compile records with the prelinked crypto mode
-        # build-libpthread-kernel.py consumes compile records, which makes unixnu run a bootstrap
-        # pass; that pass links without the provider archives, and in source crypto mode our patch
-        # keeps a reference to corecrypto_kext_start, so it cannot link (runs 45148280730 and
-        # 45213433912). Producing the records with the prelinked mode first satisfies the builder
-        # without that reference; the real build still runs in the configured source mode.
-        run: |
-          cd unixnu
-          XNU_BOOTSTRAP=1 XNU_CRYPTO_BOOTSTRAP=prelinked \
-            python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -60
-
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
         # 16.7.16 image, and [kernel.prelink] pins the kernelcache the merge consumes. The
