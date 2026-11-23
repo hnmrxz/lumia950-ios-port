@@ -693,10 +693,15 @@ jobs:
           # The second build re-reads the feed, which would put the reference back on the
           # Darwin 23 revision and make the builder refuse it again (run 45237654171 did, even
           # with the tree reference checked out). The feed entry itself is changed instead.
-          for feed in "$UNIXNU_OUT/lumia950/tree/feeds.toml" unixnu/feeds.toml; do
+          # This step runs from inside the unixnu clone, so its feed file is relative.
+          for feed in "$UNIXNU_OUT/lumia950/tree/feeds.toml" feeds.toml; do
             if [ -f "$feed" ] && grep -q "libpthread-519.120.4" "$feed"; then
               sed -i '' 's/libpthread-519.120.4/libpthread-519.101.1/g' "$feed"
               echo "feed pinned to the Darwin 22 pthread source: $feed"
+            fi
+            if [ -f "$feed" ] && grep -q "c0e60fb5ecfc54cf379c261d3f9572cc22ded891" "$feed"; then
+              sed -i '' 's/c0e60fb5ecfc54cf379c261d3f9572cc22ded891/ba8e1488a0e6848b710c5daad2e226f66cfed656/g' "$feed"
+              echo "feed commit pinned to the Darwin 22 pthread source: $feed"
             fi
           done
           # The builder reads its source from a reference clone whose location was guessed wrong
