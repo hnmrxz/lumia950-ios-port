@@ -685,33 +685,23 @@ jobs:
           git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
           echo "reference now at $(git -C "$reference" rev-parse HEAD)"
 
-      - name: Give the record pass weak stand-ins for the two provider symbols
-        # The bootstrap pass links before any builder has produced the provider archives, and this
-        # port's patches reference two of their symbols. The harness takes the archive list from
-        # CONFIG_XNU_EXTRA_LD_ARCHIVES and would override an exported variable, so the stub goes into
-        # the device copy of the defconfig instead. Weak definitions are replaced by the strong ones
-        # in the final link, and nothing in the records image calls them.
+      - name: Build the tree once without the pthread component
+        # build-libpthread-kernel.py needs compile records, and asking for them makes the driver run a
+        # records pass that links without any provider archives (that pass cannot succeed while this
+        # port's patches reference them). Building once without the component creates records and the
+        # archives; the archive is then built from those records, and the second build links it.
         run: |
-          stub="$RUNNER_TEMP/kernel-provider-stubs.o"
-          xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -c \
-              -o "$stub" ci/stubs/kernel-provider-stubs.c
-          target=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit || true)
-          [ -n "$target" ] || { echo "::error::the device tree has no defconfig to extend"; exit 1; }
-          echo "defconfig: $target"
-          python3 - "$target" "$stub" <<'PY'
-          import pathlib, re, sys
-          path, stub = pathlib.Path(sys.argv[1]), sys.argv[2]
-          text = path.read_text()
-          # The device copy may use CRLF, so anchor on the key instead of on a whole line:
-          # a splitlines() row would not match the text it came from.
-          key = 'CONFIG_XNU_EXTRA_LD_ARCHIVES="'
-          if key in text:
-              text = text.replace(key, key + stub + ' ', 1)
-          else:
-              text += f'\n{key}{stub}"\n'
-          path.write_text(text)
-          print([row for row in text.splitlines() if row.startswith("CONFIG_XNU_EXTRA_LD_ARCHIVES=")][0])
-          PY
+          config=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit)
+          board=$(find "$RUNNER_TEMP/device" -name 'board.toml' -print -quit)
+          cp "$config" "$RUNNER_TEMP/defconfig.saved"
+          cp "$board" "$RUNNER_TEMP/board.saved"
+          sed -i '' '/^CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
+          sed -i '' '/build-libpthread-kernel.py/d' "$board"
+          cd unixnu
+          python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -20
+          cp "$RUNNER_TEMP/defconfig.saved" "$config"
+          cp "$RUNNER_TEMP/board.saved" "$board"
+          echo "records and archives exist; the component can be built from them now"
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
