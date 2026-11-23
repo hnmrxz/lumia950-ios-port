@@ -616,6 +616,24 @@ jobs:
           name: lumia950-payload
           path: out/payload
 
+      - name: Make the framework build print its kernel archive list
+        # The failing link is the only place that knows which archives reached it, and make does not
+        # print LD_KERNEL_ARCHIVES. This edits the framework checkout in place, after the 16.x patch
+        # step and before the build, so the next probe run says what it actually linked.
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          script = pathlib.Path("unixnu/scripts/build-xnu-4k-baseline.sh")
+          text = script.read_text()
+          needle = 'EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")'
+          if "echo LD_KERNEL_ARCHIVES" not in text and needle in text:
+              text = text.replace(needle, 'echo "LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES"\n' + needle, 1)
+              script.write_text(text)
+              print("added the archive echo")
+          else:
+              print("archive echo already present or anchor missing")
+          PY
+
       - name: Prepare the build copy
         # The committed board keeps example = true so nothing pretends this port is
         # complete. CI builds from a scratch copy with the guard cleared, and only for
