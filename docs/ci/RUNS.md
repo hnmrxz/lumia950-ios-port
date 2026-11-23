@@ -164,6 +164,19 @@ Run 45141721102 is the first green one: the kernel built, the QEMU gate reported
 
 Four failures were fixed on the way, each with its run number in the workflow: the job needed the payload artifact; the fixture refuses the prelinked image and wants the stager's own strip; `--menu-tree` takes the stage root; and the rendered menu has to be normalised to the explicit-choice test menu before the fixture rewrites it.
 
+### 2026-11-23: the archived report now reaches bsd_init
+
+Run 45146040369, job kernel, both QEMU steps green. The in-job observation passes `--past-bsd` as well, so the archived `lumia950-xnu-entry` report records what the emulated boot actually reached:
+
+```
+milestones            ... iokit_return, bsd_init_entry
+past_bsd_outcome      panicked
+panic_format          pthread kernel extension not loaded (function table is NULL)
+pthread_providers_missing  [_pthread_start, _source_pthread_bootstrap]
+```
+
+That is the same measurement the local runs made on 2026-11-17, now produced and archived by CI on a public repository.
+
 ## How to add a run
 
 ```sh

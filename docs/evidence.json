@@ -31,7 +31,7 @@
     },
     {
       "id": "xnu-entry-qemu-ci",
-      "what": "The linked kernel executing in CI itself: the kernel job builds it and runs the QEMU fixture in place, reaching arm_vm_init, the source crypto POST and IOKit",
+      "what": "The linked kernel executing in CI itself: the kernel job builds it and runs the QEMU fixture in place, reaching arm_vm_init, the source crypto POST, IOKit and bsd_init, whose pthread panic is archived with its text",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -43,7 +43,7 @@
           "path": "docs/ci/RUNS.md"
         }
       ],
-      "note": "Run 45141721102, job kernel, steps 'The emulated kernel boots through IOKit, in this job' and 'Archive what the emulated boot reached', both green. The image never leaves the runner because a public repository must not publish it; the report is archived as lumia950-xnu-entry. Emulation only."
+      "note": "Runs 45141721102 (gate) and 45146040369 (observation with --past-bsd), job kernel, both QEMU steps green. The report records bsd_init_entry, past_bsd_outcome panicked and the pthread panic text. The image never leaves the runner because a public repository must not publish it; only the report is archived as lumia950-xnu-entry. Emulation only."
     },
     {
       "id": "boot-args-qemu",
