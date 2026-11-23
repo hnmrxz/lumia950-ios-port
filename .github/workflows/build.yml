@@ -505,7 +505,7 @@ jobs:
   # Manual like the kernel job: it clones edk2 and builds BaseTools, which is minutes of
   # runner time for files that only change when the menu or the loader does.
   payload:
-    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'payload' || inputs.target == 'both')
+    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'payload' || inputs.target == 'both' || inputs.target == 'kernel')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
