@@ -628,13 +628,11 @@ jobs:
           needle = 'EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")'
           if "echo LD_KERNEL_ARCHIVES" not in text and needle in text:
               text = text.replace(needle, 'echo "LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES"\n' + needle, 1)
-              # Also print whether the device configuration reached this build pass: the
-              # pthread builder runs its own pass, and the reference that failed to resolve
-              # is exactly the one -UXNU_SOURCE_CORECRYPTO14 is supposed to disable.
-              probe = ('echo "XNU_ENV SOURCE_CORECRYPTO14=${XNU_SOURCE_CORECRYPTO14:-unset} '
+              env_line = 'echo XNU_ENV SOURCE_CORECRYPTO14=${XNU_SOURCE_CORECRYPTO14:-unset} EXTRA_LD=${XNU_EXTRA_LD_ARCHIVES:-unset}'
+              if "XNU_ENV" not in text:
+                  text = text.replace(needle, env_line + "\n" + needle, 1)
                        'EXTRA_LD=${XNU_EXTRA_LD_ARCHIVES:-unset} '
                        'SOURCE_PTHREAD=${XNU_SOURCE_PTHREAD:-unset}"'
-              if "XNU_ENV" not in text:
                   text = text.replace(needle, probe + "\n" + needle, 1)
               script.write_text(text)
               print("added the archive echo")
