@@ -708,6 +708,8 @@ jobs:
           # stage-kernel.py is the project's own stager: it strips the source kernel the way the
           # fixture's contract expects and renders the explicit-choice menu, so the ESP is built
           # by the same code the device route uses instead of by hand.
+          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          [ -n "$image" ] || { echo "::error::no unstripped kernel in this job's output"; exit 1; }
           menu=$(find out/payload -path '*/EFI/UniXNU/unixnu.toml' -print -quit || true)
           [ -n "$menu" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
           python3 scripts/stage-kernel.py --kernel "$image" \
