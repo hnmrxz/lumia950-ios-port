@@ -61,3 +61,4 @@ CONFIG_XNU_ARMVIRT_PLATFORM=n
 
 # The source-only early-boot image has no prelinked provider to initialize crypto.
 CONFIG_XNU_CRYPTO_BOOTSTRAP="source"
+CONFIG_XNU_SOURCE_PTHREAD=y

@@ -574,6 +574,9 @@ jobs:
       # calls are rate limited per IP; shared runner IPs are usually over the limit.
       # ci-tools/sitecustomize.py adds this token to api.github.com requests only.
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # This port runs xnu-8796.141.3 (Darwin 22); the framework's feed pins the
+      # Darwin 23 pthread source, which cannot link against this kernel.
+      UNIXNU_LIBPTHREAD_COMMIT: ea29c4ab45a49dd44d564a093b1c9ce9d58610bc
       PYTHONPATH: ${{ github.workspace }}/ci-tools
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -640,6 +643,22 @@ jobs:
               script.write_text(text)
           print(f"archive/env probes added: {added}")
           PY
+
+      - name: Use upstream's profile-driven pthread builder, on the Darwin 22 source
+        # ci/libpthread holds upstream's builder verbatim; the pin's version builds the Darwin 23
+        # component by construction. The reference tree is fetched at the feed's revision, so the
+        # older one has to be fetched explicitly before the builder can check it out.
+        run: |
+          cp ci/libpthread/build-libpthread-kernel.py unixnu/scripts/build-libpthread-kernel.py
+          cp ci/libpthread/kernel_target.py unixnu/scripts/kernel_target.py
+          reference=$(find "$GITHUB_WORKSPACE" -maxdepth 4 -type d -name 'libpthread*' -path '*refer*' -print -quit || true)
+          if [ -z "$reference" ]; then
+            echo "::warning::no libpthread reference tree found yet; the builder will fetch or fail"
+          else
+            git -C "$reference" fetch -q --depth 1 origin "$UNIXNU_LIBPTHREAD_COMMIT" || true
+            git -C "$reference" -c advice.detachedHead=false checkout -q "$UNIXNU_LIBPTHREAD_COMMIT"
+            echo "reference now at $(git -C "$reference" rev-parse HEAD)"
+          fi
 
       - name: Prepare the build copy
         # The committed board keeps example = true so nothing pretends this port is
