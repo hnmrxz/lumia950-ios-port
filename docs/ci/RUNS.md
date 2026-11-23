@@ -144,6 +144,17 @@ macOS time.
 
 One cheap probe (dispatch `target=payload`, Ubuntu only) on `6d90f1a`: every job failed with zero executed steps and no runner assigned (run 45126791279). Nothing in the repository changed in that week, so the condition is unchanged: it is account-level, not a workflow or script problem. The evidence is above; until the account side is resolved, no run can verify anything.
 
+### 2026-11-23: back to green on a public repository
+
+The repository was made public (the owner's choice) because the Actions quota for private repositories had run out; a public repository gets free minutes and its runs start again. Two real failures showed up in the first run and were fixed:
+
+- `validate` died on Python 3.12 inside `dataclasses` because the test module loaded with `importlib` was never put in `sys.modules` (run 45129657068);
+- `kernel` failed because `build-xnu-4k-baseline.sh` asserts the source pthread archive exists, and `CONFIG_XNU_SOURCE_PTHREAD=y` does not build it by itself (run 45130662811). Adding the builder exposed that the libpthread source does not compile against this pin's compile records and that its own make run drops the force-loaded archives, so the flag is off again with that evidence in `configs/lumia950_defconfig`.
+
+Run 45131803983 is green: `validate`, `kernel`, `efi-preflight`, `gicv2-emulation`, `installer-windows` all succeed.
+
+**The price of a public repository:** the kernel job refuses to upload `lumia950-kernel` because it carries kernel extensions merged out of an Apple kernelcache, so `stage` and `xnu-entry-qemu` have no artifact to work from and stay skipped. CI can still build and gate the link; the QEMU assertion has to run locally against an artifact, or on a private repository.
+
 ## How to add a run
 
 ```sh
