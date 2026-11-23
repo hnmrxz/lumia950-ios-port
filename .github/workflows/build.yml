@@ -683,8 +683,12 @@ jobs:
           config=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit)
           board=$(find "$RUNNER_TEMP/device" -name 'board.toml' -print -quit)
           cp "$config" "$RUNNER_TEMP/defconfig.saved"
-          sed -i '' '/^CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
+          sed -i '' '/^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
           sed -i '' '/build-libpthread-kernel.py/d' "$board"
+          if grep -q "SOURCE_PTHREAD" "$config"; then
+            echo "::error::the pthread flag survived the strip, so this build would need the archive";
+            grep -n "SOURCE_PTHREAD" "$config"; exit 1
+          fi
           cd unixnu
           python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -12
           cp "$RUNNER_TEMP/defconfig.saved" "$config"
@@ -697,8 +701,8 @@ jobs:
               refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
           git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
           echo "reference now at $(git -C "$reference" rev-parse HEAD)"
-          cp ci/libpthread/build-libpthread-kernel.py "$tree/scripts/build-libpthread-kernel.py"
-          cp ci/libpthread/kernel_target.py "$tree/scripts/kernel_target.py"
+          cp "$GITHUB_WORKSPACE/ci/libpthread/build-libpthread-kernel.py" "$tree/scripts/build-libpthread-kernel.py"
+          cp "$GITHUB_WORKSPACE/ci/libpthread/kernel_target.py" "$tree/scripts/kernel_target.py"
           ( cd "$tree" && UNIXNU_LIBPTHREAD_COMMIT=ba8e1488a0e6848b710c5daad2e226f66cfed656 \
               python3 scripts/build-libpthread-kernel.py )
           ls -l "$tree/build/libpthread-kernel"
