@@ -59,3 +59,18 @@ force-loaded display archive.
 Neither is attempted here: both need a decision about which side owns the change, and the port has
 been building and gating correctly without the pthread component (the emulated boot reaches
 `bsd_init` and its pthread panic is recorded in every run).
+
+## The bootstrap pass cannot be given archives at all
+
+EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=...") sits at the same indentation as the archive
+assignments inside the BOOTSTRAP = 0 branch (lines 546-733 of uild-xnu-4k-baseline.sh), so the
+records pass receives no LD_KERNEL_ARCHIVES whatsoever. Two attempts to feed it anyway are
+therefore dead ends, and both were measured:
+
+- exporting XNU_EXTRA_LD_ARCHIVES in the job: ignored, the harness sets it from the defconfig
+  (run 45219103054);
+- appending a weak stub object to the device copy of CONFIG_XNU_EXTRA_LD_ARCHIVES: the list is
+  printed with the stub in it, and the link still reports the same two undefined symbols
+  (runs 45225163325 and 45226537982).
+
+That leaves exactly the two ways out listed above, and neither is a configuration change.
