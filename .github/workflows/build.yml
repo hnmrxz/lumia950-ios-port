@@ -683,7 +683,17 @@ jobs:
           config=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit)
           board=$(find "$RUNNER_TEMP/device" -name 'board.toml' -print -quit)
           cp "$config" "$RUNNER_TEMP/defconfig.saved"
-          sed -i '' '/^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=/d' "$config"
+          # The driver may read its configuration from more than one file, so every file in the
+          # device tree that sets the flag is stripped, and the step stops if any survives.
+          for candidate in $(grep -rl 'CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device" 2>/dev/null); do
+            sed -i '' '/^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=/d' "$candidate"
+            echo "stripped the pthread flag from $candidate"
+          done
+          if grep -rqE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device" 2>/dev/null; then
+            echo "::error::the pthread flag survived the strip"
+            grep -rnE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device"
+            exit 1
+          fi
           sed -i '' '/build-libpthread-kernel.py/d' "$board"
           if grep -qE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$config"; then
             echo "::error::the pthread flag survived the strip, so this build would need the archive"
@@ -709,7 +719,8 @@ jobs:
               python3 scripts/build-libpthread-kernel.py ) >"$log" 2>&1; then
             # The step's own log is truncated to its tail, so the diagnostic is reprinted here.
             echo "::error::the pthread component failed to compile; diagnostics below"
-            grep -n -B6 -A3 'error:' "$log" | tail -60 || tail -60 "$log"
+            # clang's message wraps across lines here, so the captured tail is the reliable source.
+            tail -80 "$log"
             exit 1
           fi
           ls -l "$tree/build/libpthread-kernel"
