@@ -140,6 +140,10 @@ Until that is resolved, nothing in this file can be re-verified. The kernel job 
 (see README), so a later push costs a couple of minutes of Ubuntu time instead of about ninety of
 macOS time.
 
+### 2026-11-23: still failing at startup, six days later
+
+One cheap probe (dispatch `target=payload`, Ubuntu only) on `6d90f1a`: every job failed with zero executed steps and no runner assigned (run 45126791279). Nothing in the repository changed in that week, so the condition is unchanged: it is account-level, not a workflow or script problem. The evidence is above; until the account side is resolved, no run can verify anything.
+
 ## How to add a run
 
 ```sh
