@@ -30,6 +30,22 @@
       ]
     },
     {
+      "id": "xnu-entry-qemu-ci",
+      "what": "The linked kernel executing in CI itself: the kernel job builds it and runs the QEMU fixture in place, reaching arm_vm_init, the source crypto POST and IOKit",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "scripts/test-native-xnu-entry.py"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/ci/RUNS.md"
+        }
+      ],
+      "note": "Run 45141721102, job kernel, steps 'The emulated kernel boots through IOKit, in this job' and 'Archive what the emulated boot reached', both green. The image never leaves the runner because a public repository must not publish it; the report is archived as lumia950-xnu-entry. Emulation only."
+    },
+    {
       "id": "boot-args-qemu",
       "what": "The arm64 boot_args DarwinBoot built, decoded from physical memory and cross-checked against the serial log, the kernel log and the staged ADT and menu",
       "label": "QEMU-tested",
