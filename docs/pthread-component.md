@@ -112,3 +112,27 @@ the second build fetches its own reference *after* this step and puts it back on
 revision -- so the value to change is the driver's feed data, not any checkout. The next thing to find
 is that data: grep -rn libpthread-519 unixnu/ and grep -rn c0e60fb unixnu/ inside the framework
 clone, which needs one CI step or a local clone of UniXNU/UniXNU@1a01c2a.
+
+## The out-of-band build gets to the sources, and stops on one line
+
+Run 45247975473 did what it was built to do: the first build left records and archives
+(
+ecords and archives exist), the tree reference moved to the Darwin 22 commit
+(
+eference now at ba8e1488), and the upstream builder then compiled the sources itself.
+
+It stops on a single error, in Apple's kern/kern_support.c:
+
+`
+1049 |                 pthread_mutex_default_policy = policy_bootarg;
+     |                                              ~ ^~~~~~~~~~~~~~
+22 warnings and 1 error generated.
+`
+
+policy_bootarg exists in the Darwin 23 kernel headers the libpthread sources expect; this kernel is
+Darwin 22. That is the whole remaining gap: a one-line source adaptation inside the component, not a
+build-system problem. The natural place for it is a small patch file applied by
+ci/libpthread/build-libpthread-kernel.py after it prepares its work tree, next to the reason in
+ci/libpthread/README.md.
+
+Everything upstream of that line is now known to work, and none of it needed the framework changed.
