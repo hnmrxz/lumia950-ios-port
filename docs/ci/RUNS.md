@@ -188,3 +188,27 @@ Record the id, the commit, the event, the jobs and the conclusion. For a `stage`
 the `build-manifest.json` and `native-bringup.json` hashes, since those are what tie the tree to
 the run. Note that `gh` resolves this directory's `upstream` remote by default: always pass
 `--repo hnmrxz/lumia950-ios-port`.
+
+## 2026-11-24 - the source pthread component links, and bsd_init returns
+
+Run 45314032032 (branch probe/pthread-darwin22, 	arget=kernel) is the first green kernel job in
+which the pthread component is part of the image.
+
+Two changes made it possible, both measured rather than assumed:
+
+- the component's sources are written against Darwin 23 and this kernel is Darwin 22, so
+  ci/libpthread/build-libpthread-kernel.py drops two references the older kernel cannot satisfy
+  (policy_bootarg, proc_get_jit_entitled) by keying on the exact expressions;
+- scripts/check-kernel-link.py no longer asks for the literal symbols pthread_start and
+  source_pthread_bootstrap. The linker emits the entry point as a **non-external**
+  __startup_EARLY_BOOT_entry_source_pthread_bootstrap_23 in __BOOTDATA,__init_entry_set, which an
+  
+m -gU --defined-only dump cannot show, so the gate now asks for the component's global symbols
+  (pthread_init, pthread_find_owner).
+
+The archived report (lumia950-xnu-entry) records past_bsd_outcome: stopped rather than
+panicked, and the dmesg reaches dlil_init and the socket memory regions at 8.3 s: sd_init
+returned, kernel threads are running, and the networking stack is initialising.
+
+The image itself is not archived: this repository is public and the prelinked kernel contains Apple
+kernel components, so it stays inside the runner.

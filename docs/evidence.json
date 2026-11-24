@@ -228,6 +228,22 @@
         }
       ],
       "note": "Generated and checked by scripts/check-adt.py and the validate job; no recorded run."
+    },
+    {
+      "id": "xnu-bsd-init-crossed",
+      "what": "The source pthread component links and bsd_init returns: the emulated boot reaches dlil_init and socket memory setup (past_bsd_outcome stopped, not panicked)",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/ci/RUNS.md",
+          "run": "45314032032"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/libpthread/build-libpthread-kernel.py"
+        }
+      ]
     }
   ]
 }
