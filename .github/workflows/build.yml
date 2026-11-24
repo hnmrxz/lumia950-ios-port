@@ -778,6 +778,19 @@ jobs:
           assert report['loadable'] is False, 'the tool no longer marks the candidate unqualified'
           PY
 
+      - name: Look for the pthread component in the image and the link inputs
+        # The gate below says source_pthread_bootstrap did not reach the link; before believing it,
+        # print what the image actually contains and what the archive directory holds.
+        run: |
+          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          ls -l "$UNIXNU_OUT/lumia950/tree/build/libpthread-kernel/" || true
+          if [ -n "$image" ]; then
+            echo "--- symbols mentioning pthread ---"
+            nm -m "$image" 2>/dev/null | grep -i pthread | head -20 || echo "(none)"
+            echo "--- force_load of the component in the kernel log ---"
+            grep -o 'force_load[^ ]*libpthread[^ ]*' "$UNIXNU_OUT/lumia950/logs/kernel.log" | head -5 || echo "(not in the log)"
+          fi
+
       - name: The kernel image actually contains the drivers
         # `ar t` proves a member is in an archive; it does not prove the archive is in the link.
         # This reads the linked image's symbol table and the archive list from board.toml, so a
