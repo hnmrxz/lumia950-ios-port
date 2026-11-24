@@ -832,7 +832,8 @@ jobs:
           [ -n "$menu" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
           python3 scripts/stage-kernel.py --kernel "$image" \
               --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}" \
-              --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified
+              --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified \
+              --args "-v keepsyms=1 debug=0x100 cpus=1 skmem_seg_size=16384 skmem_md_seg_size=16384 skmem_drv_buf_seg_size=65536 skmem_usr_buf_seg_size=16384"
           # stage-kernel.py renders the menu for the device route; the fixture turns it into
           # the explicit-choice test menu and matches these two lines exactly, so set them here.
           sed -i '' -e 's/^default = .*/default = "exit"/' \
