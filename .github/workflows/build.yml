@@ -653,7 +653,7 @@ jobs:
           if prepare in text and "ci/skmem-skip.py" not in text:
               text = text.replace(
                   prepare,
-                  prepare + '\npython3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" .cache/xnu-work',
+                  prepare + '\npython3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" .cache/xnu-work || true',
                   1)
               added += 1
           if added:
