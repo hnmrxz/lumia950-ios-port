@@ -356,7 +356,7 @@ jobs:
         # bring-up profile from board.toml instead.
         run: |
           python3 scripts/make-lumia950-adt.py --output build/lumia950.adt \
-              --dram-size 0xC0000000 --unique-chip-id 1122334455667788 --chip-id 0x8015 \
+              --dram-size 0xAF600000 --unique-chip-id 1122334455667788 --chip-id 0x8015 \
               --owned-memory-size 0x20000000 \
               --cpu-regs 0,1,2,3,0x100,0x101 --psci-method hvc
           python3 scripts/check-adt.py --profile target build/lumia950.adt
