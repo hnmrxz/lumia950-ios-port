@@ -719,11 +719,13 @@ jobs:
               python3 scripts/build-libpthread-kernel.py ) >"$log" 2>&1; then
             # The step's own log is truncated to its tail, so the diagnostic is reprinted here.
             echo "::error::the pthread component failed to compile; diagnostics below"
-            # The captured file is small (one source, its warnings and the count), so it is printed
-            # whole: the diagnostic line does not contain the word "error", which is why every grep
-            # for it came back empty.
-            echo "--- captured log, $(wc -l <"$log") lines ---"
-            cat "$log"
+            # The builder writes each object's compiler output next to it and only prints a summary,
+            # so the diagnostic is in build/libpthread-kernel/*.log, not in the captured stdout.
+            for object_log in "$tree"/build/libpthread-kernel/*.log; do
+              [ -f "$object_log" ] || continue
+              echo "--- $(basename "$object_log") ---"
+              grep -n -i -B3 -A6 'error:' "$object_log" | head -40 || true
+            done
             exit 1
           fi
           ls -l "$tree/build/libpthread-kernel"
