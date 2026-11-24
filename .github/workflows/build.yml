@@ -831,6 +831,8 @@ jobs:
             nm -m "$image" 2>/dev/null | grep -i pthread | head -20 || echo "(none)"
             echo "--- force_load of the component in the kernel log ---"
             grep -o 'force_load[^ ]*libpthread[^ ]*' "$UNIXNU_OUT/lumia950/logs/kernel.log" | head -5 || echo "(not in the log)"
+            echo "--- did the skmem bypass reach the image? ---"
+            nm -m "$image" 2>/dev/null | grep -i 'skmem_sysctl_skip' | head -3 || echo "(not in the image)"
           fi
 
       - name: The kernel image actually contains the drivers
