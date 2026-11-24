@@ -36,3 +36,8 @@ handset's own value before any result from this boot is treated as a kernel find
 
 Rollback: `EFI/boot/bootarm.efi.stock` back over `EFI/boot/bootarm.efi`, and the copies in
 `backups/efiesp-2026-11-24/`.
+
+## Checker result
+
+The repository's own validator accepts the tree that was installed (EFIESP files plus the MainOS `Payloads` assembled into one directory for the check): `payload config ok (4 entries)` -- the four menu entries are `xnu`, `exit`, `reset` and `shutdown`, and every file they name is present.
+
