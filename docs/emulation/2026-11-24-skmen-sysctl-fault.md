@@ -26,3 +26,14 @@ initialisation. Two candidates to check, in order:
    emulated device tree does not describe (`SK[0]: skmem_region_init ...` is the last dmesg line);
 2. a Darwin 22/23 structure difference in the same area the pthread component needed two adaptations
    for.
+
+## What the source says
+
+`bsd/net/skmem_sysctl.c` (xnu-8796.141.3) is 57 lines, and its whole init is:
+
+`` 
+skmem_sysctl *sysctls = skmem_get_sysctls_obj(NULL);
+sysctls->version = SKMEM_SYSCTL_VERSION;
+`` 
+
+`skmem_get_sysctls_obj` in `bsd/skywalk/mem/skmem.c` returns the static `sk_sys_obj`, which `skmem_init(void)` sets. Nothing in that path checks the pointer, so the store faults when the object is absent -- which is what the report's `_skmem_sysctl_init+0x18` and a FAR outside the kernel VA window describe. The two candidates therefore collapse into one: this kernel reaches the sysctl initialiser with `sk_sys_obj` unset, so either `skmem_init` did not run (the dmesg line `SK[0]: skmem_region_init` is not proof that it finished) or it ran after it. The next experiment is to make that ordering visible in the fixture rather than patch Apple code blind.
