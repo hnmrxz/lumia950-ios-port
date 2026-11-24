@@ -846,7 +846,7 @@ jobs:
         # of the open-source XNU plus its in-tree drivers -- no Apple kernelcache content is merged in,
         # which is what the public-upload rule is about. It is not the prelinked image: without the
         # prelink closure some kexts are absent, so a handset may stop earlier than the emulated run.
-        if: ${{ inputs.source_kernel_artifact == 'yes' }}
+        if: github.ref_name == 'probe/pthread-darwin22'
         run: |
           kernel=$(find "$UNIXNU_OUT/lumia950/tree/build/xnu/ios-obj" -name 'mach.development.bcm2837' -print -quit || true)
           [ -n "$kernel" ] || { echo "::error::no source kernel in the build tree"; exit 1; }
@@ -860,7 +860,7 @@ jobs:
           ls -l "$out"
 
       - name: Upload the source-built kernel
-        if: ${{ inputs.source_kernel_artifact == 'yes' }}
+        if: github.ref_name == 'probe/pthread-darwin22'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-kernel-source
