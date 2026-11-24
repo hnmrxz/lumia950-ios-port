@@ -669,6 +669,40 @@ jobs:
           python3 unixnu fetch xnu libplatform libdispatch AvailabilityVersions \
               libpthread corecrypto-2023 IOStorageFamily -D "$RUNNER_TEMP/device"
 
+      - name: Skip the skmem sysctl publication in the fetched xnu tree
+        # docs/emulation/2026-11-24-skmem-sysctl-skip-proposal.md: the emulated boot stops at
+        # _skmem_sysctl_init+0x18 in every configuration tried. The function only publishes counters
+        # to the sysctl tree, so an opt-in early return lets the boot continue and show what is next.
+        # This edits the fetched source, because this port has no xnu patch slot at its framework pin.
+        run: |
+          source_tree=$(find "$UNIXNU_OUT/feeds" -maxdepth 1 -type d -name 'xnu-*' -print -quit || true)
+          target="$source_tree/bsd/net/skmem_sysctl.c"
+          if [ ! -f "$target" ]; then
+            echo "::error::no fetched xnu tree at $source_tree"
+            exit 1
+          fi
+          python3 - "$target" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          if "skmem_sysctl_skip" in text:
+              print("already patched")
+          else:
+              guard = (
+                  '#include <pexpert/pexpert.h>\n'
+                  'static int skmem_sysctl_skip = 0;\n'
+                  'static void __attribute__((constructor)) skmem_sysctl_skip_bootarg(void)\n'
+                  '{\n'
+                  '\t(void)PE_parse_boot_argn("skmem_sysctl_skip", &skmem_sysctl_skip,\n'
+                  '\t    sizeof(skmem_sysctl_skip));\n'
+                  '}\n'
+              )
+              text = text.replace("skmem_sysctl_init(void)\n{\n", guard + "skmem_sysctl_init(void)\n{\n\tif (skmem_sysctl_skip) { return; }\n", 1)
+              path.write_text(text)
+              print("patched", path)
+          PY
+          grep -n "skmem_sysctl_skip" "$target" | head -5
+
       - name: Use upstream's pthread builder, which accepts a named revision
         # The pin's builder only knows the Darwin 23 component and this port runs the Darwin 22
         # kernel. The build tree is copied from the device directory, so the builder goes into both.
@@ -833,7 +867,7 @@ jobs:
           python3 scripts/stage-kernel.py --kernel "$image" \
               --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}" \
               --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified \
-              --args "-v keepsyms=1 debug=0x100 cpus=1 skmem_seg_size=16384 skmem_md_seg_size=16384 skmem_drv_buf_seg_size=65536 skmem_usr_buf_seg_size=16384"
+              --args "-v keepsyms=1 debug=0x100 cpus=1 skmem_seg_size=16384 skmem_md_seg_size=16384 skmem_drv_buf_seg_size=65536 skmem_usr_buf_seg_size=16384 skmem_sysctl_skip=1"
           # stage-kernel.py renders the menu for the device route; the fixture turns it into
           # the explicit-choice test menu and matches these two lines exactly, so set them here.
           sed -i '' -e 's/^default = .*/default = "exit"/' \
