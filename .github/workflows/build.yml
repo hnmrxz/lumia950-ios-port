@@ -719,8 +719,12 @@ jobs:
               python3 scripts/build-libpthread-kernel.py ) >"$log" 2>&1; then
             # The step's own log is truncated to its tail, so the diagnostic is reprinted here.
             echo "::error::the pthread component failed to compile; diagnostics below"
-            # clang's message wraps across lines here, so the captured tail is the reliable source.
-            tail -80 "$log"
+            # Printed last, because the step's log keeps only its tail: the error sits above the
+            # warnings, and clang's message wraps, so the surrounding lines are shown too.
+            echo "--- lines that mention error ---"
+            grep -n -i 'error' "$log" | head -20 || true
+            echo "--- context ---"
+            grep -n -i -B2 -A4 'error:' "$log" | head -40 || tail -40 "$log"
             exit 1
           fi
           ls -l "$tree/build/libpthread-kernel"
