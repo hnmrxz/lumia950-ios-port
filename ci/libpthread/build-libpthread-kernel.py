@@ -36,9 +36,17 @@ if adaptation.exists():
     text = adaptation.read_text()
     needle = 'pthread_mutex_default_policy = policy_bootarg;'
     if needle in text:
-        adaptation.write_text(text.replace(
+        text = text.replace(
             needle,
-            '/* policy_bootarg is a Darwin 23 tunable; this kernel is Darwin 22 */'))
+            '/* policy_bootarg is a Darwin 23 tunable; this kernel is Darwin 22 */')
+    # `proc_get_jit_entitled` is a Darwin 23 accessor in the kernel pthread interface; Darwin 22 has
+    # no such member. Treating the process as not JIT-entitled keeps the default workqueue policy.
+    needle = 'pthread_kern->proc_get_jit_entitled(p)'
+    if needle in text:
+        text = text.replace(
+            needle,
+            '0 /* proc_get_jit_entitled is Darwin 23 only; this kernel is Darwin 22 */')
+    adaptation.write_text(text)
 
 SOURCE = WORK
 OUT = ROOT / 'build/libpthread-kernel'
