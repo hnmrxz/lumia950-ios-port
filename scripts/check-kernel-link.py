@@ -167,10 +167,10 @@ def main() -> int:
         enabled = {line.strip() for line in args.config.read_text().splitlines()
                    if line.strip().startswith("CONFIG_")}
         if "CONFIG_XNU_SOURCE_PTHREAD=y" in enabled:
-            # Matched as substrings: the component's entry point lands in a section-named symbol
-            # (__startup_EARLY_BOOT_entry_source_pthread_bootstrap_NN) rather than a plain one, and
-            # the kernel's own pthread code contributes pthread_start under its own spelling.
-            providers = ("pthread_start", "source_pthread_bootstrap")
+            # Checked through the component's global symbols: the entry point is emitted as a
+            # non-external __startup_EARLY_BOOT_entry_source_pthread_bootstrap_NN into
+            # __BOOTDATA,__init_entry_set, which an `nm -gU --defined-only` dump does not list.
+            providers = ("pthread_init", "pthread_find_owner")
             missing = [name for name in providers if name not in dump]
             if missing:
                 fail(f"{source} does not link {', '.join(missing)} although "

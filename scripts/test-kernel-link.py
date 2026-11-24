@@ -182,11 +182,13 @@ class KernelLinkTests(unittest.TestCase):
         config = self.root / "lumia950_defconfig"
         config.write_text("CONFIG_XNU_SOURCE_PTHREAD=y\n")
         dump = self.root / "nm-pthread.txt"
-        dump.write_text(DUMP + "\n0000000000000001 T _pthread_start\n"
-                               "0000000000000002 T _source_pthread_bootstrap\n")
+        # The real image names these the way the linked component exports them (run 45310500241):
+        # its entry point is non-external and therefore absent from an `nm -gU` dump.
+        dump.write_text(DUMP + "\n0000000000000001 T __pthread_init\n"
+                               "0000000000000002 T __pthread_find_owner\n")
         result = self._run(0, ("--symbols-from", str(dump), "--expect", "NativeMdss",
                                "--config", str(config)))
-        self.assertIn("pthread_start", result.stdout)
+        self.assertIn("pthread_init", result.stdout)
 
     def test_a_config_without_the_flag_asks_for_nothing_more(self):
         config = self.root / "lumia950_defconfig"
