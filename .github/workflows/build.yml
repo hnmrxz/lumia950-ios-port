@@ -719,12 +719,11 @@ jobs:
               python3 scripts/build-libpthread-kernel.py ) >"$log" 2>&1; then
             # The step's own log is truncated to its tail, so the diagnostic is reprinted here.
             echo "::error::the pthread component failed to compile; diagnostics below"
-            # Printed last, because the step's log keeps only its tail: the error sits above the
-            # warnings, and clang's message wraps, so the surrounding lines are shown too.
-            echo "--- lines that mention error ---"
-            grep -n -i 'error' "$log" | head -20 || true
-            echo "--- context ---"
-            grep -n -i -B2 -A4 'error:' "$log" | head -40 || tail -40 "$log"
+            # The captured file is small (one source, its warnings and the count), so it is printed
+            # whole: the diagnostic line does not contain the word "error", which is why every grep
+            # for it came back empty.
+            echo "--- captured log, $(wc -l <"$log") lines ---"
+            cat "$log"
             exit 1
           fi
           ls -l "$tree/build/libpthread-kernel"
