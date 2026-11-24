@@ -40,13 +40,21 @@ def find_tool(explicit: Path | None) -> Path:
         if not explicit.is_file():
             raise SystemExit(f"error: {explicit} is not a file")
         return explicit
+    # The project keeps the tool out of the tree (136 MB, not ours to redistribute), so its location
+    # comes from the environment when the default install path is not where it lives.
+    from_environment = os.environ.get("WPINTERNALS_EXE")
+    if from_environment:
+        candidate = Path(from_environment)
+        if candidate.is_file():
+            return candidate
+        raise SystemExit(f"error: WPINTERNALS_EXE points at {candidate}, which is not a file")
     if DEFAULT_TOOL.is_file():
         return DEFAULT_TOOL
     on_path = shutil.which("WPinternals.exe") or shutil.which("WPinternals")
     if on_path:
         return Path(on_path)
     raise SystemExit(
-        "error: WPinternals.exe not found -- pass --tool, or put it on PATH "
+        "error: WPinternals.exe not found -- pass --tool, set WPINTERNALS_EXE, or put it on PATH "
         f"(looked at {DEFAULT_TOOL})")
 
 

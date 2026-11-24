@@ -29,3 +29,10 @@ ones this port needs are exposed, so a typo cannot reach a destructive switch.
 `SwitchToMassStorageMode` needs the phone connected and already past the point where the tool can talk
 to it; if the phone sits on the firmware's service prompt, that prompt itself accepts a key press to
 shut down, and the next power-on with USB detached is what the boot test actually needs.
+
+## How it is integrated
+
+- `scripts/phone-modes.py` is the only place that runs the tool; `scripts/test-phone-modes.py` covers it and `scripts/run-tests.py` runs that test in the self-contained set (24/24 pass).
+- The binary is **not** committed: it is 136 MB and not this project's to redistribute. Its location comes from `--tool`, then `WPINTERNALS_EXE`, then the default install path, then PATH.
+- Only the switches this port needs are exposed. The destructive ones (FlashFFU, FlashCustomROM, the GPT group, RestoreGPT) stay out of the wrapper on purpose.
+
