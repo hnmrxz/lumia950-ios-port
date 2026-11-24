@@ -1,4 +1,4 @@
-﻿name: build
+name: build
 
 on:
   push:
@@ -645,6 +645,10 @@ jobs:
           added = 0
           for probe in probes:
               if probe not in text and needle in text:
+                  text = text.replace(needle, probe + "\n" + needle, 1)
+                  added += 1
+          if added:
+              script.write_text(text)
           print(f"archive/env probes added: {added}")
           PY
 
