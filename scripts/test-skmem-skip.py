@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Tests for ci/skmem-skip.py: it must patch the real function shape, be idempotent, and refuse odd input."""
 
 from __future__ import annotations
@@ -86,6 +86,18 @@ class SkmemSkipTests(unittest.TestCase):
     def test_find_locates_the_file(self):
         found = self.module.candidates([Path(self.temporary.name)])
         self.assertEqual(found, [self.file])
+
+    def test_finds_the_file_below_a_unixnu_output_tree(self):
+        """The CI step searches $UNIXNU_OUT, where the source sits several directories down."""
+        tree = Path(self.temporary.name) / "lumia950" / "tree" / "src" / "xnu" / "bsd" / "net"
+        tree.mkdir(parents=True)
+        target = tree / "skmem_sysctl.c"
+        target.write_text(SAMPLE, encoding="utf-8")
+        found = self.module.candidates([Path(self.temporary.name)])
+        self.assertIn(target, found)
+        ok, message = self.module.apply_to(target)
+        self.assertTrue(ok, message)
+        self.assertTrue(self.module.check(target)[0])
 
 
 if __name__ == "__main__":
