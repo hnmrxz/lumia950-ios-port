@@ -712,6 +712,14 @@ def run(args):
                             serial_text = (output / "serial.log").read_text(errors="replace")
                         except OSError:
                             pass
+                        # The dmesg read just above is the same boot output and is flushed before the
+                        # serial log on some runs, so consider it too.
+                        serial_text += report.get("dmesg_text", "") if isinstance(
+                            report.get("dmesg_text"), str) else ""
+                        if isinstance(report.get("dmesg"), dict):
+                            dmesg_path = output / "dmesg.txt"
+                            if dmesg_path.is_file():
+                                serial_text += dmesg_path.read_text(errors="replace")
                         waited = ("Still waiting for root device" in serial_text
                                   or "Waiting on <dict" in serial_text)
                         if waited:

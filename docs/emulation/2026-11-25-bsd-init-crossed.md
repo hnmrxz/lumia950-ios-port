@@ -63,3 +63,21 @@ directions:
   exists.
 
 Either way the next measurement is `_vfs_mountroot`, which has never been reached.
+
+## Confirmed on a second run
+
+Run 45591261099 (same guard, newer fixture) archives a report whose summary is now
+
+```
+past bsd init : root-wait
+fault symbol  : _ml_set_interrupts_enabled_with_debug+0x68
+fault address : 0x0
+root device   : waited for an Apple_HFS media
+vfs_mountroot : never reached
+```
+
+so the classification holds on a run whose stop symbol differs from the first one: the boot waits for an
+`Apple_HFS` media in both cases, and the idle-side fault that ends the observation is incidental. The
+report itself still did not carry `root_device_wait_observed` (the serial log is flushed after the point
+the fixture reads it), which is why the summariser falls back to the archived dmesg; the fixture now reads
+that file as well before deciding.
