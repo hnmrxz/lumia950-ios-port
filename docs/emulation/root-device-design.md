@@ -82,3 +82,15 @@ serial log moves from `Still waiting for root device` to an HFS mount attempt.
 - a real HFS+ volume with anything in it (userland needs one later, not this rung);
 - persistence, write-back, or power management;
 - claiming display or userland progress from a mount attempt.
+
+## Status: the IOKit half is written, not yet compiled
+
+`drivers/NativeRamBlock/` now holds `RamBlockCore` (host tested in CI, 16 assertions), `NativeRamBlock.h`
+and `NativeRamBlock.cpp` (an `IOMedia` subclass that allocates a contiguous buffer sized by
+`ramblock_bytes`, sets `kIOMediaContentKey` to `Apple_HFS`, publishes itself, and serves read/write from
+the buffer through the IOStorage completion interface), plus `Info.plist`.
+
+It is deliberately **not** in `board.toml`'s driver list yet, so the kernel job does not compile it. The
+next step is to add it there and accept a red kernel job as the price of finding out what the IOStorageFamily
+ABI actually requires -- the same loop NativeSdhci went through. Anything claimed about the media appearing
+in QEMU is premature until that compile is green.
