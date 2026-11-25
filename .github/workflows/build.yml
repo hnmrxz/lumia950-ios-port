@@ -861,7 +861,9 @@ jobs:
             esp2="$RUNNER_TEMP/esp-merged"
             rm -rf "$esp2"
             mkdir -p "$esp2"
-            cp -r out/payload/. "$esp2"/ || true
+            # Start from the ESP the gated assertion just staged: it carries the explicit non-autoboot
+            # menu and the ADT the fixture expects, and only the kernel is swapped.
+            cp -r "$esp/." "$esp2"/ || true
             mkdir -p "$esp2/EFI/UniXNU/Payloads"
             cp "$merged" "$esp2/EFI/UniXNU/Payloads/kernel.macho"
             if [ -f "$esp2/EFI/UniXNU/Payloads/kernel.macho" ]; then
