@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Run every test in scripts/ that needs no outside input, and say why the others are skipped.
 
 The CI workflow used to list test files one command per line, so a new test could be added and
@@ -30,7 +30,7 @@ SELF_CONTAINED = (
     "test-phone-tools.py",
     "test-phone-install.py",
     "test-check-bcd-layout.py",
-    "test-doc-references.py",
+    "test-skmem-skip.py",    "test-doc-references.py",
     "test-evidence.py",
     "test-gpu-tools.py",
     "test-graphics-profile.py",
@@ -122,3 +122,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -738,6 +738,15 @@ jobs:
           fi
           ls -l "$tree/build/libpthread-kernel"
 
+      - name: Gate the skmem sysctl publication behind a boot argument
+        # The emulated boot stops at _skmem_sysctl_init+0x18 storing through sysctls->version; the object
+        # is the static sk_sys_obj and the address is unmapped in this port's layout. No sk_* boot
+        # argument gates that publication, so the source is edited here, after the tree exists and before
+        # it is compiled, and the edit is verified rather than assumed.
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --check
+
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
         # 16.7.16 image, and [kernel.prelink] pins the kernelcache the merge consumes. The
