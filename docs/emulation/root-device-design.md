@@ -109,3 +109,19 @@ uses: an `extern "C"` entry point that creates the instance, attaches it to a pr
 boot, and publishes it, called from a place in XNU that runs before `vfs_mountroot` waits. That is a source
 patch of the kind `ci/skmem-skip.py` already demonstrates, and it must be verified by the log line rather
 than assumed.
+
+## The two boot images, and which one can carry a root media
+
+The kernel job produces two images and they are not interchangeable for this rung:
+
+| image | what it is | can it carry a storage device |
+|---|---|---|
+| `build/xnu/ios-obj/.../mach.development.bcm2837.unstripped` | this repository's own compile of the open-source XNU plus the in-tree drivers | **no**: `board.toml` excludes archives that subclass `IOStorageFamily`, because that family only exists after the merge |
+| `*/kernel/kernel.macho` | the prelinked image, with the pinned 16.7.16 kernelcache's extensions merged in | **possibly**: the families those drivers need are present there |
+
+The QEMU assertion boots the first. Three experiments established what that implies: a
+`bsd_init`-time call to the synthetic media cannot link there (`_native_ramblock_publish` unresolved, and
+this `ld` rejects weak undefined references too), so the media rung cannot be measured on the source
+kernel at all. The job therefore boots the merged image a second time as **evidence only**, staged by the
+project's own stager, and prints whether any media line appears. Whether the merged image is even loadable
+by the current QEMU setup is itself part of what that boot reports.
