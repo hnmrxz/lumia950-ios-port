@@ -99,10 +99,17 @@ def apply_to(path: Path) -> tuple[bool, str]:
         last = includes[-1]
         patched = patched[:last.end()] + "\n" + HEADER + patched[last.end():]
 
-    helper_anchor = "skmem_sysctl_init("
-    index = patched.index(helper_anchor)
-    # insert the helper before the doc comment block that introduces the function
-    patched = patched[:index] + HELPER + "\n" + patched[index:]
+    # Insert the helper before the whole declaration, not at the function name: this file declares the
+    # function as `__private_extern__ void` on the line above, and splitting that pair is a hard error
+    # ("cannot combine with previous '__private_extern__' declaration specifier").
+    name_index = patched.index("skmem_sysctl_init(")
+    line_start = patched.rfind("\n", 0, name_index) + 1
+    previous_start = patched.rfind("\n", 0, max(line_start - 1, 0)) + 1
+    previous_line = patched[previous_start:line_start]
+    insert_at = line_start
+    if previous_line.strip() and not previous_line.rstrip().endswith((";", "}", ")")):
+        insert_at = previous_start
+    patched = patched[:insert_at] + HELPER.strip("\n") + "\n\n" + patched[insert_at:]
 
     path.write_text(patched, encoding="utf-8")
     return True, "patched"

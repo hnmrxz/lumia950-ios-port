@@ -32,6 +32,19 @@ int other_function(void)
 '''
 
 
+
+
+PRIVATE_SAMPLE = '''#include <sys/types.h>
+
+__private_extern__ void
+skmem_sysctl_init(void)
+{
+	sk_sys_obj->version = 1;
+}
+'''
+
+
+
 def load():
     spec = importlib.util.spec_from_file_location("skmem_skip", ROOT / "ci" / "skmem-skip.py")
     module = importlib.util.module_from_spec(spec)
@@ -82,6 +95,21 @@ class SkmemSkipTests(unittest.TestCase):
         ok, message = self.module.apply_to(self.file)
         self.assertFalse(ok)
         self.assertIn("refusing", message)
+
+
+    def test_helper_goes_above_a_private_extern_declaration(self):
+        """Splitting `__private_extern__ void` from the name is a hard compile error."""
+        path = Path(self.temporary.name) / "private" / "skmem_sysctl.c"
+        path.parent.mkdir(parents=True)
+        path.write_text(PRIVATE_SAMPLE, encoding="utf-8")
+        ok, message = self.module.apply_to(path)
+        self.assertTrue(ok, message)
+        text = path.read_text(encoding="utf-8")
+        helper_at = text.index("skmem_sysctl_skip_requested(")
+        private_at = text.index("__private_extern__ void")
+        self.assertLess(helper_at, private_at, "the helper must precede the declaration specifiers")
+        self.assertIn("__private_extern__ void\nskmem_sysctl_init(void)", text)
+
 
     def test_find_locates_the_file(self):
         found = self.module.candidates([Path(self.temporary.name)])
