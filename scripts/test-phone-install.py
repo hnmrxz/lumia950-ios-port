@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,6 +21,18 @@ def load():
     return module
 
 
+
+def make_pe(path, subsystem, machine=0xAA64):
+    """A minimal PE header stub with a chosen machine and subsystem."""
+    data = bytearray(0x200)
+    data[0:2] = b"MZ"
+    struct.pack_into("<I", data, 0x3C, 0x80)
+    data[0x80:0x84] = b"PE\x00\x00"
+    struct.pack_into("<H", data, 0x84, machine)
+    data[0xDC] = subsystem
+    path.write_bytes(bytes(data))
+
+
 class PhoneInstallLayoutTests(unittest.TestCase):
     def setUp(self):
         self.module = load()
@@ -30,7 +43,7 @@ class PhoneInstallLayoutTests(unittest.TestCase):
         self.efiesp.mkdir()
         self.mainos.mkdir()
         self.bootshim = base / "BootShim.efi"
-        self.bootshim.write_bytes(b"MZ" + b"\x00" * 64)
+        make_pe(self.bootshim, subsystem=0x0A)
         self.uefi = base / "UEFI.elf"
         self.uefi.write_bytes(b"\x7fELF" + b"\x00" * 64)
         self.payload = base / "payload"
@@ -60,6 +73,20 @@ class PhoneInstallLayoutTests(unittest.TestCase):
         self.assertEqual(self.run_installer("--layout", "efiesp"), 0)
         self.assertTrue((self.efiesp / "EFI" / "boot" / "BootShim.efi").is_file())
         self.assertFalse((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").exists())
+
+
+    def test_a_driver_on_the_boot_path_is_refused(self):
+        """A boot service driver (0x0B) at the shim path is the failure this check exists for."""
+        make_pe(self.bootshim, subsystem=0x0B)
+        self.assertEqual(self.run_installer(), 1)
+        self.assertFalse((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").exists())
+
+    def test_an_application_on_the_boot_path_is_accepted(self):
+        make_pe(self.bootshim, subsystem=0x0A)
+        self.assertEqual(self.run_installer(), 0)
+        self.assertTrue((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").is_file())
+
+
 
     def test_refind_tree_is_copied_when_given(self):
         tree = Path(self.temporary.name) / "refind"

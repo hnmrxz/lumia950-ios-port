@@ -110,3 +110,20 @@ Run against this image's own enumeration it reports
 `layout ok: the store starts \windows\system32\boot\bootshim.efi` over 11 parsed entries. Run against the
 layout this session actually used (`{default}` pointing at `\EFI\boot\BootShim.efi`) it fails with the
 mismatch and prints the three `bcdedit` commands that fix it. Four host tests cover both directions.
+
+## Correction: the 42,976-byte module is a driver, not a boot shim
+
+An earlier attempt placed `8AF09F13-¡­efi` from the UEFI package at the shim path and the phone rebooted
+into the Windows reset flow. Its PE header explains why:
+
+| binary | bytes | subsystem |
+|---|---|---|
+| `8AF09F13-¡­efi` (UEFI package) | 42,976 | **0x0B** boot service driver |
+| `SJM\Core\Boot\bootaa64.efi` | 1,508,816 | **0x0A** EFI application |
+| rEFInd `refind_aa64.efi` | 202,624 | 0x0A |
+| GRUB `bootaa64.efi` | 878,544 | 0x0A |
+
+The boot manager only starts EFI applications, so a driver at `{default}` fails and the firmware falls
+back to `bootsequence` -> `mobilestartup.efi`, which is the two-gear reset flow seen on the panel.
+`phone-install.py` now refuses to place anything but subsystem 0x0A on a boot path, and two host tests
+cover the driver refusal and the application acceptance.

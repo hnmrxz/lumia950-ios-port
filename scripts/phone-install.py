@@ -29,8 +29,32 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def install(src: Path, dst: Path, apply: bool) -> bool:
-    print(f"  {src.name:32} {src.stat().st_size:>10} B  sha256 {digest(src)[:16]}")
+def pe_subsystem(path: Path) -> int | None:
+    """Return the PE subsystem, or None for anything that is not a PE image.
+
+    The boot manager only starts EFI applications (0x0A). A boot service driver (0x0B) or a runtime
+    driver (0x0C) placed at a boot path fails silently and the firmware falls back to its own sequence,
+    which on this handset means the Windows reset flow. That is exactly what happened with the 42,976-byte
+    module from the UEFI package, so the subsystem is checked before a binary may be installed.
+    """
+    data = path.read_bytes()
+    if len(data) < 0x40 or data[0:2] != b"MZ":
+        return None
+    offset = int.from_bytes(data[0x3C:0x40], "little")
+    if offset + 0x60 > len(data):
+        return None
+    return data[offset + 0x5C]
+
+
+def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = None) -> bool:
+    subsystem = pe_subsystem(src)
+    note = "" if subsystem is None else f" subsystem 0x{subsystem:02X}"
+    print(f"  {src.name:32} {src.stat().st_size:>10} B  sha256 {digest(src)[:16]}{note}")
+    if require_subsystem is not None:
+        if subsystem != require_subsystem:
+            print(f"error: {src.name} has subsystem {subsystem}, which is not the required "
+                  f"0x{require_subsystem:02X}; the boot manager would not start it", file=sys.stderr)
+            return False
     if not apply:
         return True
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shim_destination = efiesp / "EFI" / "boot" / "BootShim.efi"
         print("BootShim.efi -> EFIESP\\EFI\\boot")
-    ok &= install(args.bootshim, shim_destination, args.apply)
+    ok &= install(args.bootshim, shim_destination, args.apply, require_subsystem=0x0A)
 
     print("UEFI.elf -> EFIESP root")
     ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)
