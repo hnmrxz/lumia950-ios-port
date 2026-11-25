@@ -200,3 +200,52 @@ NativeRamBlock::doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt6
 	completion->action(completion->target, completion->parameter, kIOReturnSuccess, served);
 	return kIOReturnSuccess;
 }
+
+
+// Source-linked drivers in this port are not kexts: their Info.plist personalities are never consulted, so
+// nothing matches them (docs/emulation/root-device-design.md). The display probe already solves this by
+// being called from bsd_init.c; this is the same pattern. ci/ramblock-hook.py inserts the call, and the
+// serial log lines below are what proves it ran.
+extern "C" int
+native_ramblock_publish(void)
+{
+	static int published = 0;
+
+	if (published) {
+		return published;
+	}
+
+	IOService *resources = IOService::getResourceService();
+	if (resources == nullptr) {
+		IOLog("NativeRamBlock: no resource service; not publishing\n");
+		return 0;
+	}
+
+	NativeRamBlock *device = new NativeRamBlock;
+	if (device == nullptr) {
+		return 0;
+	}
+	if (!device->init()) {
+		IOLog("NativeRamBlock: init failed\n");
+		device->release();
+		return 0;
+	}
+
+	// Attach to the resource service: it exists in every boot and gives IOBlockStorageDriver a place to
+	// find the device, which is what the boot is waiting for.
+	if (!device->attach(resources)) {
+		IOLog("NativeRamBlock: attach failed\n");
+		device->release();
+		return 0;
+	}
+	if (!device->start(resources)) {
+		IOLog("NativeRamBlock: start failed\n");
+		device->detach(resources);
+		device->release();
+		return 0;
+	}
+
+	published = 1;
+	IOLog("NativeRamBlock: published from the bsd_init hook\n");
+	return published;
+}
