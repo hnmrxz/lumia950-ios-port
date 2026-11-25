@@ -10,7 +10,8 @@ this page and removed.
   entry as a non-external `__startup_EARLY_BOOT_entry_source_pthread_bootstrap_NN` that `nm -gU` hides.
 - The emulated boot now **returns from BSD initialisation**: run 45587399756 prints `!BSD`, then
   waits for an `IOMedia` whose `Content` is `Apple_HFS`, and reports `Still waiting for root device`
-  (`docs/emulation/2026-11-25-bsd-init-crossed.md`). `_vfs_mountroot` is still never reached.
+  (`docs/emulation/2026-11-25-bsd-init-crossed.md`). `_vfs_mountroot` is still never reached; what the
+  next rung needs is decided in `docs/emulation/root-device-design.md`.
 - That run carries the `skmem_sysctl_skip` guard from `ci/skmem-skip.py`, compiled into the tree
   before the build. The report classifies it as `panicked` because the idle thread null-dereferences
   while waiting for the root device, after `!BSD` has already been printed.
