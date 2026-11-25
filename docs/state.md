@@ -8,11 +8,12 @@ this page and removed.
 - The `kernel` job is green with the pthread component linked (runs 45314032032, 45318161131). The gate
   in `scripts/check-kernel-link.py` asks for the component's global symbols because the linker emits its
   entry as a non-external `__startup_EARLY_BOOT_entry_source_pthread_bootstrap_NN` that `nm -gU` hides.
-- The emulated boot crosses `bsd_init` (`past_bsd_outcome: stopped`), reaches `dlil_init`, and never
-  reaches `_vfs_mountroot`.
-- It stops in `skmem_sysctl_init`. The object exists and the address it points at is unmapped in this
-  port's VA layout; the bypass is a proposal, not applied
-  (`docs/emulation/2026-11-24-skmem-sysctl-skip-proposal.md`, `ci/skmem-skip.py`).
+- The emulated boot now **returns from BSD initialisation**: run 45587399756 prints `!BSD`, then
+  waits for an `IOMedia` whose `Content` is `Apple_HFS`, and reports `Still waiting for root device`
+  (`docs/emulation/2026-11-25-bsd-init-crossed.md`). `_vfs_mountroot` is still never reached.
+- That run carries the `skmem_sysctl_skip` guard from `ci/skmem-skip.py`, compiled into the tree
+  before the build. The report classifies it as `panicked` because the idle thread null-dereferences
+  while waiting for the root device, after `!BSD` has already been printed.
 
 ## Handset
 
