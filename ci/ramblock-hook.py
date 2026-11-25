@@ -20,7 +20,9 @@ import sys
 from pathlib import Path
 
 DECLARATION = "extern int native_ramblock_publish(void);"
-CALL = "\n\t/* Bring-up: publish the synthetic root media before the boot waits for a root device. */\n\tnative_ramblock_publish();\n"
+CALL = ("\n\t/* Bring-up: publish the synthetic root media before the boot waits for a root device. */\n"
+       "\textern int native_ramblock_publish(void);\n"
+       "\tnative_ramblock_publish();\n")
 MARKER = "native_ramblock_publish"
 
 
@@ -62,14 +64,6 @@ def apply_to(path: Path) -> tuple[bool, str]:
     start, _ = span
 
     text = text[:start] + CALL + text[start:]
-    if DECLARATION not in text:
-        # bsd_init.c has includes at the top; put the declaration after them.
-        includes = list(re.finditer(r"^#include .*$", text, re.MULTILINE))
-        if not includes:
-            return False, "no #include found; refusing to edit"
-        last = includes[-1]
-        text = text[:last.end()] + "\n\n" + DECLARATION + text[last.end():]
-
     path.write_text(text, encoding="utf-8")
     return True, "patched"
 
