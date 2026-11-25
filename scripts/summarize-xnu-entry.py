@@ -31,6 +31,7 @@ def summarize(report: dict) -> dict:
     missing = [name for name, value in watched.items() if not value]
     return {
         "past_bsd_outcome": report.get("past_bsd_outcome"),
+        "root_device_wait": bool(report.get("root_device_wait_observed")),
         "fault_elr_symbol": report.get("fault_elr_symbol"),
         "fault_far": report.get("fault_far"),
         "milestones": len(milestones),
@@ -55,6 +56,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     report = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    # Reports written before the fixture classified this may not carry the flag; the dmesg beside the
+    # report is the same evidence, so read it rather than reporting "not waited" when it did.
+    if not report.get("root_device_wait_observed"):
+        dmesg = path.parent / "dmesg.txt"
+        if dmesg.is_file():
+            text = dmesg.read_text(encoding="utf-8", errors="replace")
+            if "Still waiting for root device" in text or "Waiting on <dict" in text:
+                report["root_device_wait_observed"] = True
+                if report.get("past_bsd_outcome") in ("panicked", "stopped", "timed_out"):
+                    report["past_bsd_outcome"] = "root-wait"
     summary = summarize(report)
 
     print(f"report: {path}")
@@ -62,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"fault symbol  : {summary['fault_elr_symbol']}")
     print(f"fault address : {summary['fault_far']}")
     print(f"milestones    : {summary['milestones']}  last={summary['last_milestone']}")
+    print("root device   : " + ("waited for an Apple_HFS media" if summary["root_device_wait"] else "not waited"))
     print(f"vfs_mountroot : {'reached' if summary['vfs_mountroot'] else 'never reached'}")
     print()
     print("watched reached:", ", ".join(summary["watched_reached"]) or "(none)")

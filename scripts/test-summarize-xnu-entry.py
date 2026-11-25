@@ -54,6 +54,25 @@ class SummarizeTests(unittest.TestCase):
         self.assertIsNone(summary["fault_elr_symbol"])
         self.assertEqual(summary["milestones"], 1)
 
+    def test_report_without_flag_uses_the_sibling_dmesg(self):
+        """Older reports predate the flag; the dmesg beside them carries the same evidence."""
+        import json as _json
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "report.json").write_text(_json.dumps(STOPPED), encoding="utf-8")
+            (root / "dmesg.txt").write_text(
+                "[   38.688331]: Waiting on <dict ID=\"0\"><key>IOProviderClass</key>\n"
+                "[   98.839808]: Still waiting for root device\n", encoding="utf-8")
+            code = self.module.main([str(root / "report.json")])
+        self.assertEqual(code, 0)
+
+    def test_summarize_reports_the_wait_flag_when_present(self):
+        report = dict(STOPPED)
+        report["root_device_wait_observed"] = True
+        summary = self.module.summarize(report)
+        self.assertTrue(summary["root_device_wait"])
+
     def test_missing_watched_entries_are_listed_not_invented(self):
         summary = self.module.summarize({"watched": {"_vfs_mountroot": False, "irq_init": True}})
         self.assertEqual(summary["watched_reached"], ["irq_init"])

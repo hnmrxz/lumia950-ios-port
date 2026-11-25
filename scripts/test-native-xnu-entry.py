@@ -703,6 +703,21 @@ def run(args):
                             report["past_bsd_outcome"] = "timed_out"
                         else:
                             report["past_bsd_outcome"] = "stopped"
+
+                        # How far boot got is not the same question as how the machine stopped. A kernel
+                        # that waited for a root device had already returned from BSD initialisation, so
+                        # saying "panicked" for it hides the progress; classify it separately.
+                        serial_text = ""
+                        try:
+                            serial_text = (output / "serial.log").read_text(errors="replace")
+                        except OSError:
+                            pass
+                        waited = ("Still waiting for root device" in serial_text
+                                  or "Waiting on <dict" in serial_text)
+                        if waited:
+                            report["root_device_wait_observed"] = True
+                            if report["past_bsd_outcome"] in ("panicked", "stopped", "timed_out"):
+                                report["past_bsd_outcome"] = "root-wait"
                     if watched:
                         report["watched"] = watched
                     if reads or args.read_at:
