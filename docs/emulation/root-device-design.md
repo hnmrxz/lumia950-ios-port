@@ -207,3 +207,37 @@ has no `XNU_SOURCE_STORAGE`, so on this pin the only way to the media is the mer
 
 No workflow change was made for this note: the pin question has to be answered before a build can prove
 anything.
+
+## Why a source-only kernel cannot mount a root volume
+
+The last route (upstream's `XNU_SOURCE_STORAGE`) turns out not to compile the storage family either. Its own
+header says what it compiles, and it is one file plus a metaclass tweak:
+
+> The original IOStorageFamily and APFS stay in the kernel collection. Only the public
+> IOBlockStorageDevice implementation is compiled here; its metaclass is registered late below the original
+> class so the original storage driver can match the source-backed device.
+
+and the code matches that description:
+
+```python
+base = out / 'IOBlockStorageDevice.cpp'
+original = (storage / 'IOStorageFamily/IOBlockStorageDevice.cpp').read_text()
+...
+OSDefineMetaClassWithInit(IOBlockStorageDevice, IOService, )
+IOBlockStorageDevice::MetaClass::MetaClass()
+    : OSMetaClass("UniXNUBlockStorageDevice", native_source_storage_parent(), sizeof(IOBlockStorageDevice)) {}
+```
+
+Two things follow, and they settle the emulated branch of this rung:
+
+1. `IOBlockStorageDevice` is a **device** base class. It does not publish media by itself: the Apple
+   `IOStorageDriver`/`IOMedia` layer does that, and upstream keeps that layer in the kernel collection.
+2. The QEMU boot in this repository uses a **source-only kernel** -- no kernel collection. So even with the
+   device class compiled in, nothing would appear as an `IOMedia`, and `vfs_mountroot` would keep waiting.
+
+That is why the emulated branch stops where it stops: BSD initialisation returns, the boot waits for an
+`Apple_HFS` media, and no source-only arrangement of this tree changes that. The rung can only advance with a
+kernel that has the storage layer in it (a merged image that boots here, which currently panics in IOKit) or
+on the handset, where a real block device exists.
+
+Recording this is the point of this note: it is a boundary of the emulated setup, not a missing flag.
