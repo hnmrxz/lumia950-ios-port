@@ -13,6 +13,7 @@
 #include <IOKit/IOLib.h>
 #include <IOKit/IOService.h>
 #include <IOKit/IOMemoryDescriptor.h>
+#include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/storage/IOBlockStorageDevice.h>
 
 #include "RamBlockCore.h"
@@ -42,7 +43,7 @@ public:
 	IOReturn doSynchronizeCache() override { return ready ? kIOReturnSuccess : kIOReturnNotReady; }
 	IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
 	    IOStorageAttributes *attributes, IOStorageCompletion *completion) override;
-	IOReturn getDeviceCharacteristics(IOStorageDeviceCharacteristics **characteristics) override;
+	IOReturn getDeviceCharacteristics(OSDictionary **characteristics) override;
 
 private:
 	IOBufferMemoryDescriptor *storage = nullptr;

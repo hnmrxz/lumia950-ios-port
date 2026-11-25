@@ -8,6 +8,7 @@
 // read-only on purpose: the point is a mount attempt, not a writable volume.
 
 #include <pexpert/pexpert.h>
+#include <IOKit/IOBufferMemoryDescriptor.h>
 
 #include "NativeRamBlock.h"
 
@@ -40,7 +41,7 @@ NativeRamBlock::start(IOService *provider)
 	}
 
 	storage = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task,
-	    kIOMemoryPageable | kIODirectionInOut, (vm_size_t)geometry.bytes, PAGE_SIZE);
+	    kIODirectionInOut, (vm_size_t)geometry.bytes, PAGE_SIZE);
 	if (storage == nullptr) {
 		native_ramblock_errors++;
 		return false;
@@ -147,7 +148,7 @@ NativeRamBlock::reportMediaState(bool *present, bool *changed)
 }
 
 IOReturn
-NativeRamBlock::getDeviceCharacteristics(IOStorageDeviceCharacteristics **characteristics)
+NativeRamBlock::getDeviceCharacteristics(OSDictionary **characteristics)
 {
 	if (characteristics == nullptr) {
 		return kIOReturnBadArgument;
@@ -171,10 +172,10 @@ NativeRamBlock::getDeviceCharacteristics(IOStorageDeviceCharacteristics **charac
 	}
 
 	// The keys IOBlockStorageDriver reads when it builds the IOMedia.
-	properties->setObject(kIOBlockStorageDevicePropertyBlockSize, blockSize);
+	properties->setObject("Block Size", blockSize);
 	properties->setObject("Block Count", blockCount);
-	properties->setObject(kIOBlockStorageDevicePropertyContentHint, content);
-	properties->setObject(kIOBlockStorageDevicePropertyWriteProtect, writeProtect);
+	properties->setObject("Content Hint", content);
+	properties->setObject("Write Protect", writeProtect);
 
 	OSSafeReleaseNULL(blockSize);
 	OSSafeReleaseNULL(blockCount);
