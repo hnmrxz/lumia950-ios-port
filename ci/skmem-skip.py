@@ -88,6 +88,7 @@ def apply_to(path: Path) -> tuple[bool, str]:
         return False, "skmem_sysctl_init(void) not found; refusing to guess"
     start, _ = span
 
+    defined_split = text
     body_open = text.index("{", start) + 1
     patched = text[:body_open] + "\n" + GUARD + text[body_open:]
 
@@ -109,6 +110,14 @@ def apply_to(path: Path) -> tuple[bool, str]:
     insert_at = line_start
     if previous_line.strip() and not previous_line.rstrip().endswith((";", "}", ")")):
         insert_at = previous_start
+    # Two invariants, both learned from the CI failure: the helper must land at file scope, and a
+    # declaration the file wrote across two lines must stay that way.
+    depth = patched[:insert_at].count("{") - patched[:insert_at].count("}")
+    if depth != 0:
+        return False, f"refusing to insert at brace depth {depth}"
+    if "__private_extern__ void" in text:
+        if "__private_extern__ void\nskmem_sysctl_init(void)" not in defined_split:
+            return False, "the declaration was split; refusing to write"
     patched = patched[:insert_at] + HELPER.strip("\n") + "\n\n" + patched[insert_at:]
 
     path.write_text(patched, encoding="utf-8")
