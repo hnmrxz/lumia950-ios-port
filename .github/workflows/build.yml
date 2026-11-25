@@ -221,7 +221,7 @@ jobs:
               scripts/check-oem-scm-profile.py scripts/test-oem-scm-profile.py \
               scripts/test-gicv2-qemu.py scripts/probe_fat.py scripts/test-probe-fat.py
           bash -n scripts/build-payload.sh scripts/build-probe.sh scripts/test-probe.sh scripts/test-gpu.sh scripts/test-storage.sh \
-              scripts/test-gicv2.sh scripts/build-gicv2-test.sh scripts/test-report.sh
+              scripts/test-gicv2.sh scripts/build-gicv2-test.sh scripts/test-report.sh scripts/test-ramblock.sh
 
       - name: Check the chainload payload configuration
         # The keys and enums are the ones UniXNULib/Config.c reads, so a typo fails here
@@ -370,6 +370,7 @@ jobs:
         run: |
           mkdir -p build
           bash scripts/test-storage.sh
+          bash scripts/test-ramblock.sh
           bash scripts/test-gicv2.sh
           bash scripts/test-gpu.sh
           g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeMdss \
