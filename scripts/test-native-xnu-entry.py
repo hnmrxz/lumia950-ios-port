@@ -387,11 +387,11 @@ def run(args):
         raise ValueError("required real XNU symbols are missing")
     if args.crypto_post:
         if args.allow_prelinked:
-        # The crypto contract describes the source-built kernel (source-provider POST mapping). A merged
-        # image carries Apple extensions instead, so the comparison is not meaningful for it.
-        print("note: evidence boot, crypto contract skipped for the merged image")
-    else:
-        STAGE.crypto_contract(original)
+            # The crypto contract describes the source-built kernel (source-provider POST mapping). A
+            # merged image carries Apple extensions instead, so the comparison is not meaningful for it.
+            print("note: evidence boot, crypto contract skipped for the merged image")
+        else:
+            STAGE.crypto_contract(original)
     if args.finish_iokit and "_PE_init_iokit" not in names:
         raise ValueError("real IOKit initialization symbol is missing")
     if args.finish_bsd:
