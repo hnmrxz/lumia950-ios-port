@@ -106,7 +106,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="report what would be written and write nothing (the default; stated "
+                             "explicitly so a runbook can spell it out)")
     args = parser.parse_args(argv)
+    if args.apply and args.dry_run:
+        parser.error("--apply and --dry-run contradict each other")
+    args.apply = args.apply and not args.dry_run
 
     efiesp = Path(args.efiesp.rstrip("\\/"))
     mainos = Path(args.mainos.rstrip("\\/"))

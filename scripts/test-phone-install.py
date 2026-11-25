@@ -63,6 +63,19 @@ class PhoneInstallLayoutTests(unittest.TestCase):
             *extra,
         ])
 
+    def test_dry_run_writes_nothing(self):
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--bootshim", str(self.bootshim), "--uefi-elf", str(self.uefi),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--dry-run"]
+        self.assertEqual(self.module.main(argv), 0)
+        self.assertFalse((self.mainos / "Windows").exists())
+        self.assertFalse((self.efiesp / "EFI").exists())
+
+    def test_apply_and_dry_run_together_are_refused(self):
+        with self.assertRaises(SystemExit):
+            self.run_installer("--dry-run")
+
     def test_default_layout_puts_the_shim_on_mainos(self):
         self.assertEqual(self.run_installer(), 0)
         self.assertTrue((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").is_file())
