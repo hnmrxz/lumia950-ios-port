@@ -854,6 +854,31 @@ jobs:
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
           python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --past-bsd --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
 
+          # A second boot of the merged image answers a question the source kernel cannot: the drivers
+          # that subclass IOStorageFamily are excluded from the source link because that family only
+          # exists after the prelink merge (board.toml). If the merged image boots at all, it is the
+          # place where a synthetic root media can exist. Evidence only: this does not gate the job.
+          merged=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit || true)
+          if [ -n "$merged" ]; then
+            esp2="$RUNNER_TEMP/esp-merged"
+            rm -rf "$esp2"
+            if python3 scripts/stage-kernel.py --kernel "$merged" \
+                --unique-chip-id 0000000000000000 --menu-tree out/payload \
+                --out "$esp2" >"$RUNNER_TEMP/stage-merged.log" 2>&1; then
+              python3 scripts/test-native-xnu-entry.py --kernel "$merged" --esp "$esp2" \
+                --firmware "$firmware" --output out/xnu-entry-merged --timeout 240 \
+                --past-bsd --dump-dmesg --adt-profile qemu --smp 2 || true
+              echo "--- merged image: did a storage media appear? ---"
+              grep -a -m 12 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device' \
+                out/xnu-entry-merged/dmesg.txt || echo "(no media line in the merged boot)"
+            else
+              echo "::warning::the merged image was not staged; see $RUNNER_TEMP/stage-merged.log"
+              tail -20 "$RUNNER_TEMP/stage-merged.log" || true
+            fi
+          else
+            echo "::warning::no merged image was produced, so it was not booted"
+          fi
+
       - name: Stage the source-built kernel for a handset smoke test
         # Opt-in through `source_kernel_artifact`. What is staged here is this repository's own compile
         # of the open-source XNU plus its in-tree drivers -- no Apple kernelcache content is merged in,
