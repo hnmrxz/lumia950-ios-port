@@ -31,3 +31,11 @@ this page and removed.
 
 `scripts/run-tests.py` 25/25, `scripts/check-evidence.py` 16 subjects, `scripts/check-doc-references.py`
 passes, and the branch is in sync with origin.
+
+## Host tests must run on the CI host, not just here
+
+A test added on 2026-11-25 asserted that a `C:\...` literal was absolute. That is true on Windows and
+false on the Linux `validate` host, so it turned the job red the moment it was pushed, and the same round
+had to fix it. `scripts/check-host-tests-portable.py` now reads every test file and refuses a Windows
+absolute path inspected through `Path`/`open` instead of `PureWindowsPath`; its own test is exempt because
+it embeds such paths deliberately. Four tests cover the checker, and the suite is 29/29.

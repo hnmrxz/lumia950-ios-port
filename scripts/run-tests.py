@@ -30,6 +30,7 @@ SELF_CONTAINED = (
     "test-phone-tools.py",
     "test-phone-install.py",
     "test-check-bcd-layout.py",
+    "test-check-host-tests-portable.py",
     "test-skmem-skip.py",    "test-doc-references.py",
     "test-evidence.py",
     "test-gpu-tools.py",
