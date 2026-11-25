@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import json
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -40,8 +42,21 @@ def walk(root: Path):
             yield path
 
 
+
+def mount_root(text: str) -> Path:
+    """The volume root for a mount argument, on Windows (`R:`) and on a POSIX path alike.
+
+    `R:` names the current directory of that drive, so the root needs a separator; a directory argument must
+    not gain one, or it stops being a directory on POSIX.
+    """
+    value = text.rstrip("\\/")
+    if re.fullmatch(r"[A-Za-z]:", value):
+        return Path(value + os.sep)
+    return Path(value)
+
+
 def save(args) -> int:
-    root = Path(args.efiesp.rstrip("\\") + "\\")
+    root = mount_root(args.efiesp)
     if not root.is_dir():
         print(f"error: {args.efiesp} is not mounted", file=sys.stderr)
         return 2
@@ -85,7 +100,7 @@ def restore(args) -> int:
         print(f"error: {manifest} is missing", file=sys.stderr)
         return 2
     data = json.loads(manifest.read_text())
-    root = Path(args.efiesp.rstrip("\\") + "\\")
+    root = mount_root(args.efiesp)
     if not root.is_dir():
         print(f"error: {args.efiesp} is not mounted", file=sys.stderr)
         return 2
