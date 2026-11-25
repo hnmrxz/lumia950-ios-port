@@ -43,7 +43,6 @@ public:
 	IOReturn doSynchronizeCache() override { return ready ? kIOReturnSuccess : kIOReturnNotReady; }
 	IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
 	    IOStorageAttributes *attributes, IOStorageCompletion *completion) override;
-	IOReturn getDeviceCharacteristics(OSDictionary **characteristics) override;
 
 private:
 	IOBufferMemoryDescriptor *storage = nullptr;

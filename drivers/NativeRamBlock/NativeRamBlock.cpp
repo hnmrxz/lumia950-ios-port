@@ -59,6 +59,12 @@ NativeRamBlock::start(IOService *provider)
 	// which is the next thing to fix and is not something this device pretends to have solved.
 	bzero(storage->getBytesNoCopy(), (vm_size_t)geometry.bytes);
 
+	// State the content on the device: the characteristics override is not part of this
+	// ABI build, so the property is where the hint can live.
+	setProperty("Content Hint", kContentHint);
+	setProperty("Block Size", (unsigned long long)geometry.blockSize, 64);
+	setProperty("Block Count", (unsigned long long)geometry.blockCount, 64);
+
 	ready = true;
 	registerService();
 
@@ -149,44 +155,6 @@ NativeRamBlock::reportMediaState(bool *present, bool *changed)
 	}
 	*present = ready;
 	*changed = false;
-	return kIOReturnSuccess;
-}
-
-IOReturn
-NativeRamBlock::getDeviceCharacteristics(OSDictionary **characteristics)
-{
-	if (characteristics == nullptr) {
-		return kIOReturnBadArgument;
-	}
-
-	OSDictionary *properties = OSDictionary::withCapacity(4);
-	if (properties == nullptr) {
-		return kIOReturnNoMemory;
-	}
-	OSNumber *blockSize = OSNumber::withNumber((unsigned long long)geometry.blockSize, 64);
-	OSNumber *blockCount = OSNumber::withNumber((unsigned long long)geometry.blockCount, 64);
-	OSString *content = OSString::withCString(kContentHint);
-	OSBoolean *writeProtect = kOSBooleanTrue;
-
-	if (blockSize == nullptr || blockCount == nullptr || content == nullptr) {
-		OSSafeReleaseNULL(properties);
-		OSSafeReleaseNULL(blockSize);
-		OSSafeReleaseNULL(blockCount);
-		OSSafeReleaseNULL(content);
-		return kIOReturnNoMemory;
-	}
-
-	// The keys IOBlockStorageDriver reads when it builds the IOMedia.
-	properties->setObject("Block Size", blockSize);
-	properties->setObject("Block Count", blockCount);
-	properties->setObject("Content Hint", content);
-	properties->setObject("Write Protect", writeProtect);
-
-	OSSafeReleaseNULL(blockSize);
-	OSSafeReleaseNULL(blockCount);
-	OSSafeReleaseNULL(content);
-
-	*characteristics = properties;
 	return kIOReturnSuccess;
 }
 
