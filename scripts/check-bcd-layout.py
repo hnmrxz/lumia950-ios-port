@@ -26,6 +26,9 @@ from pathlib import Path
 ENTRY = re.compile(r"标识符\s+(\{[^}]+\})|identifier\s+(\{[^}]+\})", re.IGNORECASE)
 FIELD = re.compile(r"^\s*(path|device|description|default)\s+(.+?)\s*$", re.IGNORECASE)
 
+# The reference WOA image points {bootmgr} at this; the firmware loads it before any entry.
+BOOTMGR_PATH = r"\efi\boot\bootarm.efi"
+
 EXPECTATIONS = {
     "mainos": "\\windows\\system32\\boot\\bootshim.efi",
     "efiesp": "\\efi\\boot\\bootshim.efi",
@@ -66,6 +69,12 @@ def check(entries: dict[str, dict[str, str]], expect: str) -> list[str]:
     if not manager:
         problems.append("no {bootmgr} entry: this is not the store the firmware reads")
         return problems
+
+    manager_path = manager.get("path", "").strip("\\").lower()
+    if manager_path != BOOTMGR_PATH.strip("\\").lower():
+        problems.append(
+            f"{{bootmgr}} path is '{manager.get('path', '(none)')}', expected '{BOOTMGR_PATH}': "
+            "that is the file the firmware loads first")
 
     target = manager.get("default", "").lower()
     if not target:

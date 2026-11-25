@@ -60,6 +60,17 @@ class CheckBcdLayoutTests(unittest.TestCase):
         entries = self.module.parse(WOA_ENUM)
         self.assertEqual(self.module.check(entries, "mainos"), [])
 
+    def test_bootmgr_path_follows_the_reference_image(self):
+        reference = self.module.parse(WOA_ENUM)
+        self.assertEqual(reference["{bootmgr}"]["path"].strip("\\").lower(),
+                         self.module.BOOTMGR_PATH.strip("\\").lower())
+
+    def test_a_different_bootmgr_path_is_reported(self):
+        text = WOA_ENUM.replace(r"\efi\boot\bootarm.efi", r"\EFI\BOOT\BOOTAA64.EFI")
+        entries = self.module.parse(text)
+        problems = self.module.check(entries, "mainos")
+        self.assertTrue(any("bootmgr" in problem.lower() for problem in problems), problems)
+
     def test_efiesp_path_fails_the_mainos_expectation_with_a_fix(self):
         entries = self.module.parse(HIJACKED_ENUM)
         problems = self.module.check(entries, "mainos")
