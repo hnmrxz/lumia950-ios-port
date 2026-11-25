@@ -21,8 +21,14 @@ unless `--apply` is given. The default tool path is
 The upstream command parser accepts: `ShowPhoneInfo`, `SwitchToMassStorageMode`, `UnlockBootloader`,
 `EnableRootAccess`, `FixBootAfterUnlockingBootloader`, `DumpUEFI`, `FlashFFU`, `FlashCustomROM`,
 `Rewritepartitionsfrommassstorage`, `Restoregptusingmassstorage`, the GPT group
-(`ReadGPT`/`BackupGPT`/`RestoreGPT`/`MergeGPT`/`ConvertGPT`), `DumpFFU`, and a few diagnostics. Only the
-ones this port needs are exposed, so a typo cannot reach a destructive switch.
+(`ReadGPT`/`BackupGPT`/`RestoreGPT`/`MergeGPT`/`ConvertGPT`), `DumpFFU`, **`AddFFU`** (adds an FFU to the
+reference repository the unlock patch resolves against), and a few diagnostics. Only the ones this port needs
+are exposed, so a typo cannot reach a destructive switch.
+
+The switch spellings are the case labels of `CommandLine.cs` in the upstream project (`case "flashffu"`,
+`case "addffu"`, ...), so the invocation is case-insensitive: `-AddFFU` and `-addffu` reach the same handler.
+`scripts/phone-recover.ps1` uses `AddFFU` for the donor image, which is checkable against that file rather
+than against this list.
 
 ## What it does not solve
 
