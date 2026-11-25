@@ -176,3 +176,34 @@ the board comment names remains the only coherent one: emit the driver as a kext
 step merge it, after which its `Info.plist` personality is actually consulted. Doing that needs the prelink
 kit's interface (`kits/NativePrelink` is not checked out in this workspace), so it is the next unit of work
 rather than something this round could finish.
+
+## The three routes to a root media, after measuring them
+
+| route | what it needs | measured status |
+|---|---|---|
+| source link + force-load | the archive in `LD_KERNEL_ARCHIVES` | **closed**: run 45706495971 fails the link with undefined `IOBlockStorageDevice::*`; run 45702387021 shows that without the force-load the member is simply not pulled in |
+| prelink closure (`XNU_NATIVE_RAM_BLOCK=1`) | on this pin, `XNU_NATIVE_AES=1`, which in turn requires `CRYPTO_BOOTSTRAP_MODE=prelinked` and `XNU_SOURCE_CORECRYPTO14=1` | **blocked**: `prelinked` means the merged image, and that image panics in IOKit here (run 45693593284) before BSD init |
+| **source storage (`XNU_SOURCE_STORAGE=1`)** | upstream's `scripts/build-sheng-source-storage.py`, i.e. the storage stack compiled from source, plus a newer framework pin | **not attempted**: this is the route the current upstream uses to make `drivers/RamBlock` legal without the AES closure |
+
+The third row is the interesting one. Upstream's own check says it plainly:
+
+```bash
+if [ "$NATIVE_RAM_BLOCK" = 1 ] && [ "${XNU_SOURCE_STORAGE:-0}" != 1 ]; then
+    # ... requires the qualified original storage/AES prelink closure
+```
+
+With source storage that requirement disappears, because the storage family is compiled into the kernel the
+same way `XNU_SOURCE_CORECRYPTO14` compiles corecrypto in. Our pin (`1a01c2a`) predates that path: its script
+has no `XNU_SOURCE_STORAGE`, so on this pin the only way to the media is the merged image, which panics.
+
+### What that makes the next unit of work
+
+1. read `scripts/build-sheng-source-storage.py` and the framework's `components.toml` entry for it, to see
+   what it compiles and which headers/ABI it assumes;
+2. decide whether to move this port's pin to a framework revision that has `XNU_SOURCE_STORAGE`, or to vendor
+   that one builder;
+3. only then touch `board.toml` again (source storage on, `XNU_NATIVE_RAM_BLOCK=1`, exclusion still in place
+   for the source link, since the media would then come from the storage archive itself).
+
+No workflow change was made for this note: the pin question has to be answered before a build can prove
+anything.
