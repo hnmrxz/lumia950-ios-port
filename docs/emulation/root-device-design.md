@@ -156,13 +156,30 @@ source-built kernel rather than a merged one (provenance, strip verification, th
 It was staged from the ESP the gated assertion had just used, with only `kernel.macho` swapped, so the menu
 the fixture expects is the one it accepted.
 
-Result, run 45693593284:
+Result, run 45693593284 (fixture report):
 
 ```
 real IOKit initialization did not return: ['_panic']
 --- merged image: did a storage media appear? ---
 (no media line in the merged boot)
 ```
+
+The serial console of the same boot (run 45715174239) refines what that actually means. It ends at the
+hand-off and then says nothing:
+
+```
+DARWINBOOT: inputs validated; exiting boot services
+?DARWINBOOT: hand-off to the kernel
+...
+Exiting boot services. A green bar across the top
+marks the loader before branching to XNU.
+qemu-system-aarch64: terminating on signal 15 from pid 61341 (<unknown process>)
+```
+
+No kernel line follows -- not even the early `arm_vm_init` banner this repository's source kernel prints. So
+the merged image does not demonstrably panic *in IOKit*: it goes silent after the hand-off and the run ends on
+the fixture's own timeout (signal 15). The `_panic` stop came from a breakpoint on a symbol read out of the
+merged image, which is weaker evidence than a console line, and the earlier wording overstated it.
 
 So the merged image **does load and execute** -- that was the open question for four rounds -- and it panics
 during IOKit initialisation, before `!BSD`. Two consequences:
