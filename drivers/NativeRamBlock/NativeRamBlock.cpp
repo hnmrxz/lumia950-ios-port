@@ -225,7 +225,7 @@ native_ramblock_publish(void)
 	if (device == nullptr) {
 		return 0;
 	}
-	if (!device->init()) {
+	if (!device->init(nullptr)) {
 		IOLog("NativeRamBlock: init failed\n");
 		device->release();
 		return 0;
