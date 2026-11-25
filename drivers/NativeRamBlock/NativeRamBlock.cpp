@@ -10,6 +10,11 @@
 #include <pexpert/pexpert.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 
+#include <libkern/c++/OSDictionary.h>
+#include <libkern/c++/OSString.h>
+#include <libkern/c++/OSNumber.h>
+#include <libkern/c++/OSBoolean.h>
+
 #include "NativeRamBlock.h"
 
 using namespace native_ram_block;
