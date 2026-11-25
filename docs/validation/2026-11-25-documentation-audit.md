@@ -68,4 +68,4 @@ should be read with the correction beside it:
    procedure, and link it from the 2026-11-24 notes.
 2. Record the donor-FFU requirement next to `scripts/phone-recover.ps1` in
    `docs/hardware/2026-11-25-flashing-toolchain.md`.
-3. Add the "snapshot first" rule to `docs/status-2026-11-24.md` where the handset steps are listed.
+3. Add the "snapshot first" rule to `docs/state.md` where the handset steps are listed.
