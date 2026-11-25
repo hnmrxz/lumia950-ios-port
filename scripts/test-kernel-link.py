@@ -90,7 +90,7 @@ class KernelLinkTests(unittest.TestCase):
         names = module.expected_from_board(ROOT / "board.toml")
         self.assertEqual(sorted(names),
                          sorted(["ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeAdreno418",
-                                 "NativeMdss", "NativeLegacyDisplay"]))
+                                 "NativeMdss", "NativeLegacyDisplay", "NativeRamBlock"]))
         # ... and the fallback list is not allowed to be smaller than the board.
         self.assertTrue(set(names) <= set(module.DEFAULT_EXPECTED))
 
