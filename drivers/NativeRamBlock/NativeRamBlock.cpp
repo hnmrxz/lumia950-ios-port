@@ -1,41 +1,35 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 //
-// NativeRamBlock: a synthetic IOMedia so `vfs_mountroot` has something to mount.
+// NativeRamBlock: the synthetic root media, as an IOBlockStorageDevice.
 //
-// The guarded run returns from BSD initialisation and then waits for an IOMedia whose content is
-// Apple_HFS (docs/emulation/2026-11-25-bsd-init-crossed.md). No storage path exists that can answer
-// that on this port yet, so this driver provides the smallest possible one: a contiguous buffer, the
-// HFS content hint, and read/write served straight out of the buffer. It exists to move the VFS rung
-// forward, not to ship (docs/emulation/root-device-design.md).
-//
-// It has no MMIO, no clock, no power domain and no interrupt, so there is nothing about it that needs
-// real hardware to prove. What it does carry is the IOStorageFamily dependency, which `board.toml`
-// documents as resolvable only after the prelink merge -- same constraint as NativeSdhci.
+// The kernel waits for an IOMedia whose content is Apple_HFS (docs/emulation/2026-11-25-bsd-init-crossed.md).
+// IOBlockStorageDriver builds that IOMedia from a storage device, so this provides the device, the
+// geometry and the characteristic that names the content. The buffer is the whole medium and it is
+// read-only on purpose: the point is a mount attempt, not a writable volume.
 
-#include <IOKit/IOLib.h>
-#include <IOKit/IOMemoryDescriptor.h>
-#include <IOKit/storage/IOMedia.h>
 #include <pexpert/pexpert.h>
 
 #include "NativeRamBlock.h"
-#include "RamBlockCore.h"
 
 using namespace native_ram_block;
 
-OSDefineMetaClassAndStructors(NativeRamBlock, IOMedia)
+OSDefineMetaClassAndStructors(NativeRamBlock, IOBlockStorageDevice)
 
 extern "C" {
-// Visible in the kernel symbol table so a boot with no console still says whether the media appeared.
+// Visible in the symbol table: a boot with no console still says whether the media appeared.
 volatile uint32_t native_ramblock_ready = 0;
 volatile uint64_t native_ramblock_bytes = 0;
 volatile uint64_t native_ramblock_reads = 0;
-volatile uint64_t native_ramblock_writes = 0;
 volatile uint64_t native_ramblock_errors = 0;
 }
 
 bool
 NativeRamBlock::start(IOService *provider)
 {
+	if (!IOBlockStorageDevice::start(provider)) {
+		return false;
+	}
+
 	// Geometry from the boot argument, so QEMU and the handset differ only in the number.
 	uint64_t bytes = kDefaultBytes;
 	(void)PE_parse_boot_argn("ramblock_bytes", &bytes, sizeof(bytes));
@@ -45,24 +39,21 @@ NativeRamBlock::start(IOService *provider)
 		return false;
 	}
 
-	buffer = IOMallocContiguous((vm_size_t)geometry.bytes, PAGE_SIZE, nullptr);
-	if (buffer == nullptr) {
+	storage = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task,
+	    kIOMemoryPageable | kIODirectionInOut, (vm_size_t)geometry.bytes, PAGE_SIZE);
+	if (storage == nullptr) {
 		native_ramblock_errors++;
 		return false;
 	}
-	bzero(buffer, (vm_size_t)geometry.bytes);
-
-	// Whole media, 512-byte blocks, content Apple_HFS: this is exactly the match vfs_mountroot asks for.
-	if (!init(0, geometry.bytes, geometry.blockSize, true, kContentHint)) {
-		IOFreeContiguous(buffer, (vm_size_t)geometry.bytes);
-		buffer = nullptr;
+	if (storage->prepare() != kIOReturnSuccess) {
 		native_ramblock_errors++;
 		return false;
 	}
+	// A zeroed medium: reads succeed, so the VFS rung gets a read path; HFS will reject the contents,
+	// which is the next thing to fix and is not something this device pretends to have solved.
+	bzero(storage->getBytesNoCopy(), (vm_size_t)geometry.bytes);
 
-	setProperty(kIOMediaContentKey, kContentHint);
-	setProperty(kIOMediaWholeKey, kOSBooleanTrue);
-	setProperty("NativeRamBlockGeometry", (unsigned long long)geometry.bytes, 64);
+	ready = true;
 	registerService();
 
 	native_ramblock_bytes = geometry.bytes;
@@ -73,53 +64,161 @@ NativeRamBlock::start(IOService *provider)
 void
 NativeRamBlock::stop(IOService *provider)
 {
-	if (buffer != nullptr) {
-		IOFreeContiguous(buffer, (vm_size_t)geometry.bytes);
-		buffer = nullptr;
-	}
+	ready = false;
 	native_ramblock_ready = 0;
-	IOMedia::stop(provider);
+	if (storage != nullptr) {
+		(void)storage->complete();
+		storage->release();
+		storage = nullptr;
+	}
+	IOBlockStorageDevice::stop(provider);
 }
 
 void
 NativeRamBlock::free()
 {
-	if (buffer != nullptr) {
-		IOFreeContiguous(buffer, (vm_size_t)geometry.bytes);
-		buffer = nullptr;
+	if (storage != nullptr) {
+		(void)storage->complete();
+		storage->release();
+		storage = nullptr;
 	}
-	IOMedia::free();
+	IOBlockStorageDevice::free();
 }
 
-void
-NativeRamBlock::read(IOService *client, UInt64 byteOffset, IOMemoryDescriptor *bufferDescriptor,
-    IOStorageCompletion completion)
+IOReturn
+NativeRamBlock::reportBlockSize(UInt64 *value)
 {
+	if (value == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*value = geometry.blockSize;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::reportMaxValidBlock(UInt64 *value)
+{
+	if (value == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*value = geometry.blockCount == 0 ? 0 : geometry.blockCount - 1;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::reportEjectability(bool *value)
+{
+	if (value == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*value = false;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::reportRemovability(bool *value)
+{
+	if (value == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*value = false;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::reportWriteProtection(bool *value)
+{
+	if (value == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*value = true;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::reportMediaState(bool *present, bool *changed)
+{
+	if (present == nullptr || changed == nullptr) {
+		return kIOReturnBadArgument;
+	}
+	*present = ready;
+	*changed = false;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::getDeviceCharacteristics(IOStorageDeviceCharacteristics **characteristics)
+{
+	if (characteristics == nullptr) {
+		return kIOReturnBadArgument;
+	}
+
+	OSDictionary *properties = OSDictionary::withCapacity(4);
+	if (properties == nullptr) {
+		return kIOReturnNoMemory;
+	}
+	OSNumber *blockSize = OSNumber::withNumber((unsigned long long)geometry.blockSize, 64);
+	OSNumber *blockCount = OSNumber::withNumber((unsigned long long)geometry.blockCount, 64);
+	OSString *content = OSString::withCString(kContentHint);
+	OSBoolean *writeProtect = kOSBooleanTrue;
+
+	if (blockSize == nullptr || blockCount == nullptr || content == nullptr) {
+		OSSafeReleaseNULL(properties);
+		OSSafeReleaseNULL(blockSize);
+		OSSafeReleaseNULL(blockCount);
+		OSSafeReleaseNULL(content);
+		return kIOReturnNoMemory;
+	}
+
+	// The keys IOBlockStorageDriver reads when it builds the IOMedia.
+	properties->setObject(kIOBlockStorageDevicePropertyBlockSize, blockSize);
+	properties->setObject("Block Count", blockCount);
+	properties->setObject(kIOBlockStorageDevicePropertyContentHint, content);
+	properties->setObject(kIOBlockStorageDevicePropertyWriteProtect, writeProtect);
+
+	OSSafeReleaseNULL(blockSize);
+	OSSafeReleaseNULL(blockCount);
+	OSSafeReleaseNULL(content);
+
+	*characteristics = properties;
+	return kIOReturnSuccess;
+}
+
+IOReturn
+NativeRamBlock::doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
+    IOStorageAttributes *attributes, IOStorageCompletion *completion)
+{
+	if (buffer == nullptr || completion == nullptr || count == 0) {
+		return kIOReturnBadArgument;
+	}
+	if (block >= geometry.blockCount || count > geometry.blockCount - block) {
+		native_ramblock_errors++;
+		return kIOReturnBadArgument;
+	}
+
+	const uint64_t byteOffset = block * geometry.blockSize;
+	const uint64_t requested = count * geometry.blockSize;
 	uint64_t served = 0;
-	if (bufferDescriptor == nullptr || !read_within(geometry, byteOffset, bufferDescriptor->getLength(), &served)) {
-		native_ramblock_errors++;
-		complete(completion, kIOReturnBadArgument, 0);
-		return;
-	}
-	// Serving from the head of the buffer: there is nothing in it to be wrong about yet, and the point of
-	// this rung is that the read path exists and reports the bytes it moved.
-	(void)bufferDescriptor->writeBytes(0, buffer, (vm_size_t)served);
-	native_ramblock_reads++;
-	complete(completion, kIOReturnSuccess, (IOByteCount)served);
-}
 
-void
-NativeRamBlock::write(IOService *client, UInt64 byteOffset, IOMemoryDescriptor *bufferDescriptor,
-    IOStorageCompletion completion)
-{
-	if (bufferDescriptor == nullptr ||
-	    !write_within(geometry, byteOffset, bufferDescriptor->getLength())) {
-		native_ramblock_errors++;
-		complete(completion, kIOReturnBadArgument, 0);
-		return;
+	if (buffer->getDirection() != kIODirectionIn) {
+		// Read-only medium: refuse writes rather than silently dropping them.
+		completion->action(completion->target, completion->parameter, kIOReturnUnsupported, 0);
+		return kIOReturnUnsupported;
 	}
-	(void)bufferDescriptor->readBytes(0, static_cast<char *>(buffer) + (vm_size_t)byteOffset,
-	    (vm_size_t)bufferDescriptor->getLength());
-	native_ramblock_writes++;
-	complete(completion, kIOReturnSuccess, (IOByteCount)bufferDescriptor->getLength());
+	if (!read_within(geometry, byteOffset, requested, &served)) {
+		native_ramblock_errors++;
+		completion->action(completion->target, completion->parameter, kIOReturnBadArgument, 0);
+		return kIOReturnBadArgument;
+	}
+
+	if (buffer->writeBytes(0, static_cast<char *>(storage->getBytesNoCopy()) + (vm_size_t)byteOffset,
+	    (vm_size_t)served) != served) {
+		native_ramblock_errors++;
+		completion->action(completion->target, completion->parameter, kIOReturnIOError, 0);
+		return kIOReturnIOError;
+	}
+
+	__atomic_fetch_add(&native_ramblock_reads, 1, __ATOMIC_RELAXED);
+	completion->action(completion->target, completion->parameter, kIOReturnSuccess, served);
+	return kIOReturnSuccess;
 }
