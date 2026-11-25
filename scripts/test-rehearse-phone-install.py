@@ -18,9 +18,12 @@ class RehearsalTests(unittest.TestCase):
             capture_output=True, text=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("dry-run exit: 0", result.stdout)
-        self.assertIn("EFIESP still empty: True", result.stdout)
-        self.assertIn("MainOS still empty: True", result.stdout)
+        self.assertIn("the dry run wrote nothing: True", result.stdout)
         self.assertIn("bcdedit /store", result.stdout)
+        # the runbook's one command, against a reference store and against a drifted one
+        self.assertIn("install + verify (reference store) exit: 0", result.stdout)
+        self.assertIn("store matches the layout: True", result.stdout)
+        self.assertIn("install + verify (loader-path store) exit: 1", result.stdout)
 
 
 if __name__ == "__main__":
