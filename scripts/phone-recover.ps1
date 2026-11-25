@@ -1,4 +1,4 @@
-# One command back to a bootable, unlocked phone: factory image, donor FFU in the repository, unlock,
+﻿# One command back to a bootable, unlocked phone: factory image, donor FFU in the repository, unlock,
 # then mass storage.
 #
 # The unlock patch (SecureBootHack-V2-EFIESP / -MainOS) resolves its reference version from the FFUs in
@@ -70,7 +70,7 @@ Write-Host "=== 2/4 factory image ==="
 if ($SkipFlash) {
     Write-Host "skipped (-SkipFlash)"
 } else {
-    if (-not (Phone-Present)) { throw "the phone is not in flash mode; hold Volume Down and power on" }
+    if (-not (Phone-Present)) { Write-Warning "phone not detected yet; WPinternals waits for it, so hold Volume Down and power on now" }
     $code = Run-Tool @('-FlashFFU', "`"$Ffu`"") "FlashFFU"
     if ($code -ne 0) { throw "FlashFFU failed; stop and report the exit code" }
 }
