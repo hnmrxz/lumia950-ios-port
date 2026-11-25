@@ -935,6 +935,11 @@ def main():
     try:
         run(args)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        # For an evidence boot of a merged image, the message alone is not enough: the provenance gate has
+        # been hit from several call sites, and a traceback names the next one instead of a guess.
+        if getattr(args, "allow_prelinked", False):
+            import traceback
+            traceback.print_exc()
         parser.exit(1, f"error: {error}\n")
 
 
