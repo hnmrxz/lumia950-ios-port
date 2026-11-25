@@ -241,3 +241,20 @@ kernel that has the storage layer in it (a merged image that boots here, which c
 on the handset, where a real block device exists.
 
 Recording this is the point of this note: it is a boundary of the emulated setup, not a missing flag.
+
+## There is no filesystem in the source kernel either
+
+An obvious next idea is to skip the block device altogether and mount a root from memory. It does not work on
+this tree, and the reason is in the pinned XNU itself. Searching the tree of `xnu-8796.141.3` (GitHub tree
+API, 5329 entries, not truncated) for HFS and for the memory-disk driver gives:
+
+- HFS: only `bsd/net/altq/altq_hfsc.h` and `bsd/net/pktsched/pktsched_hfsc.h` -- those are the HFSC packet
+  scheduler, not the filesystem. `bsd/hfs` does not exist in this source drop;
+- memory disk: no `bsd/dev/md*` file at all.
+
+Both HFS+ and APFS ship as kernel extensions in this generation, and the memory-disk driver is not part of the
+open source kernel either. So a source-only kernel has **no mountable filesystem and no way to create a
+device to mount one from**, independently of the storage-driver question.
+
+That closes the last "clever workaround" for the emulated branch: reaching userland needs a kernel that has
+the Apple extensions in it -- i.e. the merged image, which currently panics in IOKit here -- or the handset.
