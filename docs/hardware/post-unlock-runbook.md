@@ -72,6 +72,19 @@ bcdedit /store R:\EFI\Microsoft\BOOT\BCD /enum all > out/bcd-after.txt
 python scripts/check-bcd-layout.py out/bcd-after.txt --expect mainos
 ```
 
+Better, do it in the same command as the install, so the store is verified rather than remembered:
+
+```bash
+python scripts/phone-install.py --efiesp R: --mainos F: --stage out/payload --payload out/kernel \
+    --apply --verify-bcd out/bcd-after.txt
+```
+
+`--verify-bcd` runs the layout checker with the expectation that matches `--layout`, prints the `bcdedit`
+lines to fix a mismatch, and makes the install exit non-zero when the store does not match what was written.
+The three things it checks, in the order the firmware sees them: `{bootmgr} path` names
+`\efi\boot\bootarm.efi`; `{bootmgr} default` names an entry; that entry is the MainOS shim with a
+description naming BootShim.
+
 ## 4. First boot
 
 1. detach USB, power off, power on;

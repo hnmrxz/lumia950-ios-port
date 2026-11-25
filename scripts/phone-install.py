@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -86,6 +87,26 @@ def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = N
     return True
 
 
+
+def verify_bcd(enum_file: Path, layout: str) -> bool:
+    """Run the layout checker against a captured store, so the BCD step is verified rather than assumed."""
+    checker = Path(__file__).with_name("check-bcd-layout.py")
+    if not enum_file.is_file():
+        print(f"error: --verify-bcd {enum_file} is missing", file=sys.stderr)
+        return False
+    expect = "mainos" if layout == "mainos" else "efiesp"
+    print()
+    print(f"checking the store against the {expect} layout: {enum_file}")
+    result = subprocess.run([sys.executable, str(checker), "--enum-file", str(enum_file), "--expect", expect],
+                            text=True)
+    if result.returncode != 0:
+        print("error: the store does not match what this run installed; apply the printed bcdedit commands",
+              file=sys.stderr)
+        return False
+    print("store matches the layout")
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--efiesp", required=True, help="EFIESP mount, for example R:")
@@ -106,6 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
+    parser.add_argument("--verify-bcd", type=Path, default=None, metavar="ENUM_FILE",
+                        help="also check a captured 'bcdedit /store ... /enum all' output against the layout "
+                             "this run installs, so the store is verified in the same command")
     parser.add_argument("--dry-run", action="store_true",
                         help="report what would be written and write nothing (the default; stated "
                              "explicitly so a runbook can spell it out)")
@@ -165,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
                 if source.is_file():
                     relative = source.relative_to(args.refind)
                     ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply)
+
+    if args.verify_bcd is not None:
+        ok &= verify_bcd(args.verify_bcd, args.layout)
 
     print()
     if args.apply:

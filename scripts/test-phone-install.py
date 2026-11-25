@@ -76,6 +76,34 @@ class PhoneInstallLayoutTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.run_installer("--dry-run")
 
+    WOA_ENUM = """Windows \u542f\u52a8\u7ba1\u7406\u5668
+--------------------
+\u6807\u8bc6\u7b26                  {bootmgr}
+device                  partition=\\Device\\HarddiskVolume2
+path                    \\efi\\boot\\bootarm.efi
+default                 {default}
+
+Windows \u542f\u52a8\u5e94\u7528\u7a0b\u5e8f(1020000a)
+--------------------
+\u6807\u8bc6\u7b26                  {default}
+device                  partition=F:
+path                    \\windows\\system32\\boot\\bootshim.efi
+description             BootShim Application
+"""
+
+    def test_verify_bcd_accepts_the_reference_layout(self):
+        enum = self.efiesp / "bcd.txt"
+        enum.write_text(self.WOA_ENUM, encoding="utf-8")
+        self.assertTrue(self.module.verify_bcd(enum, "mainos"))
+
+    def test_verify_bcd_rejects_a_loader_path(self):
+        enum = self.efiesp / "bcd.txt"
+        enum.write_text(self.WOA_ENUM.replace("bootshim.efi", "winload.efi"), encoding="utf-8")
+        self.assertFalse(self.module.verify_bcd(enum, "mainos"))
+
+    def test_verify_bcd_reports_a_missing_file(self):
+        self.assertFalse(self.module.verify_bcd(self.efiesp / "absent.txt", "mainos"))
+
     def test_default_layout_puts_the_shim_on_mainos(self):
         self.assertEqual(self.run_installer(), 0)
         self.assertTrue((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").is_file())
