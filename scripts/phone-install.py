@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Install the handset chain from this checkout, and report what still needs a physical action.
+r"""Install the handset chain from this checkout, and report what still needs a physical action.
 
 Order comes from the upstream projects (Lumia950XLPkg README, postmarketOS wiki): unlock, put
-BootShim.efi on EFIESP and give it a boot entry, put UEFI.elf on the EFIESP root, and only then the
-UniXNU payload and the kernel. This script does the file parts, verifying every write by SHA-256, and
+BootShim.efi and give it a boot entry, put UEFI.elf on the EFIESP root, and only then the UniXNU payload
+and the kernel. The shim's location is not the obvious one: the Lumia deployment scripts put it at
+`\Windows\System32\Boot\bootshim.efi` on MainOS and point the store's `{default}` at it, which is what
+the reference WOA image on this machine does (docs/hardware/2026-11-25-woa-ffu-reference.md). `--layout
+efiesp` keeps the older placement for comparison. This script does the file parts, verifying every write by SHA-256, and
 prints the boot entries and the one action it cannot perform (a power press).
 
     python scripts/phone-install.py --efiesp R: --mainos F: --stage efiesp --payload mainos --dry-run
@@ -47,6 +50,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--payload", type=Path, default=STAGING / "redeploy-mainos",
                         help="staged MainOS tree holding EFI/UniXNU/Payloads")
     parser.add_argument("--bootshim", type=Path, default=STAGING / "bootshim" / "elf-loader-pre3" / "BootShim.efi")
+    parser.add_argument("--layout", choices=("mainos", "efiesp"), default="mainos",
+                        help="mainos puts the shim at \\Windows\\System32\\Boot\\bootshim.efi as the Lumia "
+                             "deployment scripts and the reference WOA image do; efiesp keeps the older "
+                             "placement under EFI\\boot")
+    parser.add_argument("--refind", type=Path, default=None,
+                        help="optional rEFInd tree to copy to EFIESP\\EFI\\REFIND")
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
@@ -60,8 +69,13 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     ok = True
-    print("BootShim.efi -> EFIESP")
-    ok &= install(args.bootshim, efiesp / "EFI" / "boot" / "BootShim.efi", args.apply)
+    if args.layout == "mainos":
+        shim_destination = mainos / "Windows" / "System32" / "Boot" / "bootshim.efi"
+        print(r"BootShim.efi -> MainOS\Windows\System32\Boot")
+    else:
+        shim_destination = efiesp / "EFI" / "boot" / "BootShim.efi"
+        print("BootShim.efi -> EFIESP\\EFI\\boot")
+    ok &= install(args.bootshim, shim_destination, args.apply)
 
     print("UEFI.elf -> EFIESP root")
     ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)
@@ -86,11 +100,28 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("  (no staged kernel; run scripts/stage-kernel.py --payload-out first)")
 
+    if args.refind:
+        if not args.refind.is_dir():
+            print(f"error: --refind {args.refind} is not a directory", file=sys.stderr)
+            ok = False
+        else:
+            print("rEFInd -> EFIESP\\EFI\\REFIND")
+            for source in sorted(args.refind.rglob("*")):
+                if source.is_file():
+                    relative = source.relative_to(args.refind)
+                    ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply)
+
     print()
     if args.apply:
         print("files installed and verified")
     else:
         print("dry run only; pass --apply to write")
+    if args.layout == "mainos":
+        print()
+        print("the shim is on MainOS, so the store has to point at it (run these elevated):")
+        print(r"  bcdedit /store <EFIESP>:\\EFI\\Microsoft\\BOOT\\BCD /set {default} device partition=<MainOS>:")
+        print(r"  bcdedit /store <EFIESP>:\\EFI\\Microsoft\\BOOT\\BCD /set {default} path \\windows\\system32\\boot\\bootshim.efi")
+        print(r"  bcdedit /store <EFIESP>:\\EFI\\Microsoft\\BOOT\\BCD /set {default} description \"BootShim Application\"")
     print("still requires a physical action: detach USB, power off, power on to test the boot result")
     return 0 if ok else 1
 
