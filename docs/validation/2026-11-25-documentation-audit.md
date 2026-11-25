@@ -32,7 +32,7 @@ should be read with the correction beside it:
 1. **"Replacing `EFI/boot/bootarm.efi` installs the chain"** — wrong. The firmware boots
    `EFI/boot/bootarm.efi`, and the unlocked boot manager is what looks for `UEFI.elf`; replacing the
    loader is what broke mass storage, not what installs the chain
-   (`docs/hardware/2026-11-24-booted-windows.md`, `.../2026-11-24-real-efiesp-is-r.md`).
+   (superseded notes folded into `docs/hardware/handset-boot-chain.md`).
 2. **"BootShim is the missing piece"** — half right. A shim is part of the documented chain, but the
    shim fetched from `imbushuo/boot-shim` is **ARM32** (`PE machine 0x01C4`) and cannot run on this
    AArch64 handset; the AArch64 shim ships inside the Lumia950XLPkg package (42,976 B,
