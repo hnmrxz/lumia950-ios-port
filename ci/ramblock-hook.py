@@ -21,8 +21,13 @@ from pathlib import Path
 
 DECLARATION = "extern int native_ramblock_publish(void);"
 CALL = ("\n\t/* Bring-up: publish the synthetic root media before the boot waits for a root device. */\n"
-       "\textern int native_ramblock_publish(void);\n"
-       "\tnative_ramblock_publish();\n")
+       "\t/* Weak: the archive is linked after the prelink merge, so the source build has no\n"
+       "\t * definition and must not fail to link over it. */\n"
+       "\textern int native_ramblock_publish(void) __attribute__((weak));\n"
+       "\tif (native_ramblock_publish != 0) {\n"
+       "\t\tnative_ramblock_publish();\n"
+       "\t}\n")
+
 MARKER = "native_ramblock_publish"
 
 

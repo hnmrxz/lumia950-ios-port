@@ -59,7 +59,7 @@ class RamBlockHookTests(unittest.TestCase):
         body = text.split("bsd_init(void)")[1]
         self.assertIn("native_ramblock_publish();", body)
         self.assertLess(body.index("native_ramblock_publish()"), body.index("vfs_mountroot"))
-        self.assertIn("extern int native_ramblock_publish(void);", text)
+        self.assertIn("extern int native_ramblock_publish(void) __attribute__((weak));", text)
 
     def test_apply_is_idempotent(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
