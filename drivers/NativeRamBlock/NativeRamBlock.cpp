@@ -36,10 +36,6 @@ volatile uint64_t native_ramblock_errors = 0;
 bool
 NativeRamBlock::start(IOService *provider)
 {
-	if (!OSDynamicCast(IOMedia, this)) {
-		return false;
-	}
-
 	// Geometry from the boot argument, so QEMU and the handset differ only in the number.
 	uint64_t bytes = kDefaultBytes;
 	(void)PE_parse_boot_argn("ramblock_bytes", &bytes, sizeof(bytes));
@@ -122,7 +118,7 @@ NativeRamBlock::write(IOService *client, UInt64 byteOffset, IOMemoryDescriptor *
 		complete(completion, kIOReturnBadArgument, 0);
 		return;
 	}
-	(void)bufferDescriptor->readBytes(0, buffer + (vm_size_t)byteOffset,
+	(void)bufferDescriptor->readBytes(0, static_cast<char *>(buffer) + (vm_size_t)byteOffset,
 	    (vm_size_t)bufferDescriptor->getLength());
 	native_ramblock_writes++;
 	complete(completion, kIOReturnSuccess, (IOByteCount)bufferDescriptor->getLength());
