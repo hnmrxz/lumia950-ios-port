@@ -65,8 +65,12 @@ NativeRamBlock::start(IOService *provider)
 	setProperty("Block Size", (unsigned long long)geometry.blockSize, 64);
 	setProperty("Block Count", (unsigned long long)geometry.blockCount, 64);
 
+	IOLog("NativeRamBlock: starting, %llu bytes, %llu blocks\n",
+	    (unsigned long long)geometry.bytes, (unsigned long long)geometry.blockCount);
+
 	ready = true;
 	registerService();
+	IOLog("NativeRamBlock: media published\n");
 
 	native_ramblock_bytes = geometry.bytes;
 	native_ramblock_ready = 1;

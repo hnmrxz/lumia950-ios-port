@@ -1,21 +1,16 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleIdentifier</key>
-	<string>org.lumia950.native.ramblock</string>
-	<key>CFBundleName</key>
-	<string>NativeRamBlock</string>
-	<key>IOKitPersonalities</key>
-	<dict>
-		<!-- Published by our own start(), not matched against device tree: there is no hardware here. -->
-	</dict>
-	<key>OSBundleLibraries</key>
-	<dict>
-		<key>com.apple.kpi.iokit</key>
-		<string>16.0.0</string>
-		<key>com.apple.kpi.libkern</key>
-		<string>16.0.0</string>
-	</dict>
-</dict>
-</plist>
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>org.unixnu.NativeRamBlock</string>
+  <key>CFBundleName</key><string>NativeRamBlock</string>
+  <key>CFBundleExecutable</key><string>NativeRamBlock</string>
+  <key>CFBundlePackageType</key><string>KEXT</string>
+  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>OSBundleRequired</key><string>Root</string>
+  <key>IOKitPersonalities</key><dict><key>Lumia 950 bring-up root media</key><dict>
+    <key>IOClass</key><string>NativeRamBlock</string>
+    <key>IOProviderClass</key><string>IOPlatformExpertDevice</string>
+    <key>IONameMatch</key><string>platform</string>
+    <key>IOProbeScore</key><integer>500</integer>
+  </dict></dict>
+</dict></plist>
