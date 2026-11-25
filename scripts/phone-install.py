@@ -29,6 +29,27 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+
+SJM_SHIM = Path(r"C:\Program Files\chengcong\SJM\Core\Boot\bootaa64.efi")
+LEGACY_SHIM = STAGING / "bootshim" / "elf-loader-pre3" / "BootShim.efi"
+
+
+def resolve_bootshim(explicit: Path | None) -> Path:
+    """Prefer a real EFI application: the boot manager only starts subsystem 0x0A.
+
+    The historical staging file is an ARM32 driver and is only a last resort, kept so an explicit
+    --bootshim keeps working; the subsystem check in install() refuses it either way.
+    """
+    if explicit is not None:
+        return explicit
+    for candidate in (SJM_SHIM, LEGACY_SHIM):
+        if candidate.is_file():
+            return candidate
+    return LEGACY_SHIM
+
+
+
+
 def pe_subsystem(path: Path) -> int | None:
     """Return the PE subsystem, or None for anything that is not a PE image.
 
@@ -73,7 +94,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="payload tree holding EFI/UniXNU")
     parser.add_argument("--payload", type=Path, default=STAGING / "redeploy-mainos",
                         help="staged MainOS tree holding EFI/UniXNU/Payloads")
-    parser.add_argument("--bootshim", type=Path, default=STAGING / "bootshim" / "elf-loader-pre3" / "BootShim.efi")
+    parser.add_argument("--bootshim", type=Path, default=None,
+                        help="EFI application to install as the shim; defaults to the SJM application, "
+                             "which is the only AArch64 application on this machine")
     parser.add_argument("--layout", choices=("mainos", "efiesp"), default="mainos",
                         help="mainos puts the shim at \\Windows\\System32\\Boot\\bootshim.efi as the Lumia "
                              "deployment scripts and the reference WOA image do; efiesp keeps the older "
@@ -99,7 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shim_destination = efiesp / "EFI" / "boot" / "BootShim.efi"
         print("BootShim.efi -> EFIESP\\EFI\\boot")
-    ok &= install(args.bootshim, shim_destination, args.apply, require_subsystem=0x0A)
+    shim = resolve_bootshim(args.bootshim)
+    print(f"shim source: {shim}")
+    ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A)
 
     print("UEFI.elf -> EFIESP root")
     ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)

@@ -75,6 +75,17 @@ class PhoneInstallLayoutTests(unittest.TestCase):
         self.assertFalse((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").exists())
 
 
+    def test_default_shim_resolution_prefers_a_real_application(self):
+        """With no --bootshim the resolver must not silently pick the ARM32 driver in staging."""
+        resolved = self.module.resolve_bootshim(None)
+        self.assertTrue(str(resolved).endswith(("bootaa64.efi", "BootShim.efi")))
+        # If the SJM application is present on this machine, it must be what gets chosen.
+        if self.module.SJM_SHIM.is_file():
+            self.assertEqual(resolved, self.module.SJM_SHIM)
+
+    def test_explicit_shim_is_respected(self):
+        self.assertEqual(self.module.resolve_bootshim(self.bootshim), self.bootshim)
+
     def test_a_driver_on_the_boot_path_is_refused(self):
         """A boot service driver (0x0B) at the shim path is the failure this check exists for."""
         make_pe(self.bootshim, subsystem=0x0B)
