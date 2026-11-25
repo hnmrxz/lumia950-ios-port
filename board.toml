@@ -57,6 +57,7 @@ archives = [
 # image, and `kernel-linked` is not claimed for it.
 [kernel.link_excluded]
 NativeSdhci = "subclasses IOBlockStorageDevice from IOStorageFamily, which only exists after the prelink merge"
+NativeRamBlock = "subclasses IOBlockStorageDevice from IOStorageFamily, which only exists after the prelink merge"
 
 # TODO: obtain the real userdata GPT geometry (first_lba, last_lba) read-only from the phone.
 
