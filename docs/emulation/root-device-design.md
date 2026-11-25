@@ -94,3 +94,18 @@ It is deliberately **not** in `board.toml`'s driver list yet, so the kernel job 
 next step is to add it there and accept a red kernel job as the price of finding out what the IOStorageFamily
 ABI actually requires -- the same loop NativeSdhci went through. Anything claimed about the media appearing
 in QEMU is premature until that compile is green.
+
+## Correction: personalities do not start anything here
+
+Two personalities were tried (`IOPlatformExpertDevice` named "platform", then `IOResources`) and neither
+produced a single `NativeRamBlock` log line in the emulated boot. The reason is in this repository's own
+arrangement: drivers are **link inputs to the kernel**, not loadable kexts. `board.toml` says as much about
+`NativeLegacyDisplay` -- "Link input, not a driver: upstream calls `native_legacy_display_probe()` from
+`bsd_init.c`". A source-linked class has no kext bundle, so its `Info.plist` personalities are never
+consulted and nothing matches it.
+
+What the next rung therefore needs is an explicit start hook, the same pattern the display probe already
+uses: an `extern "C"` entry point that creates the instance, attaches it to a provider that exists in the
+boot, and publishes it, called from a place in XNU that runs before `vfs_mountroot` waits. That is a source
+patch of the kind `ci/skmem-skip.py` already demonstrates, and it must be verified by the log line rather
+than assumed.
