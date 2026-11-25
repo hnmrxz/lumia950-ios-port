@@ -94,3 +94,19 @@ project does not serve without credentials.
 3. The shim and the developer menu belong on MainOS, which also means a file copy to `F:\Windows\System32\Boot\`
    rather than to EFIESP.
 4. `scripts/phone-image.py` can capture MainOS, so this arrangement is reproducible once it works.
+
+## The layout is now checked, not eyeballed
+
+`scripts/check-bcd-layout.py` reads the output of `bcdedit /store <store> /enum all` (it decodes the
+console code page, UTF-16 and UTF-8) and decides whether the store starts what it should:
+
+```
+python scripts/check-bcd-layout.py --enum-file bcd.txt --expect mainos   # shim on MainOS
+python scripts/check-bcd-layout.py --enum-file bcd.txt --expect efiesp   # shim under EFI\boot
+python scripts/check-bcd-layout.py --enum-file bcd.txt --expect windows  # plain Windows loader
+```
+
+Run against this image's own enumeration it reports
+`layout ok: the store starts \windows\system32\boot\bootshim.efi` over 11 parsed entries. Run against the
+layout this session actually used (`{default}` pointing at `\EFI\boot\BootShim.efi`) it fails with the
+mismatch and prints the three `bcdedit` commands that fix it. Four host tests cover both directions.
