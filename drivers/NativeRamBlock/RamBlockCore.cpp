@@ -3,7 +3,7 @@
 namespace native_ram_block {
 
 Geometry
-geometry_for(std::uint64_t bytes)
+geometry_for(uint64_t bytes)
 {
 	Geometry geometry = {};
 
@@ -19,8 +19,8 @@ geometry_for(std::uint64_t bytes)
 }
 
 bool
-read_within(const Geometry &geometry, std::uint64_t byteOffset, std::uint64_t length,
-    std::uint64_t *served)
+read_within(const Geometry &geometry, uint64_t byteOffset, uint64_t length,
+    uint64_t *served)
 {
 	if (served == nullptr) {
 		return false;
@@ -29,13 +29,13 @@ read_within(const Geometry &geometry, std::uint64_t byteOffset, std::uint64_t le
 	if (!geometry.valid() || byteOffset >= geometry.bytes) {
 		return false;
 	}
-	const std::uint64_t remaining = geometry.bytes - byteOffset;
+	const uint64_t remaining = geometry.bytes - byteOffset;
 	*served = length < remaining ? length : remaining;
 	return *served != 0;
 }
 
 bool
-write_within(const Geometry &geometry, std::uint64_t byteOffset, std::uint64_t length)
+write_within(const Geometry &geometry, uint64_t byteOffset, uint64_t length)
 {
 	if (!geometry.valid() || byteOffset >= geometry.bytes) {
 		return false;
