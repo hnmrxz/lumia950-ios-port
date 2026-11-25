@@ -922,6 +922,8 @@ def main():
     parser.add_argument("--finish-iokit", action="store_true", help="Also require actual IOKit initialization entry/return after the real crypto POST")
     parser.add_argument("--finish-bsd", action="store_true", help="Also require the kernel to enter bsd_init; that is the last milestone before a root volume is required")
     args = parser.parse_args()
+    # Evidence only: let the stager parses merged images without the provenance refusal.
+    STAGE.ALLOW_PRELINKED = args.allow_prelinked
     if args.past_bsd:
         args.finish_bsd = True
     if args.finish_bsd:

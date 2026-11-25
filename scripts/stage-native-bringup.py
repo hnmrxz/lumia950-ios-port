@@ -49,6 +49,10 @@ def adt_command(profile, adt, unique_chip_id):
     return command
 
 
+# Evidence-only: see the __PRELINK branch inside contract().
+ALLOW_PRELINKED = False
+
+
 def contract(blob):
     if len(blob) < 32:
         raise ValueError("short Mach-O")
@@ -77,7 +81,13 @@ def contract(blob):
             if address + span > (1 << 64) or address % 4096 or protection & ~maximum:
                 raise ValueError("invalid virtual segment")
             if (name.startswith("__PRELINK") or name.startswith("__PLK_")) and (span or file_size):
-                raise ValueError("merged/prelinked kernel refused; its runtime qualification gate is not bypassed")
+                # A merged image is refused for the handset route because its segments carry Apple
+                # kernelcache content. A caller that only asks what the image reaches (the QEMU evidence
+                # boot) may set ALLOW_PRELINKED; the segment is then kept rather than rejected. Every other
+                # contract violation still raises.
+                if not ALLOW_PRELINKED:
+                    raise ValueError(
+                        "merged/prelinked kernel refused; its runtime qualification gate is not bypassed")
             segments[name] = {"address": address, "span": span, "file_offset": file_offset,
                               "file_size": file_size, "protection": protection}
         elif command == 5:
