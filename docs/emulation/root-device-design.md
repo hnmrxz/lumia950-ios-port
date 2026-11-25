@@ -125,3 +125,26 @@ this `ld` rejects weak undefined references too), so the media rung cannot be me
 kernel at all. The job therefore boots the merged image a second time as **evidence only**, staged by the
 project's own stager, and prints whether any media line appears. Whether the merged image is even loadable
 by the current QEMU setup is itself part of what that boot reports.
+
+## What the prelink roots already say
+
+`board.toml`'s `[kernel.prelink] roots` list contains `com.apple.iokit.IOStorageFamily`. So the merged image
+does carry the family that a storage driver needs -- the source kernel does not, which is why the archive is
+excluded from it.
+
+That changes the shape of the fix. The board's own comment next to `[kernel.link_excluded]` states it:
+
+> Until the driver is emitted as a kext bundle and merged by the prelink step, it is built and checked but
+> not in the image.
+
+So the path to a root media is not "call the driver from `bsd_init`" (impossible in the source link, as three
+experiments showed) and not "another personality in the source build" (personalities are never read there).
+It is: **emit `NativeRamBlock` as a kext bundle, let the prelink step merge it, and let the framework match
+it there** -- in that arrangement the personality *is* consulted, because a merged kext is a real kext.
+
+What that requires, in order:
+
+1. a bundle layout the prelink step accepts for an in-tree driver (executable + `Info.plist`);
+2. an entry in the board/prelink configuration that merges it into the image;
+3. the personality to name the class and a provider that exists in that image;
+4. the serial log to show `NativeRamBlock: starting`, then an `Apple_HFS` media.
