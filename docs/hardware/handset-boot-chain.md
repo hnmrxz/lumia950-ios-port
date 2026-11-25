@@ -40,24 +40,62 @@ records that **every Lumia, regardless of model, needs the 950 XL image** for th
 its reference versions — the same mechanism as WPinternals' `-AddFFU` donor
 .
 
+## Where the shim actually goes (from the reference WOA image)
+
+Reading the BCD of the WOA package on this machine settled what had been guessed at for a day
+(`docs/hardware/2026-11-25-woa-ffu-reference.md`):
+
+```
+{bootmgr}   path \efi\boot\bootarm.efi        default {default}
+{default}   path \windows\system32\boot\bootshim.efi   "BootShim Application"   nointegritychecks Yes
+{01de5a27-…} \windows\system32\boot\mobilestartup.efi "Mobile Startup App"
+```
+
+The shim lives on **MainOS** under `\Windows\System32\Boot`, not on EFIESP, and `{bootmgr} default` is what
+starts it. The same store also names `\windows\system32\boot\developermenu.efi`, which is the menu the
+owner had seen before.
+
+## The subsystem rule
+
+The boot manager only starts EFI **applications** (PE subsystem `0x0A`). A boot service driver (`0x0B`)
+placed at a boot path fails and the firmware falls back to its own sequence, which here means the Windows
+reset flow (the two gears). Measured on the candidates this machine has:
+
+| binary | bytes | subsystem | usable as a boot entry |
+|---|---|---|---|
+| `8AF09F13-….efi` (UEFI package) | 42,976 | 0x0B driver | no |
+| `SJM\Core\Boot\bootaa64.efi` | 1,508,816 | 0x0A application | yes |
+| rEFInd `refind_aa64.efi` | 202,624 | 0x0A | yes |
+| GRUB `bootaa64.efi` | 878,544 | 0x0A | yes |
+
+`scripts/phone-install.py` now refuses anything but `0x0A` on a boot path, and
+`scripts/check-bcd-layout.py` checks the store afterwards.
+
 ## The procedure that matches the evidence
 
 ```
-1. flash the factory FFU (phone in flash mode)          -> Windows boots
-2. unlock with WPinternals (donor 950 XL FFU present)   -> Windows still boots, mass storage works
-3. snapshot EFIESP (scripts/phone-snapshot.py save)     -> rollback point, seconds to restore
-4. copy \UEFI.elf and EFI\Boot\bootaa64.efi             -> one change, then test
-5. boot holding Volume Down, pick the entry             -> custom UEFI or Windows, never a loop
-6. only then add EFI\UniXNU\* and the MainOS kernel
+1. flash the factory FFU (phone in flash mode)                      -> Windows boots
+2. unlock through the vendor utility (it is the only one that completes here)
+3. snapshot EFIESP (scripts/phone-snapshot.py save)                -> rollback point
+4. F:\Windows\System32\Boot\bootshim.efi <- 0x0A application (1.5 MB candidate)
+   R:\UEFI.elf <- the WOA build, sha256 68b5ff0e…
+   R:\EFI\REFIND\* <- rEFInd with its long file names (refind.conf, refind_aa64.efi, …)
+5. point the store's default at the MainOS shim, then check it with check-bcd-layout.py
+6. boot normally (no volume key)                                    -> expect the rEFInd menu
+7. only then put the UniXNU loader at EFI\BOOT\bootaa64.efi and add the MainOS kernel
 ```
+
+Two failures in this period are now explained rather than mysterious: a driver at the boot path (the
+subsystem above) and a single-partition restore that left EFIESP stock beside a patched MainOS. Both have
+checks now.
 
 The rule that came out of the failures: **one change per boot, with a snapshot before it.** Every loop
 in this period came from stacking changes and having no rollback that worked without a reflash.
 
 ## Open items on this page
 
-- The unlock on this specific phone has not yet been completed by a tool that can patch the boot chain
-  from flash mode; WPinternals' command line stalls switching to mass storage before it can patch.
+- The chain has not booted on the handset yet. The last attempt used a driver as the shim and looped;
+  the next attempt uses the 0x0A application and the checked store, and has not been run.
 - `--unique-chip-id` in the handset ADT is still a zero placeholder.
 - The kernel stage is proven in QEMU only (`docs/ci/RUNS.md`), never on the handset.
 
