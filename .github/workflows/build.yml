@@ -873,6 +873,13 @@ jobs:
               echo "--- merged image: did a storage media appear? ---"
               grep -a -m 16 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device|!BSD|panic|Panic' \
                 out/xnu-entry-merged/dmesg.txt || echo "(no media line in the merged boot)"
+              # The kernel's msgbuf is not written when the panic comes before it is usable; the emulator's
+              # serial console is, and that is where an early panic says what it was.
+              echo "--- merged image: the serial console ---"
+              grep -a -m 20 -E 'panic|Panic|IOKit|IOStorage|IOPlatform|!BSD|root device|waiting' \
+                out/xnu-entry-merged/serial.log || true
+              echo "--- merged image: last lines of the serial console ---"
+              tail -40 out/xnu-entry-merged/serial.log || echo "(no serial log)"
             else
               echo "::warning::the merged image could not be placed in the evidence ESP"
             fi
