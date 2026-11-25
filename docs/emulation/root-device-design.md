@@ -148,3 +148,31 @@ What that requires, in order:
 2. an entry in the board/prelink configuration that merges it into the image;
 3. the personality to name the class and a provider that exists in that image;
 4. the serial log to show `NativeRamBlock: starting`, then an `Apple_HFS` media.
+
+## What the merged image actually does (measured)
+
+An evidence boot of the merged image was made to run, after waiving three checks that describe the
+source-built kernel rather than a merged one (provenance, strip verification, the source crypto contract).
+It was staged from the ESP the gated assertion had just used, with only `kernel.macho` swapped, so the menu
+the fixture expects is the one it accepted.
+
+Result, run 45693593284:
+
+```
+real IOKit initialization did not return: ['_panic']
+--- merged image: did a storage media appear? ---
+(no media line in the merged boot)
+```
+
+So the merged image **does load and execute** -- that was the open question for four rounds -- and it panics
+during IOKit initialisation, before `!BSD`. Two consequences:
+
+1. the root-device question cannot even be asked of the merged image as it stands;
+2. the synthetic media is not in that image anyway, because the archive is still in
+   `[kernel.link_excluded]`.
+
+That closes the "maybe the merged image is the place to run the driver" idea in its current form. The route
+the board comment names remains the only coherent one: emit the driver as a kext bundle and let the prelink
+step merge it, after which its `Info.plist` personality is actually consulted. Doing that needs the prelink
+kit's interface (`kits/NativePrelink` is not checked out in this workspace), so it is the next unit of work
+rather than something this round could finish.
