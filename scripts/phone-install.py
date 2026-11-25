@@ -61,8 +61,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--apply", action="store_true", help="actually write")
     args = parser.parse_args(argv)
 
-    efiesp = Path(args.efiesp.rstrip("\\") + "\\")
-    mainos = Path(args.mainos.rstrip("\\") + "\\")
+    efiesp = Path(args.efiesp.rstrip("\\/"))
+    mainos = Path(args.mainos.rstrip("\\/"))
     for mount, name in ((efiesp, "EFIESP"), (mainos, "MainOS")):
         if not mount.is_dir():
             print(f"error: {name} is not mounted at {mount}", file=sys.stderr)

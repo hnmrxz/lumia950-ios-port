@@ -6,7 +6,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -29,7 +29,7 @@ class PhoneToolsTests(unittest.TestCase):
         for name, paths in self.tools.CANDIDATES.items():
             self.assertTrue(paths, f"{name} has no candidates")
             for path in paths:
-                self.assertTrue(path.is_absolute(), f"{name}: {path} is not absolute")
+                self.assertTrue(PureWindowsPath(path).is_absolute(), f"{name}: {path} is not absolute")
                 self.assertTrue(path.name.lower().endswith(".exe"), f"{name}: {path} is not an executable")
 
     def test_environment_override_wins(self):
