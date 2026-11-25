@@ -28,6 +28,7 @@ SELF_CONTAINED = (
     "test-compare-xnu-reports.py",
     "test-phone-modes.py",
     "test-phone-tools.py",
+    "test-phone-install.py",
     "test-doc-references.py",
     "test-evidence.py",
     "test-gpu-tools.py",
