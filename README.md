@@ -146,6 +146,9 @@ python3 scripts/install-native-bringup.py --stage out/stage \
 | The boot route | [board.toml](board.toml) 的 `[payload]` 注释与 [docs/native-bringup.md](docs/native-bringup.md) |
 | Linking it into the kernel | [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md) 与 `board.toml` 的 `[kernel] archives` |
 | The ladder | [docs/BUILD-VERIFICATION.md](docs/BUILD-VERIFICATION.md) 的证据级别，以及 [docs/evidence.json](docs/evidence.json) |
+| 当前状态与交接 | [docs/state.md](docs/state.md)、[docs/handover.md](docs/handover.md) |
+| 仿真分支的边界 | [docs/emulation/emulated-branch-limits.md](docs/emulation/emulated-branch-limits.md) |
+| 解锁后的真机步骤 | [docs/hardware/post-unlock-runbook.md](docs/hardware/post-unlock-runbook.md) |
 | The ADT node | [scripts/make-lumia950-adt.py](scripts/make-lumia950-adt.py) 与其注释 |
 | What is not implemented | 上面的「当前真实状态」表 |
 | Vendor registers | [docs/storage-bringup.md](docs/storage-bringup.md) |
