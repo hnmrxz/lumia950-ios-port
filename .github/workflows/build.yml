@@ -871,7 +871,7 @@ jobs:
                 --firmware "$firmware" --output out/xnu-entry-merged --timeout 240 \
                 --past-bsd --dump-dmesg --adt-profile qemu --smp 2 --allow-prelinked || true
               echo "--- merged image: did a storage media appear? ---"
-              grep -a -m 12 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device|!BSD' \
+              grep -a -m 16 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device|!BSD|panic|Panic' \
                 out/xnu-entry-merged/dmesg.txt || echo "(no media line in the merged boot)"
             else
               echo "::warning::the merged image could not be placed in the evidence ESP"
