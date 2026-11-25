@@ -77,7 +77,7 @@ def check(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     if MARKER not in text:
         return False, "missing the publish call"
-    if DECLARATION not in text:
+    if "extern int native_ramblock_publish" not in text:
         return False, "missing the declaration"
     return True, "ok"
 
