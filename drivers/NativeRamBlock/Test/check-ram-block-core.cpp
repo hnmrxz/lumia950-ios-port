@@ -39,7 +39,7 @@ main()
 	check(standard.blockCount * standard.blockSize == standard.bytes, "geometry is self-consistent");
 
 	// Reads are clamped to the end of the buffer, and a read past the end is refused.
-	std::uint64_t served = 0;
+	uint64_t served = 0;
 	check(!read_within(standard, standard.bytes, kBlockSize, &served), "a read past the end is refused");
 	check(read_within(standard, standard.bytes - kBlockSize, kBlockSize * 4, &served),
 	    "a read that overruns the end is still offered");
