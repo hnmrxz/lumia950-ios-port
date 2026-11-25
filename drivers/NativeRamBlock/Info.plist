@@ -7,10 +7,18 @@
   <key>CFBundlePackageType</key><string>KEXT</string>
   <key>CFBundleVersion</key><string>0.1.0</string>
   <key>OSBundleRequired</key><string>Root</string>
-  <key>IOKitPersonalities</key><dict><key>Lumia 950 bring-up root media</key><dict>
-    <key>IOClass</key><string>NativeRamBlock</string>
-    <key>IOProviderClass</key><string>IOPlatformExpertDevice</string>
-    <key>IONameMatch</key><string>platform</string>
-    <key>IOProbeScore</key><integer>500</integer>
-  </dict></dict>
+  <key>IOKitPersonalities</key><dict>
+    <!-- IOResources: the provider that exists in every boot, for a device with no hardware behind it. -->
+    <key>Lumia 950 root media (resources)</key><dict>
+      <key>IOClass</key><string>NativeRamBlock</string>
+      <key>IOProviderClass</key><string>IOResources</string>
+      <key>IOProbeScore</key><integer>800</integer>
+    </dict>
+    <!-- Kept as a second chance: the platform node by class, without a name match. -->
+    <key>Lumia 950 root media (platform)</key><dict>
+      <key>IOClass</key><string>NativeRamBlock</string>
+      <key>IOProviderClass</key><string>IOPlatformExpertDevice</string>
+      <key>IOProbeScore</key><integer>500</integer>
+    </dict>
+  </dict>
 </dict></plist>
