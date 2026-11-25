@@ -366,7 +366,12 @@ def read_system_registers(connection):
 def run(args):
     original = args.kernel.read_bytes()
     lean = (args.esp / "EFI/UniXNU/Payloads/kernel.macho").read_bytes()
-    STAGE.verify_strip(original, lean)
+    if args.allow_prelinked:
+        # An evidence boot of a merged image is not the staged pair this check compares: the payload
+        # carries the merged kernel itself, so there is no lean copy derived from it to verify.
+        print("note: evidence boot, strip verification skipped for the merged image")
+    else:
+        STAGE.verify_strip(original, lean)
     names = symbols(original, allow_prelinked=args.allow_prelinked)
     required = ["_arm_vm_init", "_arm64_eventi", "_gPEClockFrequencyInfo"]
     if any(name not in names for name in required):
