@@ -81,8 +81,16 @@ python scripts/check-bcd-layout.py out/bcd-after.txt --expect mainos
 
 ## 5. Roll back
 
-- files: `python scripts/phone-snapshot.py --restore <snapshot>` (or the partition images under
-  `out/phone-backups/`);
+- files: rehearse first, then run the same command with `--apply`:
+
+  ```bash
+  python scripts/rehearse-phone-rollback.py            # snapshot, damage, dry run, apply, verify
+  python scripts/phone-snapshot.py restore --efiesp R: --name <name>          # dry run
+  python scripts/phone-snapshot.py restore --efiesp R: --name <name> --apply  # restores and verifies
+  ```
+
+  `restore` takes `--out` where `save` put the snapshot; leaving it at the default is the one way to get
+  `manifest.json is missing` from a good backup;
 - boot store: restore the `{default}` values captured before step 3;
 - full recovery: `scripts/phone-recover.ps1` (FlashFFU → donor AddFFU → Unlock → MSM), which needs the unlock
   again afterwards.

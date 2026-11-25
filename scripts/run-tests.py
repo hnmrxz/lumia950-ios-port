@@ -30,6 +30,7 @@ SELF_CONTAINED = (
     "test-phone-tools.py",
     "test-phone-install.py",
     "test-rehearse-phone-install.py",
+    "test-rehearse-phone-rollback.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
