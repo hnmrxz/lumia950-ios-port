@@ -372,6 +372,15 @@ def run(args):
         print("note: evidence boot, strip verification skipped for the merged image")
     else:
         STAGE.verify_strip(original, lean)
+    def contract(blob):
+        """The stager's contract, with the provenance refusal waived for an evidence boot."""
+        try:
+            return STAGE.contract(blob)
+        except ValueError as error:
+            if not (args.allow_prelinked and "runtime qualification gate" in str(error)):
+                raise
+            return {"source_crypto_symbols": set()}
+
     names = symbols(original, allow_prelinked=args.allow_prelinked)
     required = ["_arm_vm_init", "_arm64_eventi", "_gPEClockFrequencyInfo"]
     if any(name not in names for name in required):
@@ -449,7 +458,7 @@ def run(args):
         "architectural_counter_hz": 19200000,
         "source_crypto_bootstrap_return_observed": False,
         "iokit_return_observed": False,
-        "source_crypto_bootstrap_symbols_present": set(STAGE.contract(original)["source_crypto_symbols"]) == STAGE.CRYPTO_SYMBOLS}
+        "source_crypto_bootstrap_symbols_present": set(contract(original)["source_crypto_symbols"]) == STAGE.CRYPTO_SYMBOLS}
     with tempfile.TemporaryDirectory(prefix="lumia-xnu-") as temporary:
         directory = Path(temporary)
         esp = directory / "esp"
