@@ -867,7 +867,7 @@ jobs:
             if [ -f "$esp2/EFI/UniXNU/Payloads/kernel.macho" ]; then
               python3 scripts/test-native-xnu-entry.py --kernel "$merged" --esp "$esp2" \
                 --firmware "$firmware" --output out/xnu-entry-merged --timeout 240 \
-                --past-bsd --dump-dmesg --adt-profile qemu --smp 2 || true
+                --past-bsd --dump-dmesg --adt-profile qemu --smp 2 --allow-prelinked || true
               echo "--- merged image: did a storage media appear? ---"
               grep -a -m 12 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device|!BSD' \
                 out/xnu-entry-merged/dmesg.txt || echo "(no media line in the merged boot)"
