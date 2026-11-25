@@ -31,6 +31,7 @@ SELF_CONTAINED = (
     "test-phone-install.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
+    "test-summarize-xnu-entry.py",
     "test-skmem-skip.py",    "test-doc-references.py",
     "test-evidence.py",
     "test-gpu-tools.py",
