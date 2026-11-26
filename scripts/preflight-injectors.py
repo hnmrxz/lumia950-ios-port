@@ -37,7 +37,8 @@ REV = "xnu-8796.141.3"
 CACHE = ROOT / "build" / "local" / "preflight"
 SOURCES = {
     "osfmk/arm/arm_init.c": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/osfmk/arm/arm_init.c?ref={REV}",
-    "iokit/KernelConfigTables.cpp": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/KernelConfigTables.cpp?ref={REV}",
+        "bsd/kern/bsd_init.c": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/bsd/kern/bsd_init.c?ref={REV}",
+"iokit/KernelConfigTables.cpp": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/KernelConfigTables.cpp?ref={REV}",
 }
 
 SNIPPET = r'''

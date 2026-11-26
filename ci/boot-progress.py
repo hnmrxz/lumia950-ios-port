@@ -32,6 +32,16 @@ DECLARATION = ("\textern void native_boot_progress_stage(void *base, unsigned lo
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
+# The third stage runs after the platform expert has installed the video console, so pexpert has mapped the
+# framebuffer and translated its address: this is the first draw that does not depend on the bootstrap map.
+BSD_ANCHOR = "\tthrottle_init();\n"
+BSD_DECLARATION = ("\textern void native_boot_progress_stage(void *base, unsigned long stride, "
+                   "unsigned long height, const char *command_line, int stage);\n")
+BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, drawn once the panel has a mapping. */\n"
+             + BSD_DECLARATION
+             + "\tnative_boot_progress_stage((void *)PE_state.video.v_baseAddr, PE_state.video.v_rowBytes, "
+             + "\t                           PE_state.video.v_height, PE_boot_args()->CommandLine, 2);\n")
+
 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
@@ -47,6 +57,14 @@ def find(root: Path) -> list[Path]:
     found: list[Path] = []
     for candidate in sorted(root.rglob("arm_init.c")):
         if candidate.parent.name == "arm":
+            found.append(candidate)
+    return found
+
+
+def find_bsd_init(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for candidate in sorted(root.rglob("bsd_init.c")):
+        if candidate.parent.name == "kern" and candidate.parent.parent.name == "bsd":
             found.append(candidate)
     return found
 
@@ -85,6 +103,26 @@ def apply_to(path: Path) -> tuple[bool, str]:
     return True, "patched"
 
 
+def apply_bsd(path: Path) -> tuple[bool, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if MARKER in text:
+        return True, "already carries the third stage"
+    if BSD_ANCHOR not in text:
+        return False, "skipped: no throttle_init() in this copy of bsd_init.c"
+    text = text.replace(BSD_ANCHOR, BSD_STAGE + BSD_ANCHOR, 1)
+    path.write_text(text, encoding="utf-8")
+    return True, "patched"
+
+
+def check_bsd(path: Path) -> tuple[bool, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "PE_boot_args()->CommandLine, 2)" not in text:
+        if BSD_ANCHOR not in text:
+            return False, "skipped: no throttle_init() in this copy of bsd_init.c"
+        return False, "missing the third stage"
+    return True, "ok"
+
+
 def check(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     missing = [str(stage) for stage in (0, 1) if f"args->CommandLine, {stage})" not in text]
@@ -113,11 +151,15 @@ def main(argv: list[str] | None = None) -> int:
     if not files:
         print(f"error: no osfmk/arm/arm_init.c under {roots[0]}", file=sys.stderr)
         return 2
+    bsd_files = find_bsd_init(roots[0])
 
     patched = 0
     skipped = 0
-    for path in files:
-        ok, message = apply_to(path) if args.apply else check(path)
+    for path in files + bsd_files:
+        if path.name == "bsd_init.c":
+            ok, message = apply_bsd(path) if args.apply else check_bsd(path)
+        else:
+            ok, message = apply_to(path) if args.apply else check(path)
         if ok:
             print(f"ok   {path}: {message}")
             patched += 1
