@@ -43,10 +43,10 @@ BSD_INCLUDE = "#include <console/video_console.h>\n"
 BSD_ANCHOR = "\tthrottle_init();\n"
 BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, through the console's own panel mapping. */\n"
              "\textern struct vc_info vinfo;\n"
-             "\textern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height, "
-             "const char *command_line, int stage);\n"
-             "\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
-             "\t                           (const char *)PE_boot_args(), 2);\n")
+             "\textern void native_boot_progress_stage_remembered(void *base, unsigned long stride, "
+             "unsigned long height, int stage);\n"
+             "\tnative_boot_progress_stage_remembered((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, "
+             "vinfo.v_height, 2);\n")
 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
@@ -94,7 +94,7 @@ def arm_init_body(text: str):
 
 def apply_bsd(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "native_boot_progress_stage((void *)vinfo.v_baseaddr" in text:
+    if "native_boot_progress_stage_remembered((void *)vinfo.v_baseaddr" in text:
         return True, "already carries the third bar"
     if BSD_ANCHOR not in text:
         return False, "skipped: no throttle_init() in this copy of bsd_init.c"
@@ -109,7 +109,7 @@ def apply_bsd(path: Path) -> tuple[bool, str]:
 
 def check_bsd(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "native_boot_progress_stage((void *)vinfo.v_baseaddr" not in text:
+    if "native_boot_progress_stage_remembered((void *)vinfo.v_baseaddr" not in text:
         if BSD_ANCHOR not in text:
             return False, "skipped: no throttle_init() in this copy of bsd_init.c"
         return False, "missing the third bar"

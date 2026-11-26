@@ -85,6 +85,14 @@ native_boot_progress_remember(void *base, unsigned long stride, unsigned long he
     remembered.command_line = command_line;
 }
 
+// The post-MMU caller has the console's mapped panel but not the command line as a C string (PE_boot_args() returns
+// the boot_args block itself), so the switch is evaluated against what arm_init remembered.
+extern "C" void
+native_boot_progress_stage_remembered(void *base, unsigned long stride, unsigned long height, int stage)
+{
+    native_boot_progress_stage(base, stride, height, remembered.command_line, stage);
+}
+
 extern "C" int
 native_boot_progress_switch(const char *command_line, const char *want)
 {

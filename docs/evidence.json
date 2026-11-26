@@ -288,7 +288,7 @@
       "evidence": [
         {
           "label": "EFI-tested",
-          "path": "out/control-mark-qemu/panel.ppm"
+          "path": "docs/hardware/control-mark/qemu-panel.ppm"
         },
         {
           "label": "EFI-tested",
