@@ -945,6 +945,20 @@ jobs:
           path: out/kernel-source/**
           retention-days: 7
 
+      # The gates boot the unstripped image and pass the crypto POST; the staged copy that goes to the phone does
+      # not, because staging rewrites the image and the kernel's own FIPS integrity check then fails before
+      # bsd_init. Publish the image the gates actually booted so a handset test can use exactly that.
+      - name: Upload the unstripped kernel the gates booted
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lumia950-kernel-unstripped
+          path: |
+            out/lumia950/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
+            out/lumia950/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Archive what the emulated boot reached
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
