@@ -190,3 +190,39 @@ milestones : arm_vm_init_entry → arm_vm_init_return → kernel_bootstrap_entry
 
 **部署在手机上的那一份文件，内容上是被验证过的**：它在本机能穿过 IOKit 进入 `bsd_init` 并画出底部绿条。
 剩下的唯一未知是"这台手机的实际硬件会不会跑它"——那正是需要一次开机照片的东西。
+
+## 找到一个会让真机"画完绿条就崩"的 bug：**DAIF 只屏蔽、没恢复**
+
+把手机里那份内核在本机跑，`LUMIA:` 之后立刻 panic：
+
+```
+panic : Calling {k,z}alloc from interrupt disabled context isn't allowed
+format: %s:%d Assertion failed: %s
+```
+
+顺着这条线索读 `drivers/NativeBootProgress/NativeBootProgress.cpp`：画第 2 条（post-MMU）色块的代码做了
+
+```c
+asm volatile("msr DAIFSet, #0xf" ::: "memory");   // 屏蔽所有中断
+... 写帧缓冲 ...
+asm volatile("dsb sy" ::: "memory");
+```
+
+**它屏蔽了中断却从不恢复**。于是 `bsd_init` 里紧接着的第一次分配（`throttle_init`）就在"中断已屏蔽"的上下文里调用
+`kalloc`，命中内核断言。
+
+这意味着：**真机若跑到 `bsd_init`，会被我们自己的埋点搞崩**——绿条出现后随即 panic。这不是 QEMU 的怪癖，是与硬件无关的代码缺陷。
+
+### 修法（已改）
+
+```c
+uint64_t daif = 0;
+asm volatile("mrs %0, DAIF" : "=r"(daif) :: "memory");   // 先保存
+asm volatile("msr DAIFSet, #0xf" ::: "memory");          // 再屏蔽
+... 写帧缓冲 ...
+asm volatile("dsb sy" ::: "memory");
+asm volatile("msr DAIF, %0" :: "r"(daif) : "memory");     // 最后恢复
+```
+
+主机测试无法执行内联汇编，所以用源码不变量来钉：`scripts/test-diaf-restored.py` 断言"有屏蔽就必须先保存、后恢复，且恢复在屏蔽之后"。
+`preflight` 的 aarch64 编译也重新通过。

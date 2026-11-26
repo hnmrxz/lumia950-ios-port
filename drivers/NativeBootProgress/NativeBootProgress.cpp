@@ -139,7 +139,14 @@ native_boot_progress_stage(void *base, unsigned long stride, unsigned long heigh
     // Commit before anything else can fault: the same pair upstream's check script requires. On a host build
     // the barriers are not available and not needed -- there the same function writes into a heap buffer so the
     // geometry and the switch can be tested without a kernel.
+    //
+    // DAIF is saved and restored, not just masked. Masking it here and returning left the rest of bsd_init running with
+    // interrupts disabled, and the first allocation after the bar -- throttle_init's, in this kernel -- panicked with
+    // 'Calling {k,z}alloc from interrupt disabled context isn't allowed'. Emulated boots showed it right after the LUMIA
+    // line on every configuration, including the one deployed on the handset.
 #if defined(__aarch64__)
+    uint64_t daif = 0;
+    asm volatile("mrs %0, DAIF" : "=r"(daif) :: "memory");
     asm volatile("msr DAIFSet, #0xf" ::: "memory");
     asm volatile("dsb sy" ::: "memory");
 #endif
@@ -155,5 +162,6 @@ native_boot_progress_stage(void *base, unsigned long stride, unsigned long heigh
 
 #if defined(__aarch64__)
     asm volatile("dsb sy" ::: "memory");
+    asm volatile("msr DAIF, %0" :: "r"(daif) : "memory");
 #endif
 }

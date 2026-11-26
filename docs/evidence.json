@@ -600,6 +600,26 @@
         }
       ],
       "limits": "Emulator only. It proves the deployed bytes are sound; it does not prove the handset executes them, which is what the bottom-bar photograph is for."
+    },
+    {
+      "id": "boot-progress-diaf-leak",
+      "what": "The post-MMU progress instrument masked DAIF and never restored it, so the first allocation after the bar panicked with 'Calling {k,z}alloc from interrupt disabled context isn't allowed'; the instrument now saves and restores DAIF and a source test holds that invariant",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-diaf-restored.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "drivers/NativeBootProgress/NativeBootProgress.cpp"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/state-of-objective.md"
+        }
+      ],
+      "limits": "The panic was observed in emulation; what is verified here is the source invariant and that the component still compiles for aarch64 in preflight. The fix itself has not been booted yet."
     }
   ]
 }
