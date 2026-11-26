@@ -59,6 +59,23 @@ CI run and carrying the `skmem_sysctl_skip` guard) because that image is the one
 is `XNU-entry-tested` on hardware; if the panel stays silent for both images, the next instrument is a
 framebuffer write from a driver that runs before anything else.
 
+## Second hardware boot: the source-built kernel is silent too
+
+The prelinked image was not the explanation. Booting the **source-built** kernel on the handset (15,298,424 B,
+sha256 0001c3fbc1ecb63e, the image that prints `arm_vm_init` and `!BSD` in QEMU) produced the identical screen:
+the hand-off page, unchanged, with `entry words 140006F5`, `CurrentEL 1`, `SCTLR_EL1 0xC0180D`,
+`TCR_EL1 0x280803518`, `ID_AA64MMFR0_EL1 0x1122`, `ID_AA64PFR0_EL1 0x2222`, and nothing after it.
+
+So "the merged image simply has no console" is ruled out: two different kernels, one of which demonstrably prints
+in the emulator, both print nothing here. What remains is either that the kernel never executes the branch, or
+that this panel is not the console either image reaches -- and those two are exactly what an entry probe
+separates.
+
+The next image deployed is the green build 45778628055: the same source kernel with the framebuffer instrument
+(15,298,536 B, sha256 f2ebcc450f3250aa) and `args = "-v cpus=1 lumia-bars"`, so the bars draw only when that
+argument is present. One bar means `arm_init` ran, two means it reached `arm_vm_init`, none means the kernel never
+reached `arm_init` at all.
+
 ## What is not claimed
 
 - No kernel output had been observed at the time of writing, so **`XNU-entry-tested` is not claimed** for the
