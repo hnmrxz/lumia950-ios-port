@@ -746,6 +746,15 @@ jobs:
           fi
           ls -l "$tree/build/libpthread-kernel"
 
+      # The instrument lives in the kernel, not in the driver archive: arm_init remembers the panel and draws the two
+      # bootstrap bars, bsd_init prints what it can see and draws the post-MMU bar. This step was withdrawn when the
+      # kernel-side bars were shown to fault, and that withdrawal silently removed the instrument from every build
+      # since -- the archive was force-loaded, but nothing called it. Restored, with --check so the edit is verified.
+      - name: Instrument the kernel entry with the bring-up bars
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --check
+
       - name: Gate the skmem sysctl publication behind a boot argument
         # The emulated boot stops at _skmem_sysctl_init+0x18 storing through sysctls->version; the object
         # is the static sk_sys_obj and the address is unmapped in this port's layout. No sk_* boot
