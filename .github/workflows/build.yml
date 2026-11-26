@@ -746,6 +746,24 @@ jobs:
           fi
           ls -l "$tree/build/libpthread-kernel"
 
+      # The storage driver cannot join the source link (no IOStorageFamily) and the prelink will not take a kext of
+      # ours, but the kernel can load one from memory. This builds the kext half of that route and packs the container
+      # the loader takes, then checks both on the runner so a malformed bundle does not reach a phone.
+      - name: Build the NativeSdhci kext and its mkext container
+        continue-on-error: true
+        run: |
+          python3 "$GITHUB_WORKSPACE/scripts/build-arm-driver.py" NativeSdhci --kext
+          kext="build/native-sdhci/kext/org.unixnu.NativeSdhci/Contents/MacOS/NativeSdhci"
+          mkdir -p out/kext
+          cp -R build/native-sdhci/kext/org.unixnu.NativeSdhci out/kext/
+          python3 "$GITHUB_WORKSPACE/scripts/check-kext.py" "$kext"
+          python3 "$GITHUB_WORKSPACE/scripts/make-mkext.py" \
+            --bundle-id org.unixnu.NativeSdhci \
+            --info-plist "$GITHUB_WORKSPACE/drivers/NativeSdhci/Info.plist" \
+            --executable "$kext" \
+            --output out/kext/NativeSdhci.mkext
+          ls -l out/kext
+
       # The instrument lives in the kernel, not in the driver archive: arm_init remembers the panel and draws the two
       # bootstrap bars, bsd_init prints what it can see and draws the post-MMU bar. This step was withdrawn when the
       # kernel-side bars were shown to fault, and that withdrawal silently removed the instrument from every build

@@ -31,13 +31,22 @@ COMPONENTS = {
         "include": ["drivers/NativeGicV2"],
     },
     "NativeSdhci": {
-        "sources": ["drivers/NativeSdhci/NativeSdhci.cpp", "drivers/NativeSdhci/SdhciCore.cpp",
-                    "drivers/NativeSdhci/PollingHost.cpp"],
+        "sources": [
+            "drivers/NativeSdhci/Kmod.cpp",
+            "drivers/NativeSdhci/NativeSdhci.cpp",
+            "drivers/NativeSdhci/SdhciCore.cpp",
+            "drivers/NativeSdhci/PollingHost.cpp",
+        ],
         "out": "native-sdhci",
         # The storage ABI headers are prepared from IOStorageFamily by the kernel step;
         # osfmk is where the recorded recipe resolves <mach/...> from.
         "include": ["drivers/NativeSdhci", "build/storage-abi/include", ".cache/xnu-work/osfmk"],
-    },
+
+        "kext": {
+            "bundle_id": "org.unixnu.NativeSdhci",
+            "info_plist": "drivers/NativeSdhci/Info.plist",
+            "executable": "NativeSdhci",
+        },    },
     "NativeAdreno418": {
         # Rung 1 of the GPU: maps the KGSL and MMSS windows, checks the GDSC state
         # and reads the revision registers. The cores hold the decoding, the ring
@@ -147,6 +156,8 @@ def build_command(record, source, destination, include_dirs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("component", choices=sorted(COMPONENTS))
+    parser.add_argument("--kext", action="store_true",
+                        help="also link the objects into a kext bundle and check it")
     args = parser.parse_args()
 
     spec = COMPONENTS[args.component]
@@ -183,6 +194,27 @@ def main():
     subprocess.run(["ar", "rcs", str(archive)] + [str(o) for o in objects], check=True)
     print(f"{args.component}: {archive}")
     print(f"  link with  -Wl,-force_load,{archive}")
+
+    kext = spec.get("kext")
+    if args.kext:
+        if not kext:
+            raise SystemExit(f"{args.component} has no kext description")
+        bundle = output / "kext" / kext["bundle_id"] / "Contents" / "MacOS"
+        bundle.mkdir(parents=True, exist_ok=True)
+        executable = bundle / kext["executable"]
+        linker = shutil.which("ld")
+        if linker is None:
+            raise SystemExit("ld is not on PATH")
+        subprocess.run(
+            [linker, "-arch", "arm64", "-kext", "-undefined", "dynamic_lookup",
+             "-platform_version", "macos", "14.0", "14.0",
+             "-o", str(executable)] + [str(o) for o in objects],
+            check=True)
+        check = subprocess.run([sys.executable, str(ROOT / "scripts/check-kext.py"), str(executable)],
+                               check=False)
+        if check.returncode != 0:
+            raise SystemExit(f"{executable} is not a loadable kext")
+        print(f"{args.component}: kext {executable}")
 
 
 if __name__ == "__main__":
