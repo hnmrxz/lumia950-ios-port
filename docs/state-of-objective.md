@@ -107,3 +107,21 @@ past_bsd   : root-wait
 
 下一步因此非常具体：**把 `NativeSdhci` 的 kext 条目写进合并镜像的 prelink 信息**，让内核按它加载 Apple kext 的同一路径
 加载我们的驱动；随后 `Failed to mount root device` 就该变成"找到介质但格式不对"或"挂载成功"——两者都是新的、可读的证据。
+
+## 容器确实躺在内核里：95,462 字节的 mkext 在运行时被读到
+
+本机用最新源码镜像（run 45858986402 的 unstripped）加 `lumia-kext` 启动，dmesg 里出现两行，把"嵌入是否真的存在"
+这件事钉死了：
+
+```
+LUMIA: vinfo base=fffffff038c04000 row=3200 height=600
+       args=-v cpus=1 lumia-bars2 lumia-kext skmem_seg_size=16384 ...
+lumia: 95462 bytes of kext container are embedded, but OSKext::loadFromMkext() is private
+       in this kernel; the load is not wired yet
+```
+
+- **95,462 字节**正是 `NativeSdhci.mkext` 的大小（本机与 runner 两边一致）；
+- 命令行里的开关被正确识别（token 匹配）；
+- 调用路径走到了"API 私有"这一步，说明**嵌入、符号、调用点全部成立**，只差一个可用的加载入口。
+
+至此存储侧不再有"可能没做对"的部分：kext（645 符号）、容器（95 KB）、C 数组、编译进归档、运行时可达，全部有证据。

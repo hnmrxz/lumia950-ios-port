@@ -1,0 +1,133 @@
+{
+  "schema": "lumia950-xnu-entry-emulation-v1",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "ios_userspace_booted": false,
+  "gpu_frame_observed": false,
+  "kernel_sha256": "757dba065a9695661659b091bfab3eaeddcad500e1cb14c5263471a2145fc926",
+  "arm_vm_init_entry_observed": true,
+  "arm_vm_init_return_observed": true,
+  "architectural_counter_hz": 19200000,
+  "source_crypto_bootstrap_return_observed": true,
+  "iokit_return_observed": true,
+  "source_crypto_bootstrap_symbols_present": true,
+  "adt_profile": "qemu",
+  "gic_windows": {
+    "distributor": "0x08000000:0x10000",
+    "cpu_interface": "0x08010000:0x10000"
+  },
+  "milestones": [
+    "arm_vm_init_entry",
+    "arm_vm_init_return",
+    "kernel_bootstrap_entry",
+    "source_crypto_bootstrap_entry",
+    "source_crypto_bootstrap_return",
+    "iokit_entry",
+    "iokit_return",
+    "bsd_init_entry"
+  ],
+  "gdb_stop_reply": "T05thread:01;",
+  "arm_vm_init_return_target": "0xfffffff0079ebffc",
+  "kernel_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_return_target": "0xfffffff0079c2cfc",
+  "source_crypto_status": 0,
+  "iokit_entry_observed": true,
+  "iokit_return_target": "0xfffffff0079c30f8",
+  "bsd_init_entry_observed": true,
+  "bsd_init_return_target": "0xfffffff0079c3288",
+  "registers": {
+    "x0": "0xfffffff007079f53",
+    "x1": "0x3f3ffff147fa5020",
+    "x2": "0x0",
+    "x3": "0xa",
+    "x4": "0x73",
+    "x5": "0x69",
+    "x6": "0x100000000",
+    "x7": "0x0",
+    "x8": "0xfffffff007079c96",
+    "x9": "0x1a68",
+    "x10": "0xfffffff007079fb1",
+    "x11": "0x22000000",
+    "x12": "0x0",
+    "x13": "0x0",
+    "x14": "0xfffffff007070ba9",
+    "x15": "0xfffffff007005bb8",
+    "x16": "0x0",
+    "x17": "0x0",
+    "x18": "0x0",
+    "x19": "0xfffffff007ab5b80",
+    "x20": "0x0",
+    "x21": "0xfffffff0072247d0",
+    "x22": "0x3f3ffff147fa5020",
+    "x23": "0x40",
+    "x24": "0x3",
+    "x25": "0x0",
+    "x26": "0x0",
+    "x27": "0x0",
+    "x28": "0x0",
+    "x29": "0xfffffff04c087ca0",
+    "x30": "0xfffffff0079cc154",
+    "sp": "0xfffffff04c087c80",
+    "pc": "0xfffffff0079b75a4",
+    "cpsr": "0x200003c4"
+  },
+  "system_registers": {
+    "sctlr_el1": "0x3454593d",
+    "cntfrq_el0": "0x124f800",
+    "elr_el1": "0x6fde4720",
+    "tcr_el1": "0x22a51a251a",
+    "esr_el1": "0x0",
+    "far_el1": "0x0"
+  },
+  "stop_symbols": [
+    "_panic"
+  ],
+  "pc_symbol": "_panic+0x0",
+  "framebuffer": {
+    "base": "0x6c7a0000",
+    "width": 800,
+    "height": 600,
+    "row_bytes": 3200,
+    "bpp": 32,
+    "bytes": 1920000,
+    "sha256": "21cc7d5c3423f0055692d2f5a02ff5560e854af8add3e7abeeb9d775fed295cf",
+    "top_colours_bgr": [
+      {
+        "bgr": "0f0c0b",
+        "samples": 4753
+      },
+      {
+        "bgr": "000000",
+        "samples": 1374
+      },
+      {
+        "bgr": "00ff00",
+        "samples": 469
+      },
+      {
+        "bgr": "989898",
+        "samples": 393
+      }
+    ]
+  },
+  "dmesg": {
+    "magic": "0x63061",
+    "size": 131072,
+    "bufx": 8569,
+    "bufr": 0,
+    "chars": 8569,
+    "debug_buffer_chars": 0,
+    "sha256": "faecee8dcb93383675cc8660a1e448acef002d3bcc4fd1bae4c6e6b17008ed9d"
+  },
+  "past_bsd_outcome": "panicked",
+  "watched": {
+    "_vfs_mountroot": false
+  },
+  "fault_elr_symbol": null,
+  "fault_far": "0x0",
+  "panic_format": "%s:%d Assertion failed: %s : Calling {k,z}alloc from interrupt disabled context isn't allowed",
+  "wfe_event_index": 4,
+  "clock_info_bytes": "0000000000000000000000000000000000f824010000000000000000000000000100000000000000000000000000000002000000000000000100000000000000000000000000000000f82401000000000000000000000000",
+  "stack_bytes": "969c0707f0ffffff681a000000000000b19f0707f0ffffff0000000000000000107d084cf0ffffff943c3007f0ffffff00000000000000002800c585a487e3e4000000000000000000000000000000000000000000000000000000000000000003000000000000004000000000000000805bab07f0ffffffd0472207f0ffffff2050fa47f1ff3f3f0000000000000000407d084cf0ffffff2c3c2a07f0ffffff50a8af07f0ffffff50a7af07f0ffffff88724b07f0ffffff50a7af07f0ffffff607d084cf0ffffff9cdb2e07f0ffffff88724b07f0fffffff8bda807f0ffffffb07d084cf0ffffffe0714b07f0ffffff307e084cf0ffffff0000000000000000"
+}
