@@ -34,13 +34,6 @@ DECLARATION = ("\textern void native_boot_progress_remember(void *base, unsigned
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
-# The third stage runs after the platform expert has installed the video console, so pexpert has mapped the
-# framebuffer and translated its address: this is the first draw that does not depend on the bootstrap map.
-BSD_ANCHOR = "\tthrottle_init();\n"
-BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, after mapping the panel ourselves. */\n"
-             + "\textern void native_boot_progress_stage_mapped(int stage);\n"
-             + "\tnative_boot_progress_stage_mapped(2);\n")
-
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
     + DECLARATION
@@ -60,12 +53,6 @@ def find(root: Path) -> list[Path]:
     return found
 
 
-def find_bsd_init(root: Path) -> list[Path]:
-    found: list[Path] = []
-    for candidate in sorted(root.rglob("bsd_init.c")):
-        if candidate.parent.name == "kern" and candidate.parent.parent.name == "bsd":
-            found.append(candidate)
-    return found
 
 
 def arm_init_body(text: str):
@@ -113,13 +100,6 @@ def apply_bsd(path: Path) -> tuple[bool, str]:
     return True, "patched"
 
 
-def check_bsd(path: Path) -> tuple[bool, str]:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    if "native_boot_progress_stage_mapped(2)" not in text:
-        if BSD_ANCHOR not in text:
-            return False, "skipped: no throttle_init() in this copy of bsd_init.c"
-        return False, "missing the third stage"
-    return True, "ok"
 
 
 def check(path: Path) -> tuple[bool, str]:
@@ -150,15 +130,11 @@ def main(argv: list[str] | None = None) -> int:
     if not files:
         print(f"error: no osfmk/arm/arm_init.c under {roots[0]}", file=sys.stderr)
         return 2
-    bsd_files = find_bsd_init(roots[0])
 
     patched = 0
     skipped = 0
-    for path in files + bsd_files:
-        if path.name == "bsd_init.c":
-            ok, message = apply_bsd(path) if args.apply else check_bsd(path)
-        else:
-            ok, message = apply_to(path) if args.apply else check(path)
+    for path in files:
+        ok, message = apply_to(path) if args.apply else check(path)
         if ok:
             print(f"ok   {path}: {message}")
             patched += 1

@@ -70,7 +70,6 @@ extern void native_boot_progress_remember(void *base, unsigned long stride, unsi
                                           const char *command_line);
 extern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
                                        const char *command_line, int stage);
-extern void native_boot_progress_stage_mapped(int stage);
 
 /* arm_init declares its locals first and then runs statements; the injection lives among the statements. */
 static void arm_init_shaped(boot_args *args)
@@ -86,16 +85,8 @@ static void arm_init_shaped(boot_args *args)
                                args->Video.v_height, args->CommandLine, 1);
 }
 
-/* bsd_init does the same, and its third bar goes through a mapping we make ourselves. */
-static void bsd_init_shaped(void)
-{
-    int unused = 0;
 
-    native_boot_progress_stage_mapped(2);
-    (void)unused;
-}
-
-void preflight_entry(boot_args *args) { arm_init_shaped(args); bsd_init_shaped(); }
+void preflight_entry(boot_args *args) { arm_init_shaped(args); }
 """
 
 

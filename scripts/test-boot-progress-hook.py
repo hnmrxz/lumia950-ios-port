@@ -83,19 +83,6 @@ class BootProgressHookTests(unittest.TestCase):
         self.assertIn("(void *)args->Video.v_baseAddr", text)
         self.assertIn("args->Video.v_rowBytes", text)
 
-    def test_bsd_init_gets_the_mapped_stage(self):
-        bsd = Path(self.temporary.name) / "bsd" / "kern"
-        bsd.mkdir(parents=True)
-        sample = bsd / "bsd_init.c"
-        sample.write_text("void\nbsd_init(void)\n{\n\tint x = 0;\n\n\tthrottle_init();\n\t(void)x;\n}\n",
-                          encoding="utf-8")
-        ok, message = self.module.apply_bsd(sample)
-        self.assertTrue(ok, message)
-        text = sample.read_text(encoding="utf-8")
-        self.assertIn("native_boot_progress_stage_mapped(2);", text)
-        self.assertLess(text.index("native_boot_progress_stage_mapped(2)"), text.index("throttle_init();"))
-        self.assertEqual(self.module.check_bsd(sample), (True, "ok"))
-
     def test_apply_is_idempotent(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
         once = self.file.read_text(encoding="utf-8")

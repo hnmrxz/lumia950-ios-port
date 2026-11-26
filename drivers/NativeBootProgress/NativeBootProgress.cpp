@@ -81,31 +81,6 @@ native_boot_progress_remember(void *base, unsigned long stride, unsigned long he
     remembered.command_line = command_line;
 }
 
-// Map the panel ourselves, then draw: by the time this runs the pmap exists, and a mapping made here does not
-// depend on whether the platform expert mapped the panel or on how its own video struct is laid out.
-#if defined(__aarch64__)
-extern "C" unsigned long ml_io_map(unsigned long phys, unsigned long size);
-#endif
-
-extern "C" void
-native_boot_progress_stage_mapped(int stage)
-{
-    if (remembered.base == nullptr || remembered.stride == 0ul || remembered.height == 0ul) {
-        return;
-    }
-#if defined(__aarch64__)
-    const unsigned long span = remembered.stride * remembered.height;
-    const unsigned long mapped = ml_io_map(reinterpret_cast<unsigned long>(remembered.base), span);
-    if (mapped == 0ul) {
-        return;
-    }
-    void *panel = reinterpret_cast<void *>(mapped);
-#else
-    void *panel = remembered.base;  // a host build passes a buffer that is already addressable
-#endif
-    native_boot_progress_stage(panel, remembered.stride, remembered.height, remembered.command_line, stage);
-}
-
 extern "C" int
 native_boot_progress_switch(const char *command_line, const char *want)
 {
