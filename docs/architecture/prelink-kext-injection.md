@@ -144,3 +144,21 @@ milestones : ... iokit_entry（没有 iokit_return）
 2. 先做符号绑定（把 `_kmod_info` 里的函数指针与 `OSBundleLibraries` 的符号解析好），否则即使地址对了也会在 start 时 fault。
 
 这两步都是 prelinker 的正体；本轮的价值是**把"放置"从纸面变成了可执行的多步实验**，并确定了第一个具体失败点。
+
+## 修正与再测：之前用错了镜像；换成带 PRNG 保护的镜像后，失败点变成"滑动"
+
+上一轮的三次放置实验用的是 run 45832509015 的合并镜像——它**早于 PRNG 幂等保护**。用该镜像做"只加段"的对照实验时，
+panic 是 `!prng_ready`，这暴露了实验基准不对。换成 run 45858986402（第一个能到 `bsd_init` 的合并镜像）后重测：
+
+| 镜像/改动 | 结果 |
+|---|---|
+| 带保护的合并镜像，未改 | 到 `bsd_init`（`Failed to mount root device`） |
+| 同镜像 + `__LUMIA_KEXT` 段 + 字典条目 | `_fleh_synchronous`，`_mach_vm_allocate_kernel+0x94` |
+| 同上，但段 `vmsize` 页对齐 | **同一个 fault** |
+
+两次 fault 的 `fault_far` 分别是 `0xfffffff049fdaa94` 与 `0xfffffff05b7daa94`——**每次启动都不同**，这正是 KASLR 滑动的
+数量级。结合 `mach_vm_allocate_kernel` 的位置，最合理的解释是：**内核在给 kext 分配/映射时按"已滑动"的地址处理，而我们
+新增的段带着未滑动的绝对地址**，于是它去碰一个不属于自己的地址。
+
+下一步（明确）：按发射器的做法，让段地址与 `__PRELINK_TEXT` 的 **slide** 语义一致——即把我们的 kext 放进
+`__PRELINK_TEXT` 的地址空间内（增长该段），而不是新造一个绝对地址的段。这也解释了为什么"换基址"两次都没有改变 fault 形态。

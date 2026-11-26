@@ -540,6 +540,26 @@
         }
       ],
       "limits": "Emulator only, and it is a negative result: the placement does not load. It pins the failure to the kernel's own allocation step, which is progress against 'the entry is not read at all'."
+    },
+    {
+      "id": "prelink-placement-slide",
+      "what": "With the kext placed by a new segment, the boot faults inside _mach_vm_allocate_kernel at a fault_far that differs on every boot -- the signature of the kernel's slide not being applied to the added segment the way the emitter's segments are",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-slide/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-slide/dmesg.txt"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/architecture/prelink-kext-injection.md"
+        }
+      ],
+      "limits": "Emulator only, and a negative result. The earlier placement runs are superseded: they used a merged image built before the PRNG guard, which is recorded in the note."
     }
   ]
 }

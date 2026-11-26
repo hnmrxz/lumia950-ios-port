@@ -57,7 +57,11 @@ def append(image: bytes, kext: bytes, vmaddr: int) -> tuple[bytes, dict]:
     command = bytearray()
     command += struct.pack("<II", LC_SEGMENT_64, SEGMENT_COMMAND_SIZE)
     command += b"__LUMIA_KEXT".ljust(16, b"\0")
-    command += struct.pack("<QQQQ", vmaddr, len(kext), file_offset, len(kext))
+    # vmsize is page rounded: the kernel maps segments a page at a time, and a vmsize that is not a whole number of pages is
+    # the kind of thing its allocation path trips over (the first attempt faulted inside _mach_vm_allocate_kernel).
+    page = 0x4000
+    vmsize = (len(kext) + page - 1) // page * page
+    command += struct.pack("<QQQQ", vmaddr, vmsize, file_offset, len(kext))
     command += struct.pack("<iiII", VM_PROT_READ_EXECUTE, VM_PROT_READ_EXECUTE, 0, 0)
 
     out = bytearray(image)
