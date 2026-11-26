@@ -72,3 +72,19 @@ inserted org.unixnu.NativeSdhci at offset 39581, 108749 of 110592 bytes used; 17
 
 **仍然缺的一半**：条目里的 `_PrelinkExecutableLoadAddr` 必须指向镜像内被映射的模块文本，而把我们的 kext 放进去意味着
 选地址、追加段、修复 PC 相对指令——即 ADR-0003 里评估为"数周级"的那部分。这条工具的价值是让字典这一半先可测。
+
+## 内核真的读到了我们插入的条目
+
+把上一步编辑过的合并镜像（`add-prelink-entry.py` 插入 `org.unixnu.NativeSdhci`）直接在本机 QEMU 里启动，dmesg 出现：
+
+```
+[    7.666566]: Kext org.unixnu.NativeSdhci error - CFBundleVersion missing/invalid type.
+```
+
+这一行同时说明三件事：
+
+1. **prelink 字典的编辑确实被内核消费**——不是写进文件就算完，加载器读到了它；
+2. 加载器**会校验条目字段**（这里抱怨 `CFBundleVersion` 缺失/类型不对）；
+3. 随后它仍然 panic，因为条目里的 `_PrelinkExecutableLoadAddr` 指向的是内核自己的文本，而不是一个真实的模块。
+
+这条结果把"注入路线是否可行"从推断变成了观测：**路是通的，缺的是条目字段与可执行文件的放置**。后者才是数周级的部分。

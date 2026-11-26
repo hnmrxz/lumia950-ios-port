@@ -476,6 +476,26 @@
         }
       ],
       "limits": "Emulator only, and the load itself does not happen: OSKext::loadFromMkext() is private at this pin, so the kernel reports the container and stops there. What is proven is the embedding and the call site, not a load."
+    },
+    {
+      "id": "prelink-entry-consumed",
+      "what": "The kernel's prelink loader reads an entry that this repository inserted into a merged image: it reports 'Kext org.unixnu.NativeSdhci error - CFBundleVersion missing/invalid type'",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-entry/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/add-prelink-entry.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/inspect-prelink.py"
+        }
+      ],
+      "limits": "Emulator only. It proves the edit reaches the kernel's kext loader and that the loader validates the fields; placing a real executable at a real address is the remaining work."
     }
   ]
 }
