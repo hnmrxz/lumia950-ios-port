@@ -909,7 +909,7 @@ jobs:
         # of the open-source XNU plus its in-tree drivers -- no Apple kernelcache content is merged in,
         # which is what the public-upload rule is about. It is not the prelinked image: without the
         # prelink closure some kexts are absent, so a handset may stop earlier than the emulated run.
-        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
         run: |
           kernel=$(find "$UNIXNU_OUT/lumia950/tree/build/xnu/ios-obj" -name 'mach.development.bcm2837' -print -quit || true)
           [ -n "$kernel" ] || { echo "::error::no source kernel in the build tree"; exit 1; }
@@ -926,7 +926,7 @@ jobs:
         # The owner asked for the handset path, so this branch publishes the prelinked image too. It
         # carries extensions merged out of an Apple kernelcache; the main line still never uploads it,
         # and this step is gated on the probe branch for that reason.
-        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
         run: |
           prelinked=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit || true)
           [ -n "$prelinked" ] || { echo "::error::no prelinked image in the output tree"; exit 1; }
@@ -939,7 +939,7 @@ jobs:
           ls -l "$out"
 
       - name: Upload the prelinked image for the handset
-        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-prelinked
@@ -947,7 +947,7 @@ jobs:
           retention-days: 7
 
       - name: Upload the source-built kernel
-        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-kernel-source
@@ -958,7 +958,7 @@ jobs:
       # not, because staging rewrites the image and the kernel's own FIPS integrity check then fails before
       # bsd_init. Publish the image the gates actually booted so a handset test can use exactly that.
       - name: Upload the unstripped kernel the gates booted
-        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-kernel-unstripped

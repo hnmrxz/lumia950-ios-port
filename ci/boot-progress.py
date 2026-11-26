@@ -39,8 +39,7 @@ PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up 
 # osfmk/console/video_console.h: `v_rowbytes` is bytes and `v_baseaddr` is the mapped address, so the instrument needs
 # no address translation of its own and no guess about a structure's layout.
 BSD_INCLUDE_ANCHOR = "#include <sys/param.h>\n"
-BSD_INCLUDE = ("#include <console/video_console.h>\n"
-               "#include <pexpert/pexpert/arm/boot.h>\n")
+BSD_INCLUDE = "#include <console/video_console.h>\n"
 BSD_ANCHOR = "\tthrottle_init();\n"
 BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if the panel has a mapping. */\n"
              "\textern struct vc_info vinfo;\n"
@@ -48,9 +47,9 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
              "const char *command_line, int stage);\n"
              "\tkprintf(\"LUMIA: vinfo base=%lx row=%u height=%u args=%s\\n\",\n"
              "\t       (unsigned long)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
-             "\t       ((boot_args *)PE_boot_args())->CommandLine);\n"
+             "\t       PE_boot_args());\n"
              "\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
-             "\t                           ((boot_args *)PE_boot_args())->CommandLine, 2);\n")
+             "\t                           PE_boot_args(), 2);\n")
 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
