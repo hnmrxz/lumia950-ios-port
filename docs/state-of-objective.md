@@ -76,3 +76,34 @@ corecrypto 初始化路径：
 prelink 是**唯一不依赖私有 API** 的第三方 kext 通道，而它必须先通过"合并镜像能启动"这一关。现在的阻塞点非常具体：
 **要避免双重 corecrypto 初始化**——要么让源码补丁在存在 prelinked corecrypto 时不执行，要么给断言加前置判断。
 两者都在框架补丁层，不在本仓库的驱动里。
+
+## 合并镜像现在能跑到 `bsd_init` 了：单次 PRNG 注册解开了整条链
+
+`ci/prng-single-init.py` 生效后的第一次成功构建（run 45858986402，head `c834080`），fixture 的报告是：
+
+```
+milestones : arm_vm_init_entry → arm_vm_init_return → kernel_bootstrap_entry →
+             source_crypto_bootstrap_entry → source_crypto_bootstrap_return →
+             iokit_entry → iokit_return → bsd_init_entry
+stop       : _panic
+panic      : Failed to mount root device @%s:%d
+past_bsd   : root-wait
+```
+
+也就是说：**合并（prelinked）镜像已经穿过 IOKit 并进入 BSD 初始化**，然后停在"没有根设备"——这正是需求本身。
+此前它停在 `!prng_ready` 断言，一行幂等保护就把整条链解开了。
+
+同一轮里另外两件成立的事：
+
+- kext 步骤在 kernel 之前跑通：`NativeSdhci: kext`（645 符号）、`NativeSdhci: blob`、两个 mkext（校验和一致）；
+- **源码镜像的 `bsd_init` 门禁仍然 PASS**，说明补丁没有破坏已经成立的部分。
+
+### 这把问题的形状彻底改变了
+
+| 之前 | 现在 |
+|---|---|
+| 合并镜像起不来（`!prng_ready`） | 合并镜像**能到 BSD 初始化** |
+| 存储 kext 没有可用的投递通道 | **prelink 通道可用**，只差把我们的 kext 放进 prelink 信息 |
+
+下一步因此非常具体：**把 `NativeSdhci` 的 kext 条目写进合并镜像的 prelink 信息**，让内核按它加载 Apple kext 的同一路径
+加载我们的驱动；随后 `Failed to mount root device` 就该变成"找到介质但格式不对"或"挂载成功"——两者都是新的、可读的证据。

@@ -436,6 +436,26 @@
         }
       ],
       "limits": "Emulator only. It names the panic precisely; the fix belongs to the framework patch that runs the source crypto bootstrap, not to this port's drivers."
+    },
+    {
+      "id": "merged-image-bsd-init",
+      "what": "The merged (prelinked) image now passes arm_vm_init, the source crypto bootstrap, PE_init_iokit and reaches bsd_init, stopping on 'Failed to mount root device' -- the root-device wait this whole objective is about",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/merged-bsd-init/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/merged-bsd-init/dmesg.txt"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/prng-single-init.py"
+        }
+      ],
+      "limits": "Emulator only. It proves the merged image reaches BSD initialisation; the root device it waits for is the next piece of work, not a property of this run."
     }
   ]
 }
