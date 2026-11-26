@@ -34,9 +34,14 @@ this page and removed.
   `\efi\boot\bootarm.efi`, `{bootmgr} default` must name an entry, and that entry must be the MainOS shim
   (`scripts/check-bcd-layout.py`). `phone-install.py --verify-bcd <enum>` runs that check in the same
   command as the install and fails the install when the store disagrees.
-- The install on the phone is still not in a working state: the last unlock attempt did not complete, the
-  phone was flashed back to factory, and no boot of the custom chain has been observed. Everything above
-  removes the file-level and store-level doubt from that step; it does not stand in for the unlock.
+- **The chain now boots on the handset.** After the Windows-on-ARM deployment was applied, the phone walked
+  firmware -> `bootarm.efi` -> the deployment tool's ARM32 `BootShim.efi` (subsystem 0x10) -> its `UEFI.elf`
+  (LumiaWoA 2.16385) -> `EFI\BOOT\BOOTAA64.EFI` (this port's loader) -> the UniXNU 0.1.0 menu ->
+  DarwinBoot's hand-off, with the kernel read from MainOS through the staged NTFS driver and the real panel
+  reported as 1080x1920, row 4320 bytes, 32 bpp at 0x400000. Measurements, including the two failures that
+  preceded it, are in `docs/hardware/2026-11-26-first-hardware-boot.md`.
+- `XNU-entry-tested` is **not** claimed for the handset: no kernel line had been observed after the hand-off
+  when that note was written.
 - `--unique-chip-id` in the handset ADT is still a zero placeholder
   (`docs/hardware/2026-11-24-device-identity.md`).
 - Recovery is either an FFU flash (`scripts/phone-recover.ps1`, donor FFU for the unlock) or a snapshot

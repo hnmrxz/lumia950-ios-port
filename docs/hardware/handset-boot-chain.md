@@ -57,9 +57,10 @@ owner had seen before.
 
 ## The subsystem rule
 
-The boot manager only starts EFI **applications** (PE subsystem `0x0A`). A boot service driver (`0x0B`)
-placed at a boot path fails and the firmware falls back to its own sequence, which here means the Windows
-reset flow (the two gears). Measured on the candidates this machine has:
+The boot manager only starts EFI **applications** (PE subsystem `0x0A`) **or the Windows boot applications
+(`0x10`) that the deployment tools use** -- measured on this phone: `BootShim.efi` and `mobilestartup.efi` are
+ARMNT `0x01C4` / `0x10`, and `bootarm.efi` itself is `0x0A`. A boot service driver (`0x0B`) placed at a boot
+path fails and the firmware falls back to its own sequence, which here means the Windows reset flow. Measured on the candidates this machine has:
 
 | binary | bytes | subsystem | usable as a boot entry |
 |---|---|---|---|
@@ -94,8 +95,10 @@ in this period came from stacking changes and having no rollback that worked wit
 
 ## Open items on this page
 
-- The chain has not booted on the handset yet. The last attempt used a driver as the shim and looped;
-  the next attempt uses the 0x0A application and the checked store, and has not been run.
+- **The chain has booted on the handset** (2026-11-26): `EFI\BOOT\BOOTAA64.EFI` is what the custom UEFI
+  starts, and writing the loader there was the missing step; the first boot without it reported
+  `Failed to boot OS. No usable boot entry found`. See `docs/hardware/2026-11-26-first-hardware-boot.md`.
+- Still open after that boot: no kernel output was observed past DarwinBoot's hand-off.
 - `--unique-chip-id` in the handset ADT is still a zero placeholder.
 - The kernel stage is proven in QEMU only (`docs/ci/RUNS.md`), never on the handset.
 
