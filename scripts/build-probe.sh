@@ -10,7 +10,7 @@ PYTHON=${PYTHON:-python3}
 ENTRY=${PROBE_ENTRY:-LumiaProbe}
 
 case "$ENTRY" in
-  LumiaProbe|LumiaHandoff|LumiaGpuProbe|LumiaRpmHandoff|LumiaGpuPower|NativeMmioTest) ;;
+  LumiaProbe|LumiaHandoff|LumiaGpuProbe|LumiaRpmHandoff|LumiaGpuPower|NativeMmioTest|LumiaControlMark) ;;
   *) echo "error: unknown PROBE_ENTRY: $ENTRY" >&2; exit 1 ;;
 esac
 
@@ -20,7 +20,7 @@ if [ -z "$EDK2" ] || [ ! -f "$EDK2/MdePkg/Include/Uefi.h" ]; then
 fi
 mkdir -p "$OUT/objects" "$OUT/esp/EFI/LumiaProbe" "$OUT/esp/EFI/BOOT"
 
-for component in ProbeCore FramebufferCore MemoryMove LumiaProbe LumiaHandoff Test/NativeMmioTest; do
+for component in ProbeCore FramebufferCore MemoryMove LumiaProbe LumiaHandoff LumiaControlMark Test/NativeMmioTest; do
   object_name=${component##*/}
   "$CLANG" --target=aarch64-pc-windows-msvc -std=c11 -Os \
     -ffreestanding -fno-builtin -fno-stack-protector -fshort-wchar \
@@ -71,8 +71,11 @@ done
 "$CLANG" --target=aarch64-pc-windows-msvc -c "$ROOT/tools/uefi-probe/NativeMmio.S" \
   -o "$OUT/objects/NativeMmio.obj"
 
-for application in LumiaProbe LumiaHandoff LumiaGpuProbe LumiaRpmHandoff LumiaGpuPower NativeMmioTest; do
+for application in LumiaProbe LumiaHandoff LumiaGpuProbe LumiaRpmHandoff LumiaGpuPower NativeMmioTest LumiaControlMark; do
   application_objects=("$OUT/objects/ProbeCore.obj")
+  if [ "$application" = LumiaControlMark ]; then
+    application_objects=()
+  fi
   if [ "$application" = LumiaHandoff ]; then
     application_objects+=("$OUT/objects/FramebufferCore.obj")
   fi
