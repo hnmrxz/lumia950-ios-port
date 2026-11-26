@@ -303,3 +303,28 @@ bottom 16 rows bright: 12,800                  ← 绿条仍在
 
 `skmem_sysctl_skip=1` 必须留在手机的 `args` 里：去掉它，本机启动就会停在 `_skmem_sysctl_init+0x44`。
 把它留在配置里，本机启动才走到 `root-wait`。这条不是可选项，是本机验证过的必要条件。
+
+## 撤回一次"看起来很好"的改进：`arm/pmap.h` 不在 SDK 里
+
+上一轮加了"写帧缓冲前先问 pmap 是否映射"，本机 preflight 通过、主机测试通过——但 **runner 上编译失败**：
+
+```
+drivers/NativeBootProgress/Mapped.cpp:16:10: fatal error: 'arm/pmap.h' file not found
+```
+
+原因很清楚：`pmap_find_phys()` 在 XNU 的**私有**头文件里（`osfmk/arm/pmap/pmap.h`），而内核构建用的是 iPhoneOS SDK 的
+导出头（`libkern/c++/OSKext.h` 在 SDK 里，`arm/pmap.h` 不在）。**本机能编，是因为本机不编那个单元**——preflight 只编
+`NativeBootProgress.cpp`。
+
+所以这条改进被撤回（`Mapped.cpp` 与调用一起删除）。教训记在这里：
+
+- 含 XNU 私有头的代码**只能在 runner 上验证**；
+- 因此"本机 preflight 通过"**不等于**"内核构建会通过"，凡是新增内核头依赖，必须直接看 runner。
+
+### 真机上"写未映射地址"的风险，仍然没有防护
+
+撤回之后，埋点依旧是直接写 `vinfo.v_baseaddr`。若真机上那一页未映射，内核会因我们而死，且现象与"内核没启动"相同。
+可用的替代方案都需要私有头或另建单元，因此这件事暂时**只能靠一次真机开机来回答**：如果底部绿条出现，说明映射没问题；
+如果全黑且日志显示内核跑到了 `bsd_init`（需要串口/别的通道），才谈得上区分。
+
+这一点已经写进"三种结果 → 三条下一步"的表里：全黑时优先怀疑执行路径，而不是映射。

@@ -103,8 +103,6 @@ COMPONENTS = {
             "drivers/NativeBootProgress/NativeBootProgress.cpp",
             # The only unit here that includes an XNU C++ header: it is where OSKext::loadFromMkext() is called.
             "drivers/NativeBootProgress/KextLoad.cpp",
-            # Only the kernel build compiles this: it asks the arm pmap whether the panel is mapped before the store.
-            "drivers/NativeBootProgress/Mapped.cpp",
         ],
         # Written by the NativeSdhci build earlier in this same archive list: the storage driver's mkext container as a C
         # array. Naming it here rather than on the command line means the framework's archive runner needs no knowledge

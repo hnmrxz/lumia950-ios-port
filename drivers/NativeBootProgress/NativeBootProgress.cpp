@@ -87,9 +87,6 @@ extern "C" void native_boot_progress_stage(void *base, unsigned long stride, uns
 
 }  // namespace
 
-// Defined in Mapped.cpp, which only the kernel build compiles; weak so a host build links without it (null -> no check).
-extern "C" bool native_boot_progress_ready(const void *, unsigned long, unsigned long) __attribute__((weak));
-
 extern "C" void
 native_boot_progress_remember(void *base, unsigned long stride, unsigned long height, const char *command_line)
 {
@@ -139,10 +136,6 @@ native_boot_progress_stage(void *base, unsigned long stride, unsigned long heigh
         return;
     }
 
-    // Ask the kernel whether the page is mapped before storing into it (see the weak declaration above).
-    if (native_boot_progress_ready != nullptr && !native_boot_progress_ready(base, stride, height)) {
-        return;
-    }
 
     // Commit before anything else can fault: the same pair upstream's check script requires. On a host build
     // the barriers are not available and not needed -- there the same function writes into a heap buffer so the
