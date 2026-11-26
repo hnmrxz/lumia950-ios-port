@@ -52,18 +52,18 @@ class BootProgressHookTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def test_the_three_calls_land_in_order(self):
+    def test_the_two_calls_land_in_order(self):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
         first = text.index("native_boot_progress_stage(0)")
         second = text.index("native_boot_progress_stage(1)")
-        third = text.index("native_boot_progress_stage(2)")
         vm = text.index("arm_vm_init(xmaxmem, args);")
         self.assertLess(text.index("PE_init_platform"), first, "stage 0 follows PE_init_platform")
         self.assertLess(first, vm)
         self.assertLess(second, vm, "stage 1 is before arm_vm_init")
-        self.assertLess(vm, third, "stage 2 is after arm_vm_init returns")
+        self.assertNotIn("native_boot_progress_stage(2)", text,
+                         "nothing is drawn after the MMU comes on")
         self.assertIn("extern void native_boot_progress_stage(int);", text)
 
     def test_apply_is_idempotent(self):

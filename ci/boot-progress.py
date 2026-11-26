@@ -7,7 +7,9 @@ cannot satisfy. This inserts the equivalent calls for the Lumia 950:
   * after `PE_init_platform(FALSE, args);` in `osfmk/arm/arm_init.c` -- before `arm_vm_init` turns the MMU on,
     so the framebuffer physical address is still identity-mapped;
   * immediately before `arm_vm_init(xmaxmem, args);`
-  * immediately after it returns.
+  * (nothing after it: `arm_vm_init` turns the MMU on, and a store to the framebuffer physical address without
+    a mapping raises a synchronous exception -- measured in run 45764900801, which stopped at
+    `_sleh_synchronous_sp1` before VM setup when a third call was placed after the call).
 
 One bar per stage reaches the panel, so the number of bars is how far the kernel got. `--apply` is idempotent
 and `--check` re-reads the edit, the same contract the other ci/ patches use.
@@ -33,7 +35,6 @@ STAGE_1 = (
     + "\tnative_boot_progress_stage(0);\n"
 )
 STAGE_2 = "\tnative_boot_progress_stage(1);\n"
-STAGE_3 = "\tnative_boot_progress_stage(2);\n"
 
 
 def find(root: Path) -> list[Path]:
@@ -53,14 +54,13 @@ def apply_to(path: Path) -> tuple[bool, str]:
 
     text = text.replace(AFTER_PLATFORM, AFTER_PLATFORM + STAGE_1, 1)
     text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT, 1)
-    text = text.replace(BEFORE_VM_INIT, BEFORE_VM_INIT + STAGE_3, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
 
 
 def check(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    missing = [str(stage) for stage in (0, 1, 2) if f"native_boot_progress_stage({stage})" not in text]
+    missing = [str(stage) for stage in (0, 1) if f"native_boot_progress_stage({stage})" not in text]
     if missing:
         return False, f"missing stage calls: {', '.join(missing)}"
     if "extern void native_boot_progress_stage(int);" not in text:
