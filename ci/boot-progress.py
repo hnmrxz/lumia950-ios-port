@@ -28,7 +28,7 @@ MARKER = "native_boot_progress_stage"
 # source: `unsigned long v_baseAddr, v_rowBytes, v_height`. Hard-coding them drew into unmapped space
 # in QEMU (run 45764900801, synchronous exception before VM setup).
 DECLARATION = ("\textern void native_boot_progress_stage(unsigned long base, unsigned long stride, "
-               "unsigned long height, int stage);\n")
+               "unsigned long height, const char *command_line, int stage);\n")
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
@@ -37,10 +37,10 @@ STAGE_0 = (
     "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
     + DECLARATION
     + "\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
-    + "args->Video.v_height, 0);\n"
+    + "args->Video.v_height, args->CommandLine, 0);\n"
 )
 STAGE_2 = ("\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
-           "args->Video.v_height, 1);\n")
+           "args->Video.v_height, args->CommandLine, 1);\n")
 
 
 def find(root: Path) -> list[Path]:
@@ -87,14 +87,14 @@ def apply_to(path: Path) -> tuple[bool, str]:
 
 def check(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    missing = [str(stage) for stage in (0, 1) if f"args->Video.v_height, {stage})" not in text]
+    missing = [str(stage) for stage in (0, 1) if f"args->CommandLine, {stage})" not in text]
     if missing:
         return False, f"missing stage calls: {', '.join(missing)}"
     body = arm_init_body(text)
-    if body is not None and text.find("args->Video.v_height, 0)") < body:
+    if body is not None and text.find("args->CommandLine, 0)") < body:
         return False, "stage 0 is above arm_init instead of inside it"
     platform = text.find("PE_init_platform(FALSE, args);")
-    if platform >= 0 and text.find("args->Video.v_height, 0)") > platform:
+    if platform >= 0 and text.find("args->CommandLine, 0)") > platform:
         return False, "stage 0 landed after the platform call"
     if "extern void native_boot_progress_stage(" not in text:
         return False, "missing the declaration"

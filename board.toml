@@ -136,7 +136,7 @@ roots = [
 title = "iOS 16.7.16"
 # One verbose line. DarwinBoot copies it into boot_args unchanged and refuses more than 1000
 # bytes; `--args` replaces it for one staging run without editing this file.
-kernel_args = ["-v", "cpus=1"]
+kernel_args = ["-v", "cpus=1", "lumia-bars"]
 # 2806 MiB: the conventional memory the EFI probe measured
 # (docs/hardware/2026-10-26-probe-v1.json, measured.conventional_mib). The phone advertises
 # 3 GiB, and that same report lists "contiguous ownership of the phone's advertised 3 GiB" under

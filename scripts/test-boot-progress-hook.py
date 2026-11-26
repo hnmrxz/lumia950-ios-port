@@ -63,7 +63,7 @@ class BootProgressHookTests(unittest.TestCase):
         text = self.file.read_text(encoding="utf-8")
         body = self.module.arm_init_body(text)
         self.assertIsNotNone(body, "the sample has no arm_init to anchor on")
-        stage0 = text.index("args->Video.v_height, 0)")
+        stage0 = text.index("args->CommandLine, 0)")
         self.assertGreater(stage0, body, "stage 0 must be inside arm_init")
         self.assertLess(stage0, text.index("PE_init_platform"), "stage 0 must come before the platform call")
         declarations = text.index("int early = 0;")
@@ -73,9 +73,9 @@ class BootProgressHookTests(unittest.TestCase):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
-        stage1 = text.index("args->Video.v_height, 1)")
+        stage1 = text.index("args->CommandLine, 1)")
         self.assertLess(stage1, text.index("arm_vm_init(xmaxmem, args);"))
-        self.assertNotIn("v_height, 2)", text, "nothing is drawn after the MMU comes on")
+        self.assertNotIn("CommandLine, 2)", text, "nothing is drawn after the MMU comes on")
 
     def test_the_panel_comes_from_boot_args(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
