@@ -42,10 +42,13 @@ BSD_INCLUDE_ANCHOR = "#include <sys/param.h>\n"
 BSD_INCLUDE = ("#include <console/video_console.h>\n"
                "#include <pexpert/pexpert/arm/boot.h>\n")
 BSD_ANCHOR = "\tthrottle_init();\n"
-BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, through the console's own panel mapping. */\n"
+BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if the panel has a mapping. */\n"
              "\textern struct vc_info vinfo;\n"
              "\textern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height, "
              "const char *command_line, int stage);\n"
+             "\tkprintf(\"LUMIA: vinfo base=%lx row=%u height=%u args=%s\\n\",\n"
+             "\t       (unsigned long)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
+             "\t       ((boot_args *)PE_boot_args())->CommandLine);\n"
              "\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
              "\t                           ((boot_args *)PE_boot_args())->CommandLine, 2);\n")
 
