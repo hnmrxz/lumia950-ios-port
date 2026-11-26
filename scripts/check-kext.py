@@ -73,16 +73,22 @@ def read_macho(blob: bytes) -> dict:
     }
 
 
+KMOD_SYMBOLS = ("_kmod_info", "__kmod_info", "_kmod_start", "__kmod_start")
+
+
 def problems(info: dict) -> list[str]:
     found: list[str] = []
     if info["cputype"] != CPU_TYPE_ARM64:
         found.append(f"cpu type is 0x{info['cputype']:08X}, not arm64")
     if info["filetype"] != MH_KEXT_BUNDLE:
         found.append(f"file type is {info['filetype']}, not MH_KEXT_BUNDLE (0xb)")
-    if not (SEG_KMOD & info["segments"]) and not (SECT_KMOD & info["sections"]):
-        found.append("no __kmod segment or __kmod_* section, so the loader has no entry points")
-    if not any(symbol.startswith(("_kmod_info", "_kmod_start")) for symbol in info["symbols"]):
-        found.append("neither _kmod_info nor _kmod_start appears in the symbol table")
+    # KMOD_EXPLICIT_DECL() in osfmk/mach/kmod.h declares KMOD_INFO_NAME = kmod_info with no section attribute,
+    # so the record is an ordinary C symbol; the __kmod_* sections are a convention of Apple's build, not a
+    # requirement of the format. Either shape proves the bundle carries its entry points.
+    has_section = bool(SEG_KMOD & info["segments"]) or bool(SECT_KMOD & info["sections"])
+    has_symbol = any(name in info["symbols"] for name in KMOD_SYMBOLS)
+    if not has_section and not has_symbol:
+        found.append("no __kmod segment/section and no kmod_info symbol, so the loader has no entry points")
     return found
 
 

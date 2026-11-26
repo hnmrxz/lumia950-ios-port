@@ -206,10 +206,13 @@ def main():
         if linker is None:
             raise SystemExit("ld is not on PATH")
         subprocess.run(
+            # -u keeps the kmod record: the objects come from the archive, nothing references the record, and a
+            # dead-stripped kext is one the loader will refuse.
             [linker, "-arch", "arm64", "-kext", "-undefined", "dynamic_lookup",
-             # The driver objects come from the iPhoneOS SDK recipe, so the bundle is an iOS kext: linking it as
-             # macOS makes ld refuse with 'building for macOS, but linking in object file built for iOS'.
-             "-platform_version", "ios", "16.0", "16.0",
+             "-u", "_kmod_info", "-u", "_kmod_start",
+             # The driver objects come from the iPhoneOS SDK recipe, so the bundle is an iOS kext, and they were
+             # compiled for iOS 17.0; linking at 16.0 only earns a warning and is worth avoiding.
+             "-platform_version", "ios", "17.0", "17.0",
              "-o", str(executable)] + [str(o) for o in objects],
             check=True)
         check = subprocess.run([sys.executable, str(ROOT / "scripts/check-kext.py"), str(executable)],

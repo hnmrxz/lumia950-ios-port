@@ -75,9 +75,10 @@ class CheckKextTests(unittest.TestCase):
         _, found = self.parse(macho(self.module.MH_KEXT_BUNDLE, segment="__TEXT", symbols=("_main",)))
         self.assertTrue(any("__kmod" in problem for problem in found), found)
 
-    def test_a_missing_kmod_symbols_are_refused(self):
-        _, found = self.parse(macho(self.module.MH_KEXT_BUNDLE, symbols=("_other",)))
-        self.assertTrue(any("_kmod_info" in problem for problem in found), found)
+    def test_a_bundle_with_no_entry_points_is_refused(self):
+        # neither a __kmod segment nor a kmod_info symbol: nothing for the loader to call
+        _, found = self.parse(macho(self.module.MH_KEXT_BUNDLE, segment="__DATA", symbols=("_other",)))
+        self.assertTrue(any("no entry points" in problem for problem in found), found)
 
     def test_not_a_macho_is_refused(self):
         with self.assertRaises(ValueError):
