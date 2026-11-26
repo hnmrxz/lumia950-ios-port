@@ -107,11 +107,14 @@ main()
     check(stage_two_stayed_off, "the bootstrap switch does not enable the post-MMU bar");
 
     native_boot_progress_stage(panel_buffer(later), stride, height, "lumia-bars2", 2);
-    const boot_progress::Rect third = boot_progress::bar_for(2, width, height);
+    // The post-MMU bar sits on the last rows: by the time it is drawn the console has already written over the
+    // upper half, so a bar up there could be present and unreadable.
+    const boot_progress::Rect third = boot_progress::bottom_bar_for(width, height, 0x0030C030u);
     const uint32_t *third_row =
         reinterpret_cast<const uint32_t *>(reinterpret_cast<const uint8_t *>(later.data()) +
                                            static_cast<size_t>(third.y) * stride);
     check(third_row[0] == third.rgb, "the post-MMU switch draws the third bar");
+    check(third.y + third.height == height, "the post-MMU bar sits on the last rows of the panel");
 
     // A zero base must be refused rather than written through.
     native_boot_progress_stage(nullptr, stride, height, "lumia-bars", 0);

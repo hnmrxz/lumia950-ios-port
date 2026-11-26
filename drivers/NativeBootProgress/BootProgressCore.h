@@ -47,6 +47,17 @@ constexpr Rect bar_for(int stage, uint32_t width, uint32_t height)
     return Rect{0u, y, width, kBarHeight, rgb};
 }
 
+// The post-MMU bar goes on the last rows of the panel: the kernel console writes from the top and, at the point this
+// bar is drawn, its text already covers roughly the first half of the screen. A bar drawn in that area can be there
+// and still be invisible, which is exactly what an instrument must not allow.
+constexpr Rect bottom_bar_for(uint32_t width, uint32_t height, uint32_t rgb)
+{
+    if (width == 0u || height < 2u * kBarHeight) {
+        return Rect{0u, 0u, 0u, 0u, 0u};
+    }
+    return Rect{0u, height - kBarHeight, width, kBarHeight, rgb};
+}
+
 // The byte offset of the rect's first pixel, for a panel with the given row stride.
 constexpr uint64_t pixel_offset(const Rect& rect, uint64_t stride)
 {

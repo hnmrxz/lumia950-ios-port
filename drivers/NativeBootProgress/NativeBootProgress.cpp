@@ -106,9 +106,15 @@ native_boot_progress_stage(void *base, unsigned long stride, unsigned long heigh
     if (!contains(command_line, stage >= 2 ? kMappedSwitch : kSwitch)) {
         return;
     }
+    // Stage 2 runs after the kernel console has filled the upper half of the panel, so that bar goes on the last
+    // rows instead: an instrument that draws where the console overwrites it cannot be read.
     const boot_progress::Rect rect =
-        boot_progress::bar_for(stage, static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel),
-                               static_cast<uint32_t>(height));
+        stage >= 2
+            ? boot_progress::bottom_bar_for(static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel),
+                                            static_cast<uint32_t>(height),
+                                            boot_progress::bar_for(stage, static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel), static_cast<uint32_t>(height)).rgb)
+            : boot_progress::bar_for(stage, static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel),
+                                     static_cast<uint32_t>(height));
     if (base == nullptr || !boot_progress::drawable(rect, stride, static_cast<uint32_t>(height))) {
         return;
     }
