@@ -232,6 +232,21 @@ def main():
             raise SystemExit(f"{executable} is not a loadable kext")
         print(f"{args.component}: kext {executable}")
 
+        # Pack the container and emit it as a C blob. The blob is compiled by the component that carries it into the
+        # kernel, and board.toml builds NativeSdhci before that component, so one pass is enough.
+        container = output / "generated" / f"{args.component}.mkext"
+        subprocess.run([sys.executable, str(ROOT / "scripts/make-mkext.py"),
+                        "--bundle-id", kext["bundle_id"],
+                        "--info-plist", str(ROOT / kext["info_plist"]),
+                        "--executable", str(executable),
+                        "--output", str(container)], check=True)
+        blob = output / "generated" / "mkext_blob.cpp"
+        subprocess.run([sys.executable, str(ROOT / "scripts/embed-blob.py"),
+                        "--input", str(container),
+                        "--symbol", "lumia_sdhci_mkext",
+                        "--output", str(blob)], check=True)
+        print(f"{args.component}: blob {blob}")
+
 
 if __name__ == "__main__":
     sys.exit(main())
