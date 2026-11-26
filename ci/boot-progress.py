@@ -49,7 +49,10 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
              "\t       (unsigned long)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
              "\t       PE_boot_args());\n"
              "\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
-             "\t                           PE_boot_args(), 2);\n")
+             "\t                           PE_boot_args(), 2);\n"
+             "\t/* The storage driver, loaded from the container this image carries. */\n"
+             "\textern int lumia_kext_load(const char *command_line);\n"
+             "\tlumia_kext_load(PE_boot_args());\n")
 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"

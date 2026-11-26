@@ -104,6 +104,12 @@ native_boot_progress_stage_remembered(void *base, unsigned long stride, unsigned
     native_boot_progress_stage(base, stride, height, remembered.command_line, stage);
 }
 
+// The storage driver reaches the kernel as an mkext: the source link has no IOStorageFamily and the prelink takes only
+// Apple's kexts, while OSKext::loadFromMkext() is in the kernel. The container is embedded in this archive by
+// scripts/embed-blob.py, and the call is behind its own switch so a boot that does not ask for it never loads anything.
+extern "C" const unsigned char lumia_sdhci_mkext[];
+extern "C" const unsigned long lumia_sdhci_mkext_size;
+
 extern "C" int
 native_boot_progress_switch(const char *command_line, const char *want)
 {

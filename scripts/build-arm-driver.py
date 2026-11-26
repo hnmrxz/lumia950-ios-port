@@ -99,7 +99,11 @@ COMPONENTS = {
     "NativeBootProgress": {
         # Not a matched driver: an instrument the kernel calls from arm_init.c before the MMU is on, so the
         # handset's panel can show how far the kernel got. See drivers/NativeBootProgress/.
-        "sources": ["drivers/NativeBootProgress/NativeBootProgress.cpp"],
+        "sources": [
+            "drivers/NativeBootProgress/NativeBootProgress.cpp",
+            # The only unit here that includes an XNU C++ header: it is where OSKext::loadFromMkext() is called.
+            "drivers/NativeBootProgress/KextLoad.cpp",
+        ],
         "out": "native-boot-progress",
         "include": ["drivers/NativeBootProgress"],
     },
