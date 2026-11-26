@@ -125,3 +125,33 @@ lumia: 95462 bytes of kext container are embedded, but OSKext::loadFromMkext() i
 - 调用路径走到了"API 私有"这一步，说明**嵌入、符号、调用点全部成立**，只差一个可用的加载入口。
 
 至此存储侧不再有"可能没做对"的部分：kext（645 符号）、容器（95 KB）、C 数组、编译进归档、运行时可达，全部有证据。
+
+## 手机已就位：下一次开机就会真的跑内核（不再停在对照条）
+
+本轮检查发现两件事，都影响"你按一次电源能得到什么"：
+
+1. **手机确实连在这台电脑上**（`MSFT Phone MMC Stor` 大容量存储），分区都在：`H:` 是 MainOS，`R:` 是 EFIESP。
+2. 但 `R:\EFI\BOOT\BOOTAA64.EFI` 之前是**3,072 字节的对照条程序**（它画两条杠后死等），**永远不会启动内核**。
+   也就是说：在这种状态下按下电源，屏幕上不可能出现"底部绿条"——那不是内核没跑，而是我们没让它跑。
+
+已把真正的加载器恢复回去（用的是本仓库自己的备份，不碰刷机迷的文件）：
+
+```
+R:\EFI\BOOT\BOOTAA64.EFI                        94,208 B   SHA256 9d9311b3…   PE AArch64, subsystem 10
+R:\EFI\BOOT\BOOTAA64.EFI.before-control-mark     94,208 B   （同一文件，留作回滚）
+R:\EFI\BOOT\BootShim.efi                         53,744 B   ARM32 subsystem 16 —— 刷机迷的文件，未改动
+R:\EFI\BOOT\bootarm.efi                         870,856 B   —— 未改动
+```
+
+`R:\EFI\UniXNU\unixnu.toml`：`default = "xnu"`、`timeout = 20`、`args = "-v cpus=1 lumia-bars2"`。
+
+`H:\EFI\UniXNU\Payloads\kernel.macho`：18,822,808 B，SHA256 `7ae95f48…`——本机实测能画底部绿条（12,800 像素）的那一份。
+
+### 所以现在按一次电源，应该看到
+
+1. 加载器阶段（UniXNU 菜单，20 秒倒计时后自动进 `xnu`）；
+2. DarwinBoot 交接；
+3. **屏幕最底部 16 行出现绿色条**（那代表内核在真机跑到了 `bsd_init`）；
+4. 或者：菜单/交接页之后**全黑**（那代表内核在真机没执行，或视频初始化失败）。
+
+**请各拍一张：菜单/交接页、以及屏幕最底部**。这张图决定后续所有优先级。
