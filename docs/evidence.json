@@ -324,6 +324,26 @@
         }
       ],
       "limits": "Emulator only. It shows the same kernel code paints a panel when the platform expert maps it, so a black handset screen is not explained by the kernel never drawing."
+    },
+    {
+      "id": "handset-control-mark",
+      "what": "The loader-side control mark running on the handset: two bars at y=120 (red) and y=140 (yellow) on a panel the firmware reports as 1080x1920, stride 1080 pixels, BGR, frame buffer at 0x400000",
+      "label": "hardware-tested",
+      "evidence": [
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/control-mark/handset-photo.jpg"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe/LumiaControlMark.c"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "out/control-mark-qemu/report.json"
+        }
+      ],
+      "limits": "One boot, one photograph. It proves the panel takes our writes at these coordinates and that the firmware reports this mode; it says nothing about the kernel, which is loaded later in the chain."
     }
   ]
 }

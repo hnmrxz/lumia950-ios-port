@@ -116,3 +116,24 @@ python scripts\test-native-xnu-entry.py --kernel out\qemu-x\EFI\UniXNU\Payloads\
 这两者的分界正好由加载器侧对照条 + 屏上打印的 `width/height/stride/format/base` 给出：对照条能写、
 内核文字不出现 ⇒ 落到第 2 类；对照条也写不出来 ⇒ 面板写入本身有问题，属于第 1 类之外的另一层。
 
+## 真机实测（对照条，2026-11-26）：面板可写，GOP 模式是 1080×1920，stride 1080 像素
+
+诊断版对照条作为 `\EFI\BOOT\BOOTAA64.EFI` 在真机上运行，屏幕上方出现**红条（y=120）与黄条（y=140）**，
+下方由应用自己打印出五行数值：
+
+| 打印项 | 实测值 | 含义 |
+|---|---|---|
+| width | **1080** | GOP 水平分辨率 |
+| height | **1920** | GOP 垂直分辨率 |
+| stride | **1080** | `PixelsPerScanLine`，即**像素**为单位的行距 |
+| pixel format | **1** | `PixelBlueGreenRedReserved8BitPerColor`（BGR 顺序） |
+| frame buffer base | **400000** | 与 `boot_args.Video.v_baseAddr` 一致 |
+
+三件事由此确定：
+
+1. **我们的代码能点亮这块面板**（在 y=120/140 处写入并可见），所以"真机全黑"不是"面板不可写"；
+2. 固件 GOP 模式是 **1080×1920**，而行距是 **1080 像素 = 4320 字节**；DarwinBoot 报的 `row=4320` 是**字节**，
+   与 `boot_args.Video.v_rowBytes` 的语义一致，也印证了 `drivers/NativeBootProgress` 把 stride 当字节是对的；
+3. 物理面板是 **1440×2560**（ADT 的 `panel-width/height`），与固件运行模式**不是一回事**：显示驱动要走的是
+   面板时序，而不是 GOP 模式，两者不能混用。
+
