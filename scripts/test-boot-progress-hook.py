@@ -80,7 +80,7 @@ class BootProgressHookTests(unittest.TestCase):
     def test_the_panel_comes_from_boot_args(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
         text = self.file.read_text(encoding="utf-8")
-        self.assertIn("args->Video.v_baseAddr", text)
+        self.assertIn("(void *)args->Video.v_baseAddr", text)
         self.assertIn("args->Video.v_rowBytes", text)
 
     def test_apply_is_idempotent(self):

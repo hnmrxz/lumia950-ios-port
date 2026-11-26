@@ -27,7 +27,7 @@ MARKER = "native_boot_progress_stage"
 # The panel parameters come from boot_args.Video, measured in pexpert/pexpert/arm/boot.h of the pinned
 # source: `unsigned long v_baseAddr, v_rowBytes, v_height`. Hard-coding them drew into unmapped space
 # in QEMU (run 45764900801, synchronous exception before VM setup).
-DECLARATION = ("\textern void native_boot_progress_stage(unsigned long base, unsigned long stride, "
+DECLARATION = ("\textern void native_boot_progress_stage(void *base, unsigned long stride, "
                "unsigned long height, const char *command_line, int stage);\n")
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
@@ -36,10 +36,10 @@ PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
     + DECLARATION
-    + "\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
+    + "\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
     + "args->Video.v_height, args->CommandLine, 0);\n"
 )
-STAGE_2 = ("\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
+STAGE_2 = ("\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
            "args->Video.v_height, args->CommandLine, 1);\n")
 
 

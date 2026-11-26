@@ -380,6 +380,10 @@ jobs:
           g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeBootProgress \
               drivers/NativeBootProgress/Test/check-boot-progress-core.cpp -o build/check-boot-progress-core
           ./build/check-boot-progress-core
+          g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeBootProgress \
+              drivers/NativeBootProgress/Test/check-boot-progress-writes.cpp \
+              drivers/NativeBootProgress/NativeBootProgress.cpp -o build/check-boot-progress-writes
+          ./build/check-boot-progress-writes
 
       - name: Host tests of the firmware probe and framebuffer renderer
         run: bash scripts/test-probe.sh

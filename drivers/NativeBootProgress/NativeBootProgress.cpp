@@ -55,7 +55,7 @@ contains(const char *haystack, const char *needle)
 constexpr const char *kSwitch = "lumia-bars";
 
 extern "C" void
-native_boot_progress_stage(unsigned long base, unsigned long stride, unsigned long height,
+native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
                            const char *command_line, int stage)
 {
     if (!contains(command_line, kSwitch)) {
@@ -64,15 +64,20 @@ native_boot_progress_stage(unsigned long base, unsigned long stride, unsigned lo
     const boot_progress::Rect rect =
         boot_progress::bar_for(stage, static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel),
                                static_cast<uint32_t>(height));
-    if (base == 0ul || !boot_progress::drawable(rect, stride, static_cast<uint32_t>(height))) {
+    if (base == nullptr || !boot_progress::drawable(rect, stride, static_cast<uint32_t>(height))) {
         return;
     }
 
-    // Commit before anything else can fault: the same pair upstream's check script requires.
+    // Commit before anything else can fault: the same pair upstream's check script requires. On a host build
+    // the barriers are not available and not needed -- there the same function writes into a heap buffer so the
+    // geometry and the switch can be tested without a kernel.
+#if defined(__aarch64__)
     asm volatile("msr DAIFSet, #0xf" ::: "memory");
     asm volatile("dsb sy" ::: "memory");
+#endif
 
-    const uint64_t start = static_cast<uint64_t>(base) + boot_progress::pixel_offset(rect, stride);
+    const uintptr_t framebuffer = reinterpret_cast<uintptr_t>(base);
+    const uint64_t start = static_cast<uint64_t>(framebuffer) + boot_progress::pixel_offset(rect, stride);
     for (uint32_t row = 0; row < rect.height; ++row) {
         const uint64_t row_base = start + static_cast<uint64_t>(row) * stride;
         for (uint32_t column = 0; column < rect.width; ++column) {
@@ -80,5 +85,7 @@ native_boot_progress_stage(unsigned long base, unsigned long stride, unsigned lo
         }
     }
 
+#if defined(__aarch64__)
     asm volatile("dsb sy" ::: "memory");
+#endif
 }
