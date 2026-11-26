@@ -268,11 +268,11 @@
       "evidence": [
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-handset-adt/dmesg.txt"
+          "path": "docs/hardware/measurements/handset-adt-emulated-bringup/dmesg.txt"
         },
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-handset-adt/report.json"
+          "path": "docs/hardware/measurements/handset-adt-emulated-bringup/report.json"
         },
         {
           "label": "source-reviewed",
