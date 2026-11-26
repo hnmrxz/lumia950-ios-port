@@ -36,3 +36,17 @@
 - 再往 `arm_init` 里画东西（面板在那时未映射，已在 `docs/hardware/2026-11-26-instrument-plan.md` 证明）；
 - 再把 staged 镜像当成"被验证过的镜像"（它过不了内核自己的 FIPS 完整性 POST）；
 - 再靠"色块没出现"推断内核没跑（仪器缺失、开关子串匹配、指针读错都曾造成同样的现象）。
+
+## 合并镜像的 panic 位置又靠前了一步（本轮实测）
+
+本机对 `lumia950-prelinked`（54 MB，run 45832509015 的产物）跑一次 `--past-bsd --finish-iokit`：
+
+- FIPS POST **全部通过**：`fipspost_post:206: all tests PASSED (118 ms)`；
+- dmesg 一直写到 `IOKit IOMD setownership ENABLED`，然后停在 `_panic`；
+- **dmesg 里没有 panic 文本**，serial.log 也停在 DarwinBoot 的交接页。
+
+也就是说：合并镜像不是"起不来"，而是**进到 IOKit 早期、在第一次 kext 匹配之前就 panic 了**，而且 panic 的信息没有被
+kprintf 缓冲下来（这正是 fixture 用 `_panic` 符号判断的原因）。
+
+下一步（小而确定）：用 GDB 在 `_panic` 处停下并读 `x0`（panic 的格式串），把这条信息拿出来——它决定 prelink 这条路
+是否值得继续，也决定第 3 个阻塞项是"我们的 kext 不兼容"还是"合并镜像本身有更早的问题"。
