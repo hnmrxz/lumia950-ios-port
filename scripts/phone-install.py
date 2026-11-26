@@ -51,6 +51,20 @@ def resolve_bootshim(explicit: Path | None) -> Path:
 
 
 
+def pe_machine(path: Path) -> int | None:
+    """Return the PE machine field, or None for anything that is not a PE image."""
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if data[:2] != b"MZ" or len(data) < 0x40:
+        return None
+    offset = int.from_bytes(data[0x3C:0x40], "little")
+    if data[offset:offset + 4] != b"PE\0\0" or offset + 6 > len(data):
+        return None
+    return int.from_bytes(data[offset + 4:offset + 6], "little")
+
+
 def pe_subsystem(path: Path) -> int | None:
     """Return the PE subsystem, or None for anything that is not a PE image.
 
@@ -107,6 +121,32 @@ def verify_bcd(enum_file: Path, layout: str) -> bool:
     return True
 
 
+
+# Subsystems a Lumia bootmgr will start: 0x0A for EFI applications, 0x10 for the Windows boot
+# applications (`WINDOWS_BOOT_APP`) that the deployment tools put on the {default} path. The ARM32
+# bootmgr cannot start an AArch64 image at all, so the class matters as much as the machine.
+BOOT_APP_SUBSYSTEMS = {0x0A, 0x10}
+
+
+def verify_kept_shim(destination: Path) -> bool:
+    """Check the shim already on the volume instead of overwriting it."""
+    if not destination.is_file():
+        print(f"error: --keep-shim was given but {destination} does not exist", file=sys.stderr)
+        return False
+    subsystem = pe_subsystem(destination)
+    machine = pe_machine(destination)
+    note = "" if subsystem is None else f" subsystem 0x{subsystem:02X}"
+    machine_note = "" if machine is None else f" machine 0x{machine:04X}"
+    print(f"  {destination.name:32} {destination.stat().st_size:>10} B  "
+          f"sha256 {digest(destination)[:16]}{note}{machine_note}")
+    print("shim kept: the file already on the volume is the one the store points at")
+    if subsystem not in BOOT_APP_SUBSYSTEMS:
+        print(f"error: {destination.name} has subsystem {subsystem}, which is neither 0x0A nor 0x10; "
+              "the boot manager would not start it", file=sys.stderr)
+        return False
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--efiesp", required=True, help="EFIESP mount, for example R:")
@@ -127,6 +167,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
+    parser.add_argument("--keep-shim", action="store_true",
+                        help="do not write the shim; verify the one already at the layout's destination. "
+                             "The Lumia firmware's bootmgr is ARM32 and starts subsystem 0x10 boot "
+                             "applications, which is what the deployment tools put there; replacing it with "
+                             "an AArch64 0x0A image would leave nothing the bootmgr can run")
     parser.add_argument("--verify-bcd", type=Path, default=None, metavar="ENUM_FILE",
                         help="also check a captured 'bcdedit /store ... /enum all' output against the layout "
                              "this run installs, so the store is verified in the same command")
@@ -152,9 +197,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shim_destination = efiesp / "EFI" / "boot" / "BootShim.efi"
         print("BootShim.efi -> EFIESP\\EFI\\boot")
-    shim = resolve_bootshim(args.bootshim)
-    print(f"shim source: {shim}")
-    ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A)
+    if args.keep_shim:
+        ok &= verify_kept_shim(shim_destination)
+    else:
+        shim = resolve_bootshim(args.bootshim)
+        print(f"shim source: {shim}")
+        ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A)
 
     print("UEFI.elf -> EFIESP root")
     ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)

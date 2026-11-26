@@ -109,16 +109,16 @@ python scripts/check-bcd-layout.py --enum-file bcd.txt --expect windows  # plain
 Run against this image's own enumeration it reports
 `layout ok: the store starts \windows\system32\boot\bootshim.efi` over 11 parsed entries. Run against the
 layout this session actually used (`{default}` pointing at `\EFI\boot\BootShim.efi`) it fails with the
-mismatch and prints the three `bcdedit` commands that fix it. Four host tests cover both directions.
+mismatch and prints the three `bcdedit` commands that fix it. Four host tests cover both directions.
 
 ## Correction: the 42,976-byte module is a driver, not a boot shim
 
-An earlier attempt placed `8AF09F13-¡­efi` from the UEFI package at the shim path and the phone rebooted
+An earlier attempt placed `8AF09F13-â€¦efi` from the UEFI package at the shim path and the phone rebooted
 into the Windows reset flow. Its PE header explains why:
 
 | binary | bytes | subsystem |
 |---|---|---|
-| `8AF09F13-¡­efi` (UEFI package) | 42,976 | **0x0B** boot service driver |
+| `8AF09F13-â€¦efi` (UEFI package) | 42,976 | **0x0B** boot service driver |
 | `SJM\Core\Boot\bootaa64.efi` | 1,508,816 | **0x0A** EFI application |
 | rEFInd `refind_aa64.efi` | 202,624 | 0x0A |
 | GRUB `bootaa64.efi` | 878,544 | 0x0A |
@@ -126,4 +126,29 @@ into the Windows reset flow. Its PE header explains why:
 The boot manager only starts EFI applications, so a driver at `{default}` fails and the firmware falls
 back to `bootsequence` -> `mobilestartup.efi`, which is the two-gear reset flow seen on the panel.
 `phone-install.py` now refuses to place anything but subsystem 0x0A on a boot path, and two host tests
-cover the driver refusal and the application acceptance.
+cover the driver refusal and the application acceptance.
+
+## Correction (measured on the handset, 2026-11-26): which subsystem the bootmgr starts
+
+The rule this document carried -- "the boot manager only starts EFI applications (0x0A), and a 0x0B driver
+fails silently" -- holds for images the firmware loads from a standard `\EFI\BOOT` path, but it is not the
+whole rule. The Lumia's bootmgr is **ARM32** (`bootarm.efi`, machine `0x01C2`, subsystem `0x0A`), and what it
+starts from the store are **Windows boot applications**, subsystem `0x10`. Read from the live phone:
+
+| file | machine | subsystem |
+|---|---|---|
+| `R:\EFI\boot\bootarm.efi` (bootmgr) | THUMB `0x01C2` | `0x0A` EFI application |
+| `R:\EFI\boot\BootShim.efi` (what `{default}` names) | ARMNT `0x01C4` | **`0x10` Windows boot application** |
+| `R:\windows\system32\boot\mobilestartup.efi` (fallback) | ARMNT `0x01C4` | **`0x10`** |
+| `X:\UEFI.elf` | ELF, AArch64 | -- (chainloaded by the ARM32 shim) |
+| `EFI\UniXNU\UniXNU.efi` | ARM64 `0xAA64` | `0x0A` |
+| `EFI\UniXNU\Drivers\DarwinBoot.efi`, `ntfs.efi` | ARM64 | `0x0B` (started by UniXNU, not by the firmware) |
+
+Two consequences for deployment:
+
+1. **Do not replace the ARM32 shim on `{default}` with an AArch64 `0x0A` image.** An ARM32 bootmgr cannot start
+   an AArch64 application at all; the AArch64 UEFI arrives as `UEFI.elf`, chainloaded by the ARM32 shim. The
+   MainOS placement this repository documented earlier is wrong for this phone.
+2. **Keeping the existing shim needs no store edit.** `phone-install.py --layout efiesp --keep-shim` verifies
+   the file already on `{default}` (accepting `0x0A` or `0x10`) and writes only `UEFI.elf` and the UniXNU
+   payload. The captured store then passes `check-bcd-layout.py --expect efiesp` unchanged.

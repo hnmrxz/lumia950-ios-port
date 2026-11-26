@@ -104,6 +104,34 @@ description             BootShim Application
     def test_verify_bcd_reports_a_missing_file(self):
         self.assertFalse(self.module.verify_bcd(self.efiesp / "absent.txt", "mainos"))
 
+    def test_keep_shim_verifies_the_existing_boot_application(self):
+        # what the deployment tools put on the {default} path: ARM32, subsystem 0x10
+        kept = self.efiesp / "EFI" / "boot" / "BootShim.efi"
+        kept.parent.mkdir(parents=True)
+        make_pe(kept, subsystem=0x10, machine=0x01C4)
+        before = kept.read_bytes()
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--uefi-elf", str(self.uefi), "--layout", "efiesp", "--keep-shim", "--apply"]
+        self.assertEqual(self.module.main(argv), 0)
+        self.assertEqual(kept.read_bytes(), before)
+        self.assertTrue((self.efiesp / "UEFI.elf").is_file())  # the payload is still written
+
+    def test_keep_shim_refuses_a_boot_service_driver(self):
+        kept = self.efiesp / "EFI" / "boot" / "BootShim.efi"
+        kept.parent.mkdir(parents=True)
+        make_pe(kept, subsystem=0x0B, machine=0x01C4)
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--uefi-elf", str(self.uefi), "--layout", "efiesp", "--keep-shim", "--apply"]
+        self.assertNotEqual(self.module.main(argv), 0)
+
+    def test_keep_shim_requires_a_file(self):
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--uefi-elf", str(self.uefi), "--layout", "efiesp", "--keep-shim", "--apply"]
+        self.assertNotEqual(self.module.main(argv), 0)
+
     def test_default_layout_puts_the_shim_on_mainos(self):
         self.assertEqual(self.run_installer(), 0)
         self.assertTrue((self.mainos / "Windows" / "System32" / "Boot" / "bootshim.efi").is_file())
