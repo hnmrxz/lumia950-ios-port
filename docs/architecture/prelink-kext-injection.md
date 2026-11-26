@@ -54,3 +54,21 @@ pin 的 XNU 源码里没有 `bsd/hfs`，也没有 `md`（内存盘）。合并�
 ```
 
 这一步本身有价值：任何"把我们的 kext 加进去"的尝试，都要先能读懂这张表；现在它可读、可断言（6 个主机测试）。
+
+## 字典这一半也能写了
+
+`scripts/add-prelink-entry.py` 往 `_PrelinkInfoDictionary` 的数组末尾插入一条新条目，其余字节原样保留。两件事值得记：
+
+- **段里有富余空间**：真实合并镜像的文本是 108,416 字节，段是 110,592 字节，插一条 300 多字节的条目后用了 108,749，
+  仍然放得下。所以改字典不需要挪动段表。
+- **不能简单找第一个 `</array>`**：kext 条目内部自带数组（personality 之类），第一个 `</array>` 往往是内层的。
+  工具改成按标签配平找 `_PrelinkInfoDictionary` 的那个收尾——第一版就栽在这里，插进去以后读不回来。
+
+对真实镜像实跑：
+
+```
+inserted org.unixnu.NativeSdhci at offset 39581, 108749 of 110592 bytes used; 17 entries parse back
+```
+
+**仍然缺的一半**：条目里的 `_PrelinkExecutableLoadAddr` 必须指向镜像内被映射的模块文本，而把我们的 kext 放进去意味着
+选地址、追加段、修复 PC 相对指令——即 ADR-0003 里评估为"数周级"的那部分。这条工具的价值是让字典这一半先可测。
