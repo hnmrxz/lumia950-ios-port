@@ -207,7 +207,9 @@ def main():
             raise SystemExit("ld is not on PATH")
         subprocess.run(
             [linker, "-arch", "arm64", "-kext", "-undefined", "dynamic_lookup",
-             "-platform_version", "macos", "14.0", "14.0",
+             # The driver objects come from the iPhoneOS SDK recipe, so the bundle is an iOS kext: linking it as
+             # macOS makes ld refuse with 'building for macOS, but linking in object file built for iOS'.
+             "-platform_version", "ios", "16.0", "16.0",
              "-o", str(executable)] + [str(o) for o in objects],
             check=True)
         check = subprocess.run([sys.executable, str(ROOT / "scripts/check-kext.py"), str(executable)],
