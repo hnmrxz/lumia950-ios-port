@@ -43,6 +43,56 @@ project, not a driver.
 (45314032032, 45587399756, 45706495971) becomes unusable, and the pin's XNU patch set has to be re-derived. It buys
 one thing: a supported path for our kext.
 
+## M4 -- load the driver as a kext from memory (added after reading the pinned kernel)
+
+The pinned kernel carries the kext loader, so the driver does not have to be linked into the image at all:
+
+```c
+// libkern/libkern/c++/OSKext.h, xnu-8796.141.3
+static OSReturn loadFromMkext(
+    OSKextLogSpec   clientLogSpec,
+    char          * mkextBuffer,
+    uint32_t        mkextBufferLength,
+    char         ** logInfoOut,
+    uint32_t      * logInfoLengthOut);
+```
+
+and the container format is defined in the same tree (`libkern/libkern/mkext.h`):
+
+| field | value |
+|---|---|
+| magic / signature | `'MKXT'` (`0x4D4B5854`) / `'MOSX'` (`0x4D4F5358`) |
+| version 2 | `0x02002001` |
+| integrity | adler32 over the image |
+| byte order | all header fields big-endian (`OSSwapBigToHostInt32`) |
+| info dictionaries key | `_MKEXTInfoDictionaries` |
+
+That turns M1's "someone else must teach the prelink about our kext" into something this repository can do alone:
+
+1. build `NativeSdhci` as a **kext Mach-O** in the macOS kernel job (the archive recipe already compiles the
+   sources; the kext link is `ld -kext` with the same objects);
+2. pack a one-kext mkext with a small Python tool (pure computation, testable on the host);
+3. embed the bytes in the kernel image as a generated C array, force-loaded like any other device archive;
+4. call `OSKext::loadFromMkext(...)` at `bsd_init` **before** `vfs_mountroot`, then let the existing personality
+   (`IOClass=NativeSdhci`, `IOProviderClass=IOPlatformDevice`, `IONameMatch=qcom,msm8994-sdhci`) match the ADT node.
+
+Why this is the first attempt:
+
+- it is additive -- nothing about the source link, the prelink roots or Apple's kexts changes;
+- it is testable without the phone: the packer is host-testable, and the emulator can tell us whether the kext loads
+  and matches before any hardware is involved;
+- it fails cheaply and visibly (a load failure returns an `OSReturn` and logs).
+
+What has to be checked before trusting it, in this order:
+
+1. does the DEVELOPMENT kernel allow kext loading at all (`kern.kext` restrictions, signature enforcement) in this
+   configuration? If not, the boot-arg for kext developer mode decides it, and that is a one-line experiment;
+2. does `loadFromMkext` reject unsigned kexts at this pin? The emulator answers this the same way;
+3. only then: does the driver find its ADT node and publish a medium.
+
+If any of the three fails in a way we cannot change from this repository, M1 (prelink-side support) becomes the only
+path and ADR-0004 (pin migration) has to be decided first.
+
 ## Decision (proposed)
 
 Try M1 first, because it is the only option that keeps the driver and the OS contract as they are, and it fails
