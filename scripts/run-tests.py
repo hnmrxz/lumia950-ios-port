@@ -35,6 +35,7 @@ SELF_CONTAINED = (
     "test-boot-progress-hook.py",
     "test-kernel-personality.py",
     "test-deploy-kernel.py",
+    "test-swap-loader.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
