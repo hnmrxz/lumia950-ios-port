@@ -77,6 +77,12 @@ UefiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     FlushPanel(gop);
     system_table->ConOut->OutputString(system_table->ConOut,
                                        L"control mark drawn: 2 bars\r\n");
+#ifdef CONTROL_MARK_HOLD
+    // A test build stays on this screen so a screenshot can be taken; the shipped build returns to the menu.
+    for (;;) {
+        __asm__ volatile("wfe" ::: "memory");
+    }
+#endif
     return EFI_SUCCESS;
 }
 

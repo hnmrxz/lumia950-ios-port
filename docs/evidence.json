@@ -280,6 +280,30 @@
         }
       ],
       "limits": "Emulator only, and the run omitted --crypto-post on purpose, which is why the FIPS check failed. This says the tree is good enough to reach BSD initialisation; it says nothing about the handset."
+    },
+    {
+      "id": "loader-control-mark-emulated",
+      "what": "A loader-side control mark: an AArch64 EFI application that draws the same two bars, at the same coordinates and colours, that the kernel instrument would have drawn, then holds the screen so it can be read back from QMP",
+      "label": "EFI-tested",
+      "evidence": [
+        {
+          "label": "EFI-tested",
+          "path": "out/control-mark-qemu/panel.ppm"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "out/control-mark-qemu/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe/LumiaControlMark.c"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/check-control-mark-qemu.py"
+        }
+      ],
+      "limits": "Emulator only. The check found bar 0 exactly at row 120 in colour 0xE03030 and bar 1 at row 140 in 0xE0C030 on an 800x600 panel. It proves the application and its coordinates, not the handset panel."
     }
   ]
 }
