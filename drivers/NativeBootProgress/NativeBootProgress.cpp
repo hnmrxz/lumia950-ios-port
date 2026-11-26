@@ -28,19 +28,30 @@ store32(uint64_t address, uint32_t value)
 namespace {
 
 bool
+is_separator(char character)
+{
+    return character == '\0' || character == ' ' || character == '\t';
+}
+
+// A boot argument is a token: 'lumia-bars2' must not satisfy 'lumia-bars', which is what plain substring matching did
+// -- and that made the post-MMU run enable the two bootstrap bars, which fault before VM setup.
+bool
 contains(const char *haystack, const char *needle)
 {
-    if (haystack == nullptr || needle == nullptr) {
+    if (haystack == nullptr || needle == nullptr || *needle == '\0') {
         return false;
     }
     for (const char *start = haystack; *start != '\0'; ++start) {
+        if (start != haystack && !is_separator(start[-1])) {
+            continue;
+        }
         const char *a = start;
         const char *b = needle;
         while (*a != '\0' && *b != '\0' && *a == *b) {
             ++a;
             ++b;
         }
-        if (*b == '\0') {
+        if (*b == '\0' && is_separator(*a)) {
             return true;
         }
     }

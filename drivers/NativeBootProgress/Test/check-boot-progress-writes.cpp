@@ -94,6 +94,21 @@ main()
     check(second_row[0] == second.rgb, "stage 1 draws its own bar");
     check(second.rgb != bar.rgb, "the two bars are different colours");
 
+    // The post-MMU switch must not enable the bootstrap bars: matching by prefix did exactly that, and the bootstrap
+    // bars fault before VM setup, so asking for the third bar killed the kernel.
+    std::vector<uint32_t> prefix(static_cast<size_t>(stride / 4u) * height, 0u);
+    native_boot_progress_stage(panel_buffer(prefix), stride, height, "lumia-bars2", 0);
+    bool prefix_stayed_off = true;
+    for (uint32_t value : prefix) {
+        if (value != 0u) {
+            prefix_stayed_off = false;
+            break;
+        }
+    }
+    check(prefix_stayed_off, "lumia-bars2 does not enable the bootstrap bar");
+    native_boot_progress_stage(panel_buffer(prefix), stride, height, "lumia-bars", 0);
+    check(prefix[static_cast<size_t>(bar.y) * (stride / 4u)] == bar.rgb, "lumia-bars still draws the bootstrap bar");
+
     // Stage 2 is the post-MMU bar and must ignore the bootstrap switch, so a boot can ask for it alone.
     std::vector<uint32_t> later(static_cast<size_t>(stride / 4u) * height, 0u);
     native_boot_progress_stage(panel_buffer(later), stride, height, "lumia-bars", 2);
