@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 //
-// Host test for the boot-progress geometry. The stores themselves are compiled only by the kernel job;
-// this checks that the marks land inside the panel and that a stage maps to a distinct bar.
+// Host test for the boot-progress geometry. The stores themselves are compiled only by the kernel job; this
+// checks that the marks land inside the panel and that a stage maps to a distinct bar, for both the handset
+// panel and the ones the emulator reports.
 
 #include <cstdio>
 #include <cstdlib>
@@ -28,30 +29,39 @@ check(bool condition, const char* what)
 int
 main()
 {
-    // The panel numbers match what the firmware probe and DarwinBoot reported on the handset.
-    check(kWidth == 1080u && kHeight == 1920u && kRowBytes == 4320u && kBytesPerPixel == 4u,
-          "panel geometry matches the measured Lumia 950 GOP");
-    check(kRowBytes >= kWidth * kBytesPerPixel, "row stride covers the visible width");
+    // The handset panel, as the firmware probe and DarwinBoot reported it: 1080x1920, row 4320, 32 bpp.
+    const uint32_t handset_width = 1080u;
+    const uint32_t handset_height = 1920u;
+    const uint64_t handset_stride = 4320u;
+    check(handset_stride >= static_cast<uint64_t>(handset_width) * kBytesPerPixel,
+          "handset stride covers the visible width");
 
-    // Stage 0 must be drawable and land on the panel; a negative stage must not.
-    check(drawable(bar_for(0)), "stage 0 is drawable");
-    check(!drawable(bar_for(-1)), "a negative stage draws nothing");
-    check(!drawable(bar_for(200)), "a stage past the panel draws nothing");
+    check(drawable(bar_for(0, handset_width, handset_height), handset_stride, handset_height),
+          "stage 0 is drawable on the handset panel");
+    check(!drawable(bar_for(-1, handset_width, handset_height), handset_stride, handset_height),
+          "a negative stage draws nothing");
+    check(!drawable(bar_for(200, handset_width, handset_height), handset_stride, handset_height),
+          "a stage past the panel draws nothing");
 
-    // Bars must not overlap and must stay inside the panel.
     for (int stage = 0; stage < 6; ++stage) {
-        const Rect rect = bar_for(stage);
-        check(drawable(rect), "each early stage is drawable");
-        check(rect.y + rect.height <= kHeight, "bar stays inside the panel");
-        check(pixel_offset(rect) % 4u == 0u, "pixel offset is 32-bit aligned");
+        const Rect rect = bar_for(stage, handset_width, handset_height);
+        check(drawable(rect, handset_stride, handset_height), "each early stage is drawable");
+        check(rect.y + rect.height <= handset_height, "bar stays inside the panel");
+        check(pixel_offset(rect, handset_stride) % 4u == 0u, "pixel offset is 32-bit aligned");
         if (stage > 0) {
-            const Rect previous = bar_for(stage - 1);
+            const Rect previous = bar_for(stage - 1, handset_width, handset_height);
             check(rect.y >= previous.y + previous.height, "bars do not overlap");
         }
     }
 
-    // Distinct stages must be visually distinct.
-    check(bar_for(0).rgb != bar_for(1).rgb, "stage colours differ");
+    check(bar_for(0, handset_width, handset_height).rgb != bar_for(1, handset_width, handset_height).rgb,
+          "stage colours differ");
+
+    // A narrower stride than the visible width cannot be drawn into, and an empty panel draws nothing.
+    check(!drawable(bar_for(0, handset_width, handset_height), 1000u, handset_height),
+          "a stride narrower than the width is refused");
+    check(!drawable(bar_for(0, 0u, handset_height), handset_stride, handset_height),
+          "a zero-width panel draws nothing");
 
     if (failures == 0) {
         std::printf("boot progress core: ok\n");

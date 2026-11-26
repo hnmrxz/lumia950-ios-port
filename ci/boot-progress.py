@@ -23,7 +23,11 @@ from pathlib import Path
 
 MARKER = "native_boot_progress_stage"
 
-DECLARATION = "\textern void native_boot_progress_stage(int);\n"
+# The panel parameters come from boot_args.Video, measured in pexpert/pexpert/arm/boot.h of the pinned
+# source: `unsigned long v_baseAddr, v_rowBytes, v_height`. Hard-coding them drew into unmapped space
+# in QEMU (run 45764900801, synchronous exception before VM setup).
+DECLARATION = ("\textern void native_boot_progress_stage(unsigned long base, unsigned long stride, "
+               "unsigned long height, int stage);\n")
 
 # The real line carries a trailing comment; measured in the pinned xnu-8796.141.3 source.
 AFTER_PLATFORM = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
@@ -32,9 +36,11 @@ BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 STAGE_1 = (
     "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
     + DECLARATION
-    + "\tnative_boot_progress_stage(0);\n"
+    + "\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
+    + "args->Video.v_height, 0);\n"
 )
-STAGE_2 = "\tnative_boot_progress_stage(1);\n"
+STAGE_2 = ("\tnative_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, "
+           "args->Video.v_height, 1);\n")
 
 
 def find(root: Path) -> list[Path]:
@@ -60,7 +66,7 @@ def apply_to(path: Path) -> tuple[bool, str]:
 
 def check(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    missing = [str(stage) for stage in (0, 1) if f"native_boot_progress_stage({stage})" not in text]
+    missing = [str(stage) for stage in (0, 1) if f"args->Video.v_height, {stage})" not in text]
     if missing:
         return False, f"missing stage calls: {', '.join(missing)}"
     if "extern void native_boot_progress_stage(int);" not in text:

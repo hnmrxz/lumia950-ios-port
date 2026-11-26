@@ -56,15 +56,15 @@ class BootProgressHookTests(unittest.TestCase):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
-        first = text.index("native_boot_progress_stage(0)")
-        second = text.index("native_boot_progress_stage(1)")
+        first = text.index("args->Video.v_height, 0);")
+        second = text.index("args->Video.v_height, 1);")
         vm = text.index("arm_vm_init(xmaxmem, args);")
         self.assertLess(text.index("PE_init_platform"), first, "stage 0 follows PE_init_platform")
         self.assertLess(first, vm)
         self.assertLess(second, vm, "stage 1 is before arm_vm_init")
-        self.assertNotIn("native_boot_progress_stage(2)", text,
-                         "nothing is drawn after the MMU comes on")
-        self.assertIn("extern void native_boot_progress_stage(int);", text)
+        self.assertNotIn("v_height, 2);", text, "nothing is drawn after the MMU comes on")
+        self.assertIn("extern void native_boot_progress_stage(", text)
+        self.assertIn("args->Video.v_baseAddr", text, "the panel comes from boot_args, not a constant")
 
     def test_apply_is_idempotent(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
