@@ -34,6 +34,20 @@ DECLARATION = ("\textern void native_boot_progress_remember(void *base, unsigned
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
+# The third bar is drawn after the platform expert has installed the video console, through the same mapping the
+# console itself writes to. That mapping comes from the kernel's own `vinfo`, declared in
+# osfmk/console/video_console.h: `v_rowbytes` is bytes and `v_baseaddr` is the mapped address, so the instrument needs
+# no address translation of its own and no guess about a structure's layout.
+BSD_INCLUDE_ANCHOR = "#include <sys/param.h>\n"
+BSD_INCLUDE = "#include <console/video_console.h>\n"
+BSD_ANCHOR = "\tthrottle_init();\n"
+BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, through the console's own panel mapping. */\n"
+             "\textern struct vc_info vinfo;\n"
+             "\textern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height, "
+             "const char *command_line, int stage);\n"
+             "\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
+             "\t                           (const char *)PE_boot_args(), 2);\n")
+
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
     + DECLARATION
@@ -55,6 +69,14 @@ def find(root: Path) -> list[Path]:
 
 
 
+def find_bsd_init(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for candidate in sorted(root.rglob("bsd_init.c")):
+        if candidate.parent.name == "kern" and candidate.parent.parent.name == "bsd":
+            found.append(candidate)
+    return found
+
+
 def arm_init_body(text: str):
     """The index just past the opening brace of the arm_init definition, or None.
 
@@ -68,6 +90,32 @@ def arm_init_body(text: str):
     if not match:
         return None
     return match.end()
+
+
+def apply_bsd(path: Path) -> tuple[bool, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "native_boot_progress_stage((void *)vinfo.v_baseaddr" in text:
+        return True, "already carries the third bar"
+    if BSD_ANCHOR not in text:
+        return False, "skipped: no throttle_init() in this copy of bsd_init.c"
+    if BSD_INCLUDE not in text:
+        if BSD_INCLUDE_ANCHOR not in text:
+            return False, "skipped: no <sys/param.h> include to anchor the console header"
+        text = text.replace(BSD_INCLUDE_ANCHOR, BSD_INCLUDE_ANCHOR + BSD_INCLUDE, 1)
+    text = text.replace(BSD_ANCHOR, BSD_STAGE + BSD_ANCHOR, 1)
+    path.write_text(text, encoding="utf-8")
+    return True, "patched"
+
+
+def check_bsd(path: Path) -> tuple[bool, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "native_boot_progress_stage((void *)vinfo.v_baseaddr" not in text:
+        if BSD_ANCHOR not in text:
+            return False, "skipped: no throttle_init() in this copy of bsd_init.c"
+        return False, "missing the third bar"
+    if BSD_INCLUDE not in text:
+        return False, "missing the console header include"
+    return True, "ok"
 
 
 def apply_to(path: Path) -> tuple[bool, str]:
@@ -127,14 +175,18 @@ def main(argv: list[str] | None = None) -> int:
 
     roots = args.root or [Path.cwd()]
     files = find(roots[0])
+    bsd_files = find_bsd_init(roots[0])
     if not files:
         print(f"error: no osfmk/arm/arm_init.c under {roots[0]}", file=sys.stderr)
         return 2
 
     patched = 0
     skipped = 0
-    for path in files:
-        ok, message = apply_to(path) if args.apply else check(path)
+    for path in files + bsd_files:
+        if path.name == "bsd_init.c":
+            ok, message = apply_bsd(path) if args.apply else check_bsd(path)
+        else:
+            ok, message = apply_to(path) if args.apply else check(path)
         if ok:
             print(f"ok   {path}: {message}")
             patched += 1

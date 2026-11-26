@@ -94,6 +94,25 @@ main()
     check(second_row[0] == second.rgb, "stage 1 draws its own bar");
     check(second.rgb != bar.rgb, "the two bars are different colours");
 
+    // Stage 2 is the post-MMU bar and must ignore the bootstrap switch, so a boot can ask for it alone.
+    std::vector<uint32_t> later(static_cast<size_t>(stride / 4u) * height, 0u);
+    native_boot_progress_stage(panel_buffer(later), stride, height, "lumia-bars", 2);
+    bool stage_two_stayed_off = true;
+    for (uint32_t value : later) {
+        if (value != 0u) {
+            stage_two_stayed_off = false;
+            break;
+        }
+    }
+    check(stage_two_stayed_off, "the bootstrap switch does not enable the post-MMU bar");
+
+    native_boot_progress_stage(panel_buffer(later), stride, height, "lumia-bars2", 2);
+    const boot_progress::Rect third = boot_progress::bar_for(2, width, height);
+    const uint32_t *third_row =
+        reinterpret_cast<const uint32_t *>(reinterpret_cast<const uint8_t *>(later.data()) +
+                                           static_cast<size_t>(third.y) * stride);
+    check(third_row[0] == third.rgb, "the post-MMU switch draws the third bar");
+
     // A zero base must be refused rather than written through.
     native_boot_progress_stage(nullptr, stride, height, "lumia-bars", 0);
     check(true, "a zero base is ignored");

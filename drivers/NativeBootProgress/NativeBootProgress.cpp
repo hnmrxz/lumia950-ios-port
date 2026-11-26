@@ -54,6 +54,10 @@ contains(const char *haystack, const char *needle)
 // before VM setup (runs 45764900801, 45774728401), and the kernel must not be killed by its own instrument.
 constexpr const char *kSwitch = "lumia-bars";
 
+// The post-MMU bar needs its own switch: the two bootstrap bars fault on every platform (the panel is not mapped when
+// arm_init runs), so enabling them to see the third bar would kill the kernel before it ever got there.
+constexpr const char *kMappedSwitch = "lumia-bars2";
+
 namespace {
 
 // What arm_init learned from boot_args, kept for the later stage. Nothing here is an ABI guess: arm_init passes
@@ -91,7 +95,7 @@ extern "C" void
 native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
                            const char *command_line, int stage)
 {
-    if (!contains(command_line, kSwitch)) {
+    if (!contains(command_line, stage >= 2 ? kMappedSwitch : kSwitch)) {
         return;
     }
     const boot_progress::Rect rect =
