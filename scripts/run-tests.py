@@ -43,6 +43,7 @@ SELF_CONTAINED = (
     "test-prng-single-init.py",
     "test-inspect-prelink.py",
     "test-add-prelink-entry.py",
+    "test-append-prelink-kext.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
