@@ -137,3 +137,26 @@ python scripts\test-native-xnu-entry.py --kernel out\qemu-x\EFI\UniXNU\Payloads\
 3. 物理面板是 **1440×2560**（ADT 的 `panel-width/height`），与固件运行模式**不是一回事**：显示驱动要走的是
    面板时序，而不是 GOP 模式，两者不能混用。
 
+## 一个必须先解决的前提：**staged（重新落盘的）内核过不了 FIPS 完整性 POST**
+
+本机 QEMU 复现（两枚不同内核、同一流程）：
+
+| 内核 | 是否含本轮第 3 条色块 | 本机结果 |
+|---|---|---|
+| `f2ebcc45`（上一版） | 否 | `_panic`，dmesg 停在 `fipspost_post:153: FAILED: fipspost_post_integrity: -74` |
+| `be69b8d`（本轮） | 是 | 同上，`_panic` |
+
+**两枚都 panic，所以不是本轮改动引起的。** 差别只在"跑的是哪份镜像"：CI 的门禁跑的是构建树里的
+**unstripped** 镜像（并带 `--crypto-post` 的契约检查），而本机跑的是 `stage-kernel.py` 重新落盘的 **staged** 镜像。
+
+`scripts/stage-native-bringup.py:crypto_contract()` 只做**检查**（确认 `__text` 与 32 字节的 `__fips_hmacs` 存在），
+**不做封印**；运行时 `fipspost_post_integrity` 生成的 MAC 与镜像里的 "In variable" 值不一致 → `-74`。
+
+推论（对本目标直接相关）：
+
+1. **本机无法验证 `bsd_init` 之后的任何仪器**（第 3 条色块）——内核在 `source_corecrypto14_bootstrap` 就 panic；
+2. **部署到手机的镜像必须与 CI 门禁验证过的那份一致**（unstripped 或在 CI 内完成封印），否则真机同样会在
+   `bsd_init` 之前 panic —— 这与"真机全黑"高度吻合；
+3. 这不是"再加一个探针"能解决的问题，而是**交付流程**问题：要么把 unstripped 镜像作为可部署产物，要么在交付前
+   重做封印（需要 corecrypto 的封印算法与输入）。
+

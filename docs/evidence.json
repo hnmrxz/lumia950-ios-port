@@ -344,6 +344,26 @@
         }
       ],
       "limits": "One boot, one photograph. It proves the panel takes our writes at these coordinates and that the firmware reports this mode; it says nothing about the kernel, which is loaded later in the chain."
+    },
+    {
+      "id": "staged-image-fips-post",
+      "what": "Both a staged kernel with the new post-MMU bar and the previous staged kernel panic in the emulator at fipspost_post_integrity (-74), so staging, not this round's injection, breaks the crypto POST",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "out/qemu-bars2-run/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "out/qemu-prev-run/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/stage-native-bringup.py"
+        }
+      ],
+      "limits": "Emulator only, and it says nothing about the handset except this: the image this port stages for the phone is not the image CI validates, and it fails the kernel's own integrity POST before bsd_init."
     }
   ]
 }
