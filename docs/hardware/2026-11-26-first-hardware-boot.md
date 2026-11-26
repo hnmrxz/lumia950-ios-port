@@ -76,6 +76,22 @@ The next image deployed is the green build 45778628055: the same source kernel w
 argument is present. One bar means `arm_init` ran, two means it reached `arm_vm_init`, none means the kernel never
 reached `arm_init` at all.
 
+## Why the instrument faults in the emulator and should not fault on the panel
+
+The local QEMU reproduction (Windows host, QEMU 11.1.0, the same staged ESP) stops exactly where CI stopped, and
+the archived registers name the instruction: `x9 = 0xe03030` is the bar colour, `x11`/`x13 = 0x6c7fdc00` is the
+address being written, and `x1 = 0x96000005` is ESR_EL1. Decoded: EC `0x25` is a data abort taken at the same
+exception level, and the fault status `0b000101` is a translation fault at level 1.
+
+So the store is faulting on translation, which means the MMU is already on when `arm_init` runs: XNU's `start.s`
+installs a bootstrap identity map before calling into C. That map covers RAM, and in the emulator the panel sits
+at 0x6C7A0000, above RAM, so the write is unmapped. On the handset the panel is reported at 0x400000, which lies
+inside the DRAM window the ADT declares (0x0 + 0xaf600000), so the same write should be mapped there.
+
+That is the hypothesis the pending handset boot tests. If the bars appear, `arm_init` ran and the mapping
+explanation holds; if they do not, the next instrument must map the framebuffer explicitly (pmap) before drawing,
+which the official documentation's "entry probe" also implies -- its stage 3 is a reset rather than a draw.
+
 ## What is not claimed
 
 - No kernel output had been observed at the time of writing, so **`XNU-entry-tested` is not claimed** for the
