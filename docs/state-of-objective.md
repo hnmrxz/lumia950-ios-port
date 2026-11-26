@@ -226,3 +226,27 @@ asm volatile("msr DAIF, %0" :: "r"(daif) : "memory");     // 最后恢复
 
 主机测试无法执行内联汇编，所以用源码不变量来钉：`scripts/test-diaf-restored.py` 断言"有屏蔽就必须先保存、后恢复，且恢复在屏蔽之后"。
 `preflight` 的 aarch64 编译也重新通过。
+
+## DAIF 修复已在模拟器验证，并把修好的内核装到了手机上
+
+修复后的内核（run 45869127033）用**手机自己的配置**启动本机：
+
+```
+past_bsd_outcome : stopped            （之前是 panicked）
+panic            : None
+bottom 16 rows   : 12,800 亮像素       （绿条仍在）
+dmesg 末段       : dlil_init … skmem_region_init seg_size 16384 …
+```
+
+也就是说：**绿条照旧，而"绿条之后立刻 panic"消失了**，内核继续走到 `dlil_init`/`skmem_region_init` 之后才停在
+`_fleh_synchronous`——一个新的、更靠后的失败，而不是被我们自己的埋点打断。
+
+已把这份内核装到手机上（`scripts/deploy-kernel.py`，旧内核留在 `kernel.macho.prev`）：
+
+```
+H:\EFI\UniXNU\Payloads\kernel.macho        18,921,840 B   sha256 3b65f550…
+H:\EFI\UniXNU\Payloads\kernel.macho.prev   18,822,808 B   sha256 7ae95f48…（上一份，可回滚）
+H:\EFI\UniXNU\Payloads\DEPLOYED.txt        记录这次装的是哪一份
+```
+
+所以下一次开机（不论谁按电源）跑的是**没有 DAIF bug 的内核**：绿条会出现，并且不会因为埋点而立刻崩。

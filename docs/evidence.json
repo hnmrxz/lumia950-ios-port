@@ -620,6 +620,26 @@
         }
       ],
       "limits": "The panic was observed in emulation; what is verified here is the source invariant and that the component still compiles for aarch64 in preflight. The fix itself has not been booted yet."
+    },
+    {
+      "id": "diaf-fix-booted",
+      "what": "With DAIF saved and restored, the kernel no longer panics after painting the bar: it proceeds into dlil_init and skmem_region_init and the bottom bar is still 12,800 pixels",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/diaf-fix/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/diaf-fix/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-diaf-restored.py"
+        }
+      ],
+      "limits": "Emulator only. The kernel that was deployed to the handset is this build (3b65f550), so the next hardware boot exercises the fix, but that boot has not happened."
     }
   ]
 }
