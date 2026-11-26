@@ -50,3 +50,29 @@ kprintf 缓冲下来（这正是 fixture 用 `_panic` 符号判断的原因）�
 
 下一步（小而确定）：用 GDB 在 `_panic` 处停下并读 `x0`（panic 的格式串），把这条信息拿出来——它决定 prelink 这条路
 是否值得继续，也决定第 3 个阻塞项是"我们的 kext 不兼容"还是"合并镜像本身有更早的问题"。
+
+## 合并镜像 panic 的原因读出来了：`!prng_ready` 断言
+
+fixture 在 `_panic` 停下时已经解出了格式串与参数，不必再上 GDB：
+
+```
+panic_format : "%s:%d Assertion failed: %s"
+panic_args   : ['!prng_ready']
+milestones   : arm_vm_init → kernel_bootstrap → source_crypto_bootstrap → iokit_entry
+```
+
+**`!prng_ready`** 的含义是"这里断言 PRNG 还没有初始化"——可是它已经被初始化了。合并镜像里同时存在两份
+corecrypto 初始化路径：
+
+- 框架补丁 `patches/xnu/source-corecrypto14-bootstrap.patch` 在 `STARTUP(EARLY_BOOT, RANK_FIRST)` 里调用
+  `corecrypto_kext_start()`；
+- 合并镜像里还带着 Apple 自己的 `com.apple.kec.corecrypto`（prelink 的 roots 之一）。
+
+于是 PRNG 被初始化两次，后一次撞上 `!prng_ready`。源码内核没有这个问题（同一份补丁只跑一次），这也解释了为什么
+源码镜像能 PASS 而合并镜像不能。
+
+### 这对存储路线的意义
+
+prelink 是**唯一不依赖私有 API** 的第三方 kext 通道，而它必须先通过"合并镜像能启动"这一关。现在的阻塞点非常具体：
+**要避免双重 corecrypto 初始化**——要么让源码补丁在存在 prelinked corecrypto 时不执行，要么给断言加前置判断。
+两者都在框架补丁层，不在本仓库的驱动里。

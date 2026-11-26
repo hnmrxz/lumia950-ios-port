@@ -416,6 +416,26 @@
         }
       ],
       "limits": "Built and structurally checked; never loaded by a kernel yet. The kernel-side call to OSKext::loadFromMkext() is the next step, and nothing here says it will succeed."
+    },
+    {
+      "id": "merged-image-prng-assert",
+      "what": "The merged (prelinked) image panics on the assertion '!prng_ready' after IOKit entry, because both the source crypto bootstrap patch and the prelinked Apple corecrypto initialize the PRNG",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/merged-prng/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/merged-prng/dmesg.txt"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/state-of-objective.md"
+        }
+      ],
+      "limits": "Emulator only. It names the panic precisely; the fix belongs to the framework patch that runs the source crypto bootstrap, not to this port's drivers."
     }
   ]
 }

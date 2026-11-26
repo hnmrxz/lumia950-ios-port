@@ -1,0 +1,113 @@
+[    7.256024]:  vm_cache_geometry_colors: 16
+[    7.257249]: do_cacheid() - 65536 bytes Unknown cache (I:32768 D:32768 (separate)), 16-way assoc, 64 bytes/line
+[    7.266879]: kprintf initialized
+[    7.269886]: initialize_screen: b=6C7A0000, w=00000320, h=00000258, r=00000C80, d=00000000
+[    7.271120]: pe_arm_init_interrupts: args: 0xfffffff007a86720
+[    7.271308]: pe_arm_map_interrupt_controller: soc_phys:  0x0
+[    7.271411]: pe_arm_init_debug: failed to initialize gSocPhys == 0
+[    7.272810]: Darwin Kernel Version 22.6.0: Thu Nov 26 13:57:43 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+[    7.295957]: pmap_startup() init/release time: 14279 microsec
+[    7.296052]: pmap_startup() delayed init/release of 0 pages
+[    7.296473]: vm_page_bootstrap: 112054 free pages, 19018 wired pages, (up to 0 of which are delayed free)
+[    7.308606]: VM boostrap: 51 maps, 153 entries and 128 holes available
+[    7.313166]: Maximum number of VM swap files: 5
+[    7.316893]: gIOKitPageableFixed0    : 0xfffffff03a000000 - 0xfffffff040000000 (96M)
+[    7.317110]: zones                   : 0xfffffff040000000 - 0xfffffff640000000 (24G)
+[    7.317137]: ipc_kernel_map          : 0xfffffff640000000 - 0xfffffff642000000 (32M)
+[    7.317160]: io_submap               : 0xfffffff642000000 - 0xfffffff642800000 (8M)
+[    7.317180]: kmem_sprayqtn_range     : 0xfffffff642800000 - 0xfffffff65066d000 (222M)
+[    7.317201]: gIOKitPageableFixed3    : 0xfffffff65066d000 - 0xfffffff65666d000 (96M)
+[    7.317221]: compressor              : 0xfffffff65666d000 - 0xfffffff69e66e000 (1152M)
+[    7.317241]: kmem_ptr_range_meta     : 0xfffffff69e66e000 - 0xfffffff69e76f000 (1028K)
+[    7.317261]: mb                      : 0xfffffff69e76f000 - 0xfffffff6a276f000 (64M)
+[    7.317281]: zone_meta               : 0xfffffff6a276f000 - 0xfffffff6a88dd000 (97M)
+[    7.317301]: bufferhdr               : 0xfffffff6a88dd000 - 0xfffffff6a8a27000 (1320K)
+[    7.317321]: gIOKitPageableFixed2    : 0xfffffff6a8a27000 - 0xfffffff6aea27000 (96M)
+[    7.317342]: bsd_pageable            : 0xfffffff6aea27000 - 0xfffffff6af2a9000 (8M)
+[    7.317362]: ipc_kernel_copy_map     : 0xfffffff6af2a9000 - 0xfffffff6afaa9000 (8M)
+[    7.317382]: kmem_data_range         : 0xfffffff6afaa9000 - 0xfffffffaa3e5c000 (15G)
+[    7.317402]: gIOKitPageableFixed1    : 0xfffffffaa3e5c000 - 0xfffffffaa9e5c000 (96M)
+[    7.317422]: kmem_ptr_range          : 0xfffffffaa9e5c000 - 0xfffffffbffdfc000 (5G)
+[    7.324469]: kmem_large_ranges[1]    : 0 - 0 (0B)
+[    7.324531]: kmem_large_ranges[2]    : 0 - 0 (0B)
+[    7.324550]: kmem_large_ranges[3]    : 0 - 0 (0B)
+[    7.324569]: kmem_large_ranges[4]    : 0xfffffff6443cda00 - 0xfffffff65066d000 (194M)
+[    7.324589]: kmem_large_ranges[5]    : 0xfffffff72e31f600 - 0xfffffffaa3e5c000 (13G)
+[    7.325116]: "vm_compressor_mode" is 8
+[    7.325208]: mapping deprecated VM_PAGER_FREEZER_DEFAULT to VM_PAGER_FREEZER_COMPRESSOR_NO_SWAP
+[    7.327416]: zone_init: pgzalloc  0xfffffff040000000:0xfffffff0400df000 (892K) [111 slots]
+[    7.327858]: zone_init: map VM    0xfffffff0400df000:0xfffffff126723000 (3686M)
+[    7.328022]: zone_init: map RO    0xfffffff126723000:0xfffffff1733e4000 (1228M)
+[    7.328096]: zone_init: map GEN0  0xfffffff1733e4000:0xfffffff259a29000 (3686M)
+[    7.328202]: zone_init: map GEN1  0xfffffff259a29000:0xfffffff34006e000 (3686M)
+[    7.328271]: zone_init: map GEN2  0xfffffff34006e000:0xfffffff4266b3000 (3686M)
+[    7.328333]: zone_init: map GEN3  0xfffffff4266b3000:0xfffffff50ccf8000 (3686M)
+[    7.328457]: zone_init: map DATA  0xfffffff50ccf8000:0xfffffff640000000 (4915M)
+[    7.328609]: zone_init: metadata  0xfffffff6a277f000:0xfffffff6a877f000 (96M)
+[    7.328656]: zone_init: metabits  0xfffffff6a877f000:0xfffffff6a88cd000 (1336K)
+[    7.328694]: zone_init: extra     0:0 (0B)
+[    7.335624]: VM bootstrap done: 39 maps, 112 entries and 116 holes left
+[    7.371478]: IOKit IOMD setownership ENABLED
+[    7.371624]: ATM subsystem is initialized
+[    7.379524]: Log queues configured: slot count: 8, per-slot size: 32768, total size: 262144
+[    7.381005]: Firehose configured: 16 chunks, 8 io pages
+[    7.381561]: OSLog stream configured: stream: 8192 bytes, cache: 2112 bytes
+[    7.381596]: OSLog stream verification: 0
+[    7.381835]: Long logs support configured: size: 16384
+[    7.382269]: Telemetry: Sampling all tasks once per 1 second
+[    7.382601]: Scheduler: Default of clutch
+[    7.382664]: Setting scheduler priority decay band limit 18
+[    7.383671]: standard timeslicing quantum is 10000 us
+[    7.383763]: standard background quantum is 2500 us
+[    7.385677]: mig_table_max_displ = 54 mach_kobj_count = 371
+[    7.388205]: BANK subsystem is initialized
+[    7.427770]: Registered coredump handler for kernel
+[    7.427969]: Serial requested, consistent debug disabled or debug boot arg not present, configuring debugging over serial
+[    7.428000]: Initializing serial KDP
+[    7.430286]: corecrypto_kext_start (tracing disabled)
+[    7.430484]: FIPSPOST_KEXT [142577425] fipspost_post:141: [FIPSPOST][Module-ID] Apple corecrypto Module v14.0 [Apple ARM, Kernel, Software, SL1]
+[    7.433710]: FIPSPOST_KEXT [142639107] fipspost_post:149: PASSED: (2 ms) - fipspost_post_hmac
+[    7.486780]: FIPSPOST_KEXT [143647975] fipspost_post:153: PASSED: (52 ms) - fipspost_post_integrity
+[    7.490198]: FIPSPOST_KEXT [143713050] fipspost_post:157: PASSED: (3 ms) - fipspost_post_indicator
+[    7.491378]: FIPSPOST_KEXT [143735471] fipspost_post:158: PASSED: (1 ms) - fipspost_post_aes_ecb
+[    7.493954]: FIPSPOST_KEXT [143784344] fipspost_post:159: PASSED: (2 ms) - fipspost_post_aes_cbc
+[    7.514572]: FIPSPOST_KEXT [144176103] fipspost_post:160: PASSED: (20 ms) - fipspost_post_rsa_sig
+[    7.585505]: FIPSPOST_KEXT [145523721] fipspost_post:161: PASSED: (70 ms) - fipspost_post_ecdsa
+[    7.591219]: FIPSPOST_KEXT [145632325] fipspost_post:162: PASSED: (5 ms) - fipspost_post_ecdh
+[    7.593098]: FIPSPOST_KEXT [145668140] fipspost_post:163: PASSED: (1 ms) - fipspost_post_aes_ccm
+[    7.594552]: FIPSPOST_KEXT [145695773] fipspost_post:164: PASSED: (1 ms) - fipspost_post_aes_cmac
+[    7.595141]: FIPSPOST_KEXT [145707030] fipspost_post:165: PASSED: (0 ms) - fipspost_post_hkdf
+[    7.625139]: FIPSPOST_KEXT [146276898] fipspost_post:166: PASSED: (29 ms) - fipspost_post_pbkdf
+[    7.626220]: FIPSPOST_KEXT [146297469] fipspost_post:167: PASSED: (0 ms) - fipspost_post_drbg_hmac
+[    7.626734]: FIPSPOST_KEXT [146307261] fipspost_post:169: PASSED: (0 ms) - fipspost_post_kdf_ctr
+[    7.628097]: FIPSPOST_KEXT [146333167] fipspost_post:170: PASSED: (1 ms) - fipspost_post_kdf_ctr_cmac
+[    7.629446]: FIPSPOST_KEXT [146358700] fipspost_post:171: PASSED: (1 ms) - fipspost_post_aes_gcm
+[    7.630126]: FIPSPOST_KEXT [146371738] fipspost_post:172: PASSED: (0 ms) - fipspost_post_aes_xts
+[    7.631109]: FIPSPOST_KEXT [146390428] fipspost_post:173: PASSED: (0 ms) - fipspost_post_tdes_ecb
+[    7.632886]: FIPSPOST_KEXT [146424138] fipspost_post:174: PASSED: (1 ms) - fipspost_post_drbg_ctr
+[    7.632957]: FIPSPOST_KEXT [146425600] fipspost_post:186: all tests PASSED (200 ms)
+[    7.636106]: corecrypto_kext_start completed successfully
+[    7.636556]: iBoot version: 
+[    7.636592]: iBoot Stage 2 version: 
+[    7.703323]: corecrypto_kext_start (tracing disabled)
+[    7.703550]: FIPSPOST_KEXT [147765480] fipspost_post:152: [FIPSPOST][Module-ID] Apple corecrypto Module v13.0 [Apple ARM, Kernel, Software, SL1]
+[    7.707267]: FIPSPOST_KEXT [147837163] fipspost_post:160: PASSED: (3 ms) - fipspost_post_hmac
+[    7.709981]: FIPSPOST_KEXT [147888823] fipspost_post:164: PASSED: (2 ms) - fipspost_post_integrity
+[    7.713487]: FIPSPOST_KEXT [147955015] fipspost_post:168: PASSED: (3 ms) - fipspost_post_indicator
+[    7.714385]: FIPSPOST_KEXT [147972559] fipspost_post:169: PASSED: (0 ms) - fipspost_post_aes_ecb
+[    7.715136]: FIPSPOST_KEXT [147986867] fipspost_post:170: PASSED: (0 ms) - fipspost_post_aes_cbc
+[    7.732787]: FIPSPOST_KEXT [148322230] fipspost_post:171: PASSED: (17 ms) - fipspost_post_rsa_sig
+[    7.778756]: FIPSPOST_KEXT [149195378] fipspost_post:172: PASSED: (45 ms) - fipspost_post_ecdsa
+[    7.781219]: FIPSPOST_KEXT [149242400] fipspost_post:173: PASSED: (2 ms) - fipspost_post_ecdh
+[    7.783153]: FIPSPOST_KEXT [149279151] fipspost_post:174: PASSED: (1 ms) - fipspost_post_aes_ccm
+[    7.784423]: FIPSPOST_KEXT [149303344] fipspost_post:175: PASSED: (1 ms) - fipspost_post_aes_cmac
+[    7.785102]: FIPSPOST_KEXT [149316246] fipspost_post:176: PASSED: (0 ms) - fipspost_post_hkdf
+[    7.814889]: FIPSPOST_KEXT [149882086] fipspost_post:177: PASSED: (29 ms) - fipspost_post_pbkdf
+[    7.815954]: FIPSPOST_KEXT [149902388] fipspost_post:178: PASSED: (0 ms) - fipspost_post_drbg_hmac
+[    7.816642]: FIPSPOST_KEXT [149915440] fipspost_post:180: PASSED: (0 ms) - fipspost_post_kdf_ctr
+[    7.818210]: FIPSPOST_KEXT [149945251] fipspost_post:181: PASSED: (1 ms) - fipspost_post_aes_gcm
+[    7.819296]: FIPSPOST_KEXT [149965926] fipspost_post:182: PASSED: (0 ms) - fipspost_post_aes_xts
+[    7.820530]: FIPSPOST_KEXT [149989259] fipspost_post:183: PASSED: (1 ms) - fipspost_post_tdes_ecb
+[    7.822638]: FIPSPOST_KEXT [150029386] fipspost_post:184: PASSED: (1 ms) - fipspost_post_drbg_ctr
+[    7.822711]: FIPSPOST_KEXT [150030932] fipspost_post:206: all tests PASSED (118 ms)
+
