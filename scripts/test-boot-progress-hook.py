@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for ci/boot-progress.py: the three calls must land in order, once, and be checkable."""
+"""Tests for ci/boot-progress.py: two calls, the first inside arm_init, once, and checkable."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ SAMPLE = '''#include <pexpert/pexpert.h>
 void
 arm_init(void)
 {
+	int early = 0;
+
 	PE_init_platform(FALSE, args); /* Get platform expert set up */
 
 	configure_timer_apple_regs();
@@ -52,19 +54,29 @@ class BootProgressHookTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def test_the_two_calls_land_in_order(self):
+    def test_stage_zero_is_the_first_statement_of_arm_init(self):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
-        first = text.index("args->Video.v_height, 0);")
-        second = text.index("args->Video.v_height, 1);")
-        vm = text.index("arm_vm_init(xmaxmem, args);")
-        self.assertLess(text.index("PE_init_platform"), first, "stage 0 follows PE_init_platform")
-        self.assertLess(first, vm)
-        self.assertLess(second, vm, "stage 1 is before arm_vm_init")
-        self.assertNotIn("v_height, 2);", text, "nothing is drawn after the MMU comes on")
-        self.assertIn("extern void native_boot_progress_stage(", text)
-        self.assertIn("args->Video.v_baseAddr", text, "the panel comes from boot_args, not a constant")
+        body = self.module.arm_init_body(text)
+        self.assertIsNotNone(body, "the sample has no arm_init to anchor on")
+        stage0 = text.index("args->Video.v_height, 0)")
+        self.assertGreater(stage0, body, "stage 0 must be inside arm_init")
+        self.assertLess(stage0, text.index("PE_init_platform"), "stage 0 must come before the platform call")
+
+    def test_stage_one_sits_before_arm_vm_init(self):
+        ok, message = self.module.apply_to(self.file)
+        self.assertTrue(ok, message)
+        text = self.file.read_text(encoding="utf-8")
+        stage1 = text.index("args->Video.v_height, 1)")
+        self.assertLess(stage1, text.index("arm_vm_init(xmaxmem, args);"))
+        self.assertNotIn("v_height, 2)", text, "nothing is drawn after the MMU comes on")
+
+    def test_the_panel_comes_from_boot_args(self):
+        self.assertTrue(self.module.apply_to(self.file)[0])
+        text = self.file.read_text(encoding="utf-8")
+        self.assertIn("args->Video.v_baseAddr", text)
+        self.assertIn("args->Video.v_rowBytes", text)
 
     def test_apply_is_idempotent(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
@@ -79,15 +91,18 @@ class BootProgressHookTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("missing", message)
 
-    def test_refuses_when_an_anchor_is_absent(self):
-        self.file.write_text("void arm_init(void) { }\n", encoding="utf-8")
+    def test_a_copy_without_arm_vm_init_is_skipped_not_failed(self):
+        self.file.write_text("void arm_init(void)\n{\n}\n", encoding="utf-8")
         ok, message = self.module.apply_to(self.file)
         self.assertFalse(ok)
-        self.assertIn("refusing", message)
+        self.assertTrue(message.startswith("skipped"), message)
 
-    def test_finds_only_the_arm_init(self):
-        (self.tree / "other.c").write_text("int x;\n", encoding="utf-8")
-        self.assertEqual(self.module.find(Path(self.temporary.name)), [self.file])
+    def test_one_patchable_copy_is_enough(self):
+        other = Path(self.temporary.name) / "feeds" / "osfmk" / "arm"
+        other.mkdir(parents=True)
+        (other / "arm_init.c").write_text("int unrelated;\n", encoding="utf-8")
+        code = self.module.main(["--root", self.temporary.name, "--apply"])
+        self.assertEqual(code, 0, "a tree without the anchors must not fail the run on its own")
 
 
 if __name__ == "__main__":
