@@ -1,0 +1,137 @@
+{
+  "schema": "lumia950-xnu-entry-emulation-v1",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "ios_userspace_booted": false,
+  "gpu_frame_observed": false,
+  "kernel_sha256": "3b65f5502fbdd02a241d5b8f0ae369256f60a907acdbcf0f791a932310b839e2",
+  "arm_vm_init_entry_observed": true,
+  "arm_vm_init_return_observed": true,
+  "architectural_counter_hz": 19200000,
+  "source_crypto_bootstrap_return_observed": true,
+  "iokit_return_observed": true,
+  "source_crypto_bootstrap_symbols_present": true,
+  "adt_profile": "qemu",
+  "gic_windows": {
+    "distributor": "0x08000000:0x10000",
+    "cpu_interface": "0x08010000:0x10000"
+  },
+  "milestones": [
+    "arm_vm_init_entry",
+    "arm_vm_init_return",
+    "kernel_bootstrap_entry",
+    "source_crypto_bootstrap_entry",
+    "source_crypto_bootstrap_return",
+    "iokit_entry",
+    "iokit_return",
+    "bsd_init_entry"
+  ],
+  "gdb_stop_reply": "T05thread:01;",
+  "arm_vm_init_return_target": "0xfffffff0079ec004",
+  "kernel_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_return_target": "0xfffffff0079c2d04",
+  "source_crypto_status": 0,
+  "iokit_entry_observed": true,
+  "iokit_return_target": "0xfffffff0079c3100",
+  "bsd_init_entry_observed": true,
+  "bsd_init_return_target": "0xfffffff0079c3290",
+  "registers": {
+    "x0": "0xfffffff00714a864",
+    "x1": "0x0",
+    "x2": "0x39d58",
+    "x3": "0xfffffffbe978f9d6",
+    "x4": "0x10",
+    "x5": "0x1",
+    "x6": "0xa",
+    "x7": "0xfffffffbe978f9f0",
+    "x8": "0xfffffff00714a661",
+    "x9": "0x3cb",
+    "x10": "0x39d58",
+    "x11": "0x0",
+    "x12": "0x1000",
+    "x13": "0xfffffff007b59000",
+    "x14": "0x200000110000938",
+    "x15": "0x100000000",
+    "x16": "0x2",
+    "x17": "0x3",
+    "x18": "0x0",
+    "x19": "0xfffffff007a7ff80",
+    "x20": "0xfffffff007b6a000",
+    "x21": "0xfffffff007b0e210",
+    "x22": "0xfffffff007b0e228",
+    "x23": "0x20",
+    "x24": "0x0",
+    "x25": "0xfffffff82c0dd010",
+    "x26": "0xfffffff578dd9498",
+    "x27": "0x0",
+    "x28": "0xfffffff007a7ff80",
+    "x29": "0xfffffffbe978fd00",
+    "x30": "0xfffffff007a47658",
+    "sp": "0xfffffffbe978fce0",
+    "pc": "0xfffffff0079b75ac",
+    "cpsr": "0x60000204"
+  },
+  "system_registers": {
+    "sctlr_el1": "0x3454593d",
+    "cntfrq_el0": "0x124f800",
+    "elr_el1": "0xfffffff007408040",
+    "tcr_el1": "0x22a51a251a",
+    "esr_el1": "0x0",
+    "far_el1": "0x0"
+  },
+  "stop_symbols": [
+    "_panic"
+  ],
+  "pc_symbol": "_panic+0x0",
+  "framebuffer": {
+    "base": "0x6c7a0000",
+    "width": 800,
+    "height": 600,
+    "row_bytes": 3200,
+    "bpp": 32,
+    "bytes": 1920000,
+    "sha256": "21cc7d5c3423f0055692d2f5a02ff5560e854af8add3e7abeeb9d775fed295cf",
+    "top_colours_bgr": [
+      {
+        "bgr": "0f0c0b",
+        "samples": 4753
+      },
+      {
+        "bgr": "000000",
+        "samples": 1374
+      },
+      {
+        "bgr": "00ff00",
+        "samples": 469
+      },
+      {
+        "bgr": "989898",
+        "samples": 393
+      }
+    ]
+  },
+  "dmesg": {
+    "magic": "0x63061",
+    "size": 131072,
+    "bufx": 12424,
+    "bufr": 0,
+    "chars": 12424,
+    "debug_buffer_chars": 0,
+    "sha256": "48faa49e827da355e989463543313ad88c224210dd897ceeab6a7b98801faf04"
+  },
+  "past_bsd_outcome": "root-wait",
+  "root_device_wait_observed": true,
+  "watched": {
+    "_vfs_mountroot": false
+  },
+  "fault_elr_symbol": "_machine_idle+0xf8",
+  "fault_far": "0x0",
+  "panic_format": "Failed to mount root device @%s:%d",
+  "panic_string_args": [
+    "fo\ufffd"
+  ],
+  "wfe_event_index": 4,
+  "clock_info_bytes": "0000000000000000000000000000000000f824010000000000000000000000000100000000000000000000000000000002000000000000000100000000000000000000000000000000f82401000000000000000000000000",
+  "stack_bytes": "61a61407f0ffffffcb0300000000000000a0b607f0ffffff003b9345faffffffb0fd78e9fbffffff388c9207f0ffffff0050955bf0ffffff00201b07f0ffffffc0030000000000000100000000000000e8fd78e9fbffffff5847092c000000003c0000000000000090e49e07f0ffffff0000000000000000e900d21534d4354c00e0b007f0ffffff00000000000000000000000600000000607baf07f0ffffff00571807f0ffffffb7da0d07f0ffffff6ada0d07f0ffffff5dd80d07f0ffffff10e2b007f0ffffff28e2b007f0ffffffd0fe78e9fbffffff1c486b07f0ffffff00400052f0ffffff800c0000000000005802000000000000ccb81807f0ffffff"
+}

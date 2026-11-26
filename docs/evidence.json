@@ -640,6 +640,26 @@
         }
       ],
       "limits": "Emulator only. The kernel that was deployed to the handset is this build (3b65f550), so the next hardware boot exercises the fix, but that boot has not happened."
+    },
+    {
+      "id": "phone-config-reaches-root-wait",
+      "what": "The three files now on the handset -- loader 9d9311b3, config with skmem_sysctl_skip=1, kernel 3b65f550 -- boot in emulation through IOKit into bsd_init, paint the 12,800-pixel bottom bar and stop on 'Failed to mount root device'",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/phone-config/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/phone-config/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/stage-phone-esp.py"
+        }
+      ],
+      "limits": "Emulator only. It is the best configuration this repository knows how to produce; whether the handset executes it is still the open question."
     }
   ]
 }

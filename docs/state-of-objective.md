@@ -250,3 +250,31 @@ H:\EFI\UniXNU\Payloads\DEPLOYED.txt        记录这次装的是哪一份
 ```
 
 所以下一次开机（不论谁按电源）跑的是**没有 DAIF bug 的内核**：绿条会出现，并且不会因为埋点而立刻崩。
+
+## 手机现在的配置：本机跑到 **root-wait**，而且绿条还在
+
+上一轮把修好的内核（`3b65f550`）装进手机后，本机复跑又暴露一个**配置层**的问题：停点是 `_skmem_sysctl_init+0x44`。
+这正是 CI 用 `skmem_sysctl_skip=1` 关掉的那段发布逻辑——而手机的 `args` 里没有它。
+
+把该参数加进 `R:\EFI\UniXNU\unixnu.toml` 后重跑（**用的就是手机上的文件**）：
+
+```
+args = "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1"
+
+past_bsd  : root-wait
+panic     : Failed to mount root device        ← 这正是目标里的"没有根设备"
+milestones: … iokit_return → bsd_init_entry
+bottom 16 rows bright: 12,800                  ← 绿条仍在
+```
+
+### 现在的状态（手机侧的三个文件都是"最好的已知版本"）
+
+| 文件 | 内容 |
+|---|---|
+| `R:\EFI\BOOT\BOOTAA64.EFI` | 真加载器 94,208 B `9d9311b3` |
+| `R:\EFI\UniXNU\unixnu.toml` | `args = "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1"` |
+| `H:\EFI\UniXNU\Payloads\kernel.macho` | 18,921,840 B `3b65f550`（含 DAIF 修复） |
+
+**本机用这套文件启动：穿过 IOKit、进入 `bsd_init`、画出 12,800 像素底部绿条，最后停在"找不到根设备"。**
+
+也就是说：手机若与 QEMU 一致，按下电源应看到绿条并停留在根设备等待——那正是这个目标要跨过去的最后一道门。
