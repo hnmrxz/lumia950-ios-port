@@ -10,53 +10,56 @@
 // the host preflight compiles NativeBootProgress.cpp with nothing but the repository on the include path, and it should
 // stay that way.
 
-#include <libkern/c++/OSKext.h>
+#include <pexpert/pexpert.h>
 
-extern "C" const unsigned char lumia_sdhci_mkext[];
+// The kernel cannot load an mkext from here.
+//
+// OSKext::loadFromMkext() exists in the pinned kernel, but it is a **private** member (OSKext.h, line 509), as is
+// withBooterData(); the compiler refuses the call outright:
+//
+//   error: 'loadFromMkext' is a private member of 'OSKext'
+//
+// The public entry, loadKextWithIdentifier(), looks a bundle up on disk, and this port has no filesystem at bsd_init --
+// that is the very thing the driver would provide. So the container stays embedded and unused until one of these is
+// built:
+//
+//   * a kernel-side request through kmod_control()/OSKext::handleRequest(), whose request format is user-space shaped;
+//   * an entry in the kernel's own __PRELINK_INFO, so the boot path loads the kext the way it loads Apple's;
+//   * a public (or upstreamed) memory-loading entry point.
+//
+// What this file does keep is the diagnostic: it reports that a boot asked for the kext and that the route is not
+// wired yet, so the log says which of the two is missing instead of looking like a silent failure.
+
 extern "C" const unsigned long lumia_sdhci_mkext_size;
 
-namespace {
-
-bool
-has_token(const char *haystack, const char *needle)
+extern "C" int
+lumia_kext_load(const char *command_line)
 {
-    if (haystack == nullptr || needle == nullptr || *needle == '\0') {
-        return false;
+    if (command_line == nullptr || lumia_sdhci_mkext_size == 0UL) {
+        return 0;
     }
-    for (const char *start = haystack; *start != '\0'; ++start) {
-        if (start != haystack && start[-1] != ' ' && start[-1] != '\t') {
+    // "lumia-kext" is a token check, matching the other switches.
+    bool wanted = false;
+    for (const char *start = command_line; *start != '\0'; ++start) {
+        if (start != command_line && start[-1] != ' ' && start[-1] != '\t') {
             continue;
         }
+        const char *candidate = "lumia-kext";
         const char *a = start;
-        const char *b = needle;
+        const char *b = candidate;
         while (*a != '\0' && *b != '\0' && *a == *b) {
             ++a;
             ++b;
         }
         if (*b == '\0' && (*a == '\0' || *a == ' ' || *a == '\t')) {
-            return true;
+            wanted = true;
+            break;
         }
     }
-    return false;
-}
-
-}  // namespace
-
-extern "C" int
-lumia_kext_load(const char *command_line)
-{
-    if (!has_token(command_line, "lumia-kext")) {
+    if (!wanted) {
         return 0;
     }
-    char *log = nullptr;
-    uint32_t log_length = 0;
-    const OSReturn result = OSKext::loadFromMkext(
-        0, const_cast<char *>(reinterpret_cast<const char *>(lumia_sdhci_mkext)),
-        static_cast<uint32_t>(lumia_sdhci_mkext_size), &log, &log_length);
-    IOLog("lumia: OSKext::loadFromMkext returned %d (%lu bytes, %u bytes of log)\n",
-          static_cast<int>(result), lumia_sdhci_mkext_size, log_length);
-    if (log != nullptr && log_length > 0) {
-        IOLog("lumia: %.*s\n", static_cast<int>(log_length), log);
-    }
-    return static_cast<int>(result);
+    kprintf("lumia: %lu bytes of kext container are embedded, but OSKext::loadFromMkext() is private in this kernel; "
+            "the load is not wired yet\n", lumia_sdhci_mkext_size);
+    return 0;
 }

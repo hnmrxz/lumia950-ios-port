@@ -138,3 +138,26 @@ code until `-u _kmod_info` held it.
 What remains for M4 is the load itself: embed the container in the kernel image, call
 `OSKext::loadFromMkext(0, buffer, length, NULL, NULL)` from `bsd_init` behind a switch, and see whether the personality
 matches `sdhci@f9824900`.
+
+### M4 blocker found at compile time: the memory loader is private
+
+Run 45844797948 refused the call outright:
+
+```
+drivers/NativeBootProgress/KextLoad.cpp:53:37: error: 'loadFromMkext' is a private member of 'OSKext'
+```
+
+`OSKext.h` confirms it: `loadFromMkext` (line 509) and `withBooterData` (line 422) are both under `private:`, while the
+public entry `loadKextWithIdentifier()` looks a bundle up **on disk** -- and this port has no filesystem at `bsd_init`,
+which is exactly what the driver is meant to provide.
+
+So the container is built, embedded and checked, but there is nothing public to hand it to. The remaining ways, in the
+order they look affordable:
+
+1. `kmod_control()` / `OSKext::handleRequest()` with a user-space shaped load request -- public entry, heavier protocol;
+2. an entry in the kernel's own `__PRELINK_INFO`, so the boot path loads our kext the way it loads Apple's -- no private
+   API involved, but it means writing prelink info, not just a container;
+3. a public memory-loading entry point, which does not exist at this pin.
+
+Until one of those exists, `KextLoad.cpp` reports the situation on the console rather than pretending to load: a boot
+with `lumia-kext` prints how many bytes are embedded and that the route is not wired.
