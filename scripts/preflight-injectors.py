@@ -41,7 +41,7 @@ SOURCES = {
 "iokit/KernelConfigTables.cpp": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/KernelConfigTables.cpp?ref={REV}",
 }
 
-SNIPPET = r'''
+SNIPPET = r"""
 #include <stdint.h>
 
 struct Boot_Video {
@@ -66,23 +66,37 @@ typedef struct boot_args {
     char CommandLine[1024];
 } boot_args;
 
-extern void native_boot_progress_stage(unsigned long base, unsigned long stride, unsigned long height,
+extern void native_boot_progress_remember(void *base, unsigned long stride, unsigned long height,
+                                          const char *command_line);
+extern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
                                        const char *command_line, int stage);
+extern void native_boot_progress_stage_mapped(int stage);
 
-/* arm_init declares its locals first and then runs statements; the injection has to live among the statements */
+/* arm_init declares its locals first and then runs statements; the injection lives among the statements. */
 static void arm_init_shaped(boot_args *args)
 {
     unsigned int maxmem;
     (void)maxmem;
 
-    native_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, args->Video.v_height,
-                               args->CommandLine, 0);
-    native_boot_progress_stage(args->Video.v_baseAddr, args->Video.v_rowBytes, args->Video.v_height,
-                               args->CommandLine, 1);
+    native_boot_progress_remember((void *)args->Video.v_baseAddr, args->Video.v_rowBytes,
+                                  args->Video.v_height, args->CommandLine);
+    native_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes,
+                               args->Video.v_height, args->CommandLine, 0);
+    native_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes,
+                               args->Video.v_height, args->CommandLine, 1);
 }
 
-void preflight_entry(boot_args *args) { arm_init_shaped(args); }
-'''
+/* bsd_init does the same, and its third bar goes through a mapping we make ourselves. */
+static void bsd_init_shaped(void)
+{
+    int unused = 0;
+
+    native_boot_progress_stage_mapped(2);
+    (void)unused;
+}
+
+void preflight_entry(boot_args *args) { arm_init_shaped(args); bsd_init_shaped(); }
+"""
 
 
 def find_zig() -> str | None:
