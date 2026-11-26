@@ -74,7 +74,7 @@ done
 for application in LumiaProbe LumiaHandoff LumiaGpuProbe LumiaRpmHandoff LumiaGpuPower NativeMmioTest LumiaControlMark; do
   application_objects=("$OUT/objects/ProbeCore.obj")
   if [ "$application" = LumiaControlMark ]; then
-    application_objects=()
+    application_objects+=("$OUT/objects/FramebufferCore.obj")
   fi
   if [ "$application" = LumiaHandoff ]; then
     application_objects+=("$OUT/objects/FramebufferCore.obj")

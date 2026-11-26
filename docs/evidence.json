@@ -292,7 +292,7 @@
         },
         {
           "label": "EFI-tested",
-          "path": "out/control-mark-qemu/report.json"
+          "path": "docs/hardware/control-mark/report.json"
         },
         {
           "label": "source-reviewed",
@@ -312,15 +312,15 @@
       "evidence": [
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-fb/framebuffer.ppm"
+          "path": "docs/hardware/console-emulated/framebuffer.ppm"
         },
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-fb/report.json"
+          "path": "docs/hardware/console-emulated/report.json"
         },
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-fb/dmesg.txt"
+          "path": "docs/hardware/console-emulated/dmesg.txt"
         }
       ],
       "limits": "Emulator only. It shows the same kernel code paints a panel when the platform expert maps it, so a black handset screen is not explained by the kernel never drawing."
@@ -340,7 +340,7 @@
         },
         {
           "label": "EFI-tested",
-          "path": "out/control-mark-qemu/report.json"
+          "path": "docs/hardware/control-mark/report.json"
         }
       ],
       "limits": "One boot, one photograph. It proves the panel takes our writes at these coordinates and that the firmware reports this mode; it says nothing about the kernel, which is loaded later in the chain."
@@ -352,11 +352,11 @@
       "evidence": [
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-bars2-run/report.json"
+          "path": "docs/hardware/staged-fips/bars2-report.json"
         },
         {
           "label": "QEMU-tested",
-          "path": "out/qemu-prev-run/report.json"
+          "path": "docs/hardware/staged-fips/previous-report.json"
         },
         {
           "label": "source-reviewed",

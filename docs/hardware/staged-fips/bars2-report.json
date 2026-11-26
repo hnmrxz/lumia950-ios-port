@@ -1,0 +1,125 @@
+{
+  "schema": "lumia950-xnu-entry-emulation-v1",
+  "emulator_only": true,
+  "handset_boot_observed": false,
+  "ios_userspace_booted": false,
+  "gpu_frame_observed": false,
+  "kernel_sha256": "78e27f091a092f465f3d48feec0aff710d4ca28271adb59599d6893a1657638c",
+  "arm_vm_init_entry_observed": true,
+  "arm_vm_init_return_observed": true,
+  "architectural_counter_hz": 19200000,
+  "source_crypto_bootstrap_return_observed": false,
+  "iokit_return_observed": false,
+  "source_crypto_bootstrap_symbols_present": true,
+  "adt_profile": "qemu",
+  "gic_windows": {
+    "distributor": "0x08000000:0x10000",
+    "cpu_interface": "0x08010000:0x10000"
+  },
+  "milestones": [
+    "arm_vm_init_entry",
+    "arm_vm_init_return",
+    "kernel_bootstrap_entry",
+    "source_crypto_bootstrap_entry"
+  ],
+  "gdb_stop_reply": "T05thread:01;",
+  "arm_vm_init_return_target": "0xfffffff0079d3dbc",
+  "kernel_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_entry_observed": true,
+  "source_crypto_bootstrap_return_target": "0xfffffff0079aaadc",
+  "registers": {
+    "x0": "0xfffffff00713e3d3",
+    "x1": "0x1373ae00040004",
+    "x2": "0x0",
+    "x3": "0xfffffffbf9dad0e8",
+    "x4": "0x0",
+    "x5": "0x0",
+    "x6": "0x74736f705f7473",
+    "x7": "0xd5",
+    "x8": "0x156",
+    "x9": "0xfffffff00713e3fa",
+    "x10": "0x89e7358",
+    "x11": "0x0",
+    "x12": "0x0",
+    "x13": "0x0",
+    "x14": "0x2000001100000e8",
+    "x15": "0x100000000",
+    "x16": "0x2",
+    "x17": "0x3",
+    "x18": "0x0",
+    "x19": "0xfffffff007a48ff8",
+    "x20": "0xfffffff00705c287",
+    "x21": "0xfffffff00716c000",
+    "x22": "0xfffffff007b5d000",
+    "x23": "0xfffffff007b8b988",
+    "x24": "0xfffffff007b8bb80",
+    "x25": "0xfffffff00716c000",
+    "x26": "0xfffffff00705c2a0",
+    "x27": "0x0",
+    "x28": "0x0",
+    "x29": "0xfffffff7bd80be30",
+    "x30": "0xfffffff00797e110",
+    "sp": "0xfffffff7bd80bcc0",
+    "pc": "0xfffffff00799f384",
+    "cpsr": "0x400003c4"
+  },
+  "system_registers": {
+    "sctlr_el1": "0x3454593d",
+    "cntfrq_el0": "0x124f800",
+    "elr_el1": "0x6fdf74ac",
+    "tcr_el1": "0x22a51a251a",
+    "esr_el1": "0x0",
+    "far_el1": "0x0"
+  },
+  "stop_symbols": [
+    "_panic"
+  ],
+  "pc_symbol": "_panic+0x0",
+  "framebuffer": {
+    "base": "0x6c7a0000",
+    "width": 800,
+    "height": 600,
+    "row_bytes": 3200,
+    "bpp": 32,
+    "bytes": 1920000,
+    "sha256": "6cf0f4c1cb9dafedf694c21d9e7a0220099ef54900e041cdc7c8ccdd843b7b9b",
+    "top_colours_bgr": [
+      {
+        "bgr": "0f0c0b",
+        "samples": 4945
+      },
+      {
+        "bgr": "000000",
+        "samples": 1376
+      },
+      {
+        "bgr": "00ff00",
+        "samples": 469
+      },
+      {
+        "bgr": "989898",
+        "samples": 391
+      }
+    ]
+  },
+  "dmesg": {
+    "magic": "0x63061",
+    "size": 131072,
+    "bufx": 7351,
+    "bufr": 0,
+    "chars": 7351,
+    "debug_buffer_chars": 0,
+    "sha256": "1e0b241feac7f347c47b960a2cddcfcf05ba8d736c027b9d186435c8cf6691c9"
+  },
+  "past_bsd_outcome": "panicked",
+  "watched": {
+    "_vfs_mountroot": false
+  },
+  "fault_elr_symbol": null,
+  "fault_far": "0x0",
+  "panic_format": "\"FIPS Kernel POST Failed (%d)!\" @%s:%d",
+  "wfe_event_index": 4,
+  "clock_info_bytes": "0000000000000000000000000000000000f824010000000000000000000000000100000000000000000000000000000002000000000000000100000000000000000000000000000000f82401000000000000000000000000",
+  "stack_bytes": "e6f7ffff00000000fae31307f0ffffff5601000000000000e09e8abcf1ffffff0060a407f0ffffff40b08abcf1ffffff80e2a907f0ffffffe09e8abcf1ffffff0000000000000000000000000000000070bd80bdf7ffffff00202007f0ffffff00202007f0ffffff0411f707f0ffffff1e150d07f0ffffff0010f707f0ffffff71c20507f0ffffff38be80bdf7ffffff10be80bdf7fffffff8269307f0ffffff00000000070000003011f707f0ffffff0500000000000000800da907f0ffffffe0bd80bdf7fffffffcd02e07f0ffffff00000000000000000000000000000000a0c20507f0ffffff00c01607f0ffffff30be80bdf7ffffffc42e9307f0ffffff",
+  "source_crypto_status": 5
+}
