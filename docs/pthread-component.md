@@ -78,18 +78,19 @@ That leaves exactly the two ways out listed above, and neither is a configuratio
 ## Where the two-pass attempt stands
 
 The records pass is avoidable: building once with the component removed creates records and archives
-(run 45231105748 printed 
+(run 45231105748 printed
 ecords and archives exist), and the second build never prints
 ootstrap pass for the compile records.
 
-What still stops it is the builder's own revision check. Its SOURCE is 
+What still stops it is the builder's own revision check. Its SOURCE is
 efer/libpthread **inside
 the build tree**, and that clone is created (or re-created) by the second build, so:
 
 - copying the upstream builder into unixnu/scripts and the device tree is not enough by itself;
 - checking the tree reference out to the Darwin 22 commit prints 	ree reference now at ba8e1488
   and the builder still answers Unexpected libpthread source revision (run 45237654171);
-- rewriting eeds.toml in the two places tried did nothing, because neither file named the Darwin 23
+- rewriting
+eeds.toml in the two places tried did nothing, because neither file named the Darwin 23
   tag (libpthread-519.120.4) that the feed reports in the logs (run 45240055584).
 
 The next step is therefore to find where that revision actually comes from: the log line is

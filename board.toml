@@ -26,6 +26,7 @@ defconfig = "lumia950_defconfig"
 # platform expert that consumes the ADT; ArmCpu owns the CPU, timer and interrupt path;
 # NativeSdhci is this device's eMMC driver (see drivers/NativeSdhci and README.md).
 archives = [
+  "build-libpthread-kernel.py",
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
@@ -44,7 +45,8 @@ archives = [
   # so the kernel needs the symbol even with the flag off. The defconfig force-loads
   # this archive through XNU_EXTRA_LD_ARCHIVES.
   "build-arm-driver.py NativeLegacyDisplay",
-  # "build-arm-driver.py NativeRamBlock",   # Data volume; also needs the virtio bindings builder
+  "build-arm-driver.py NativeRamBlock",   # synthetic root media for the vfs_mountroot rung
+"build-arm-driver.py NativeBootProgress",  # framebuffer progress instrument
 ]
 # Components whose archive cannot be linked into the source kernel yet, with the reason. The link
 # checker reads this map, so an exclusion is a recorded decision rather than a silent omission.
@@ -56,6 +58,7 @@ archives = [
 # image, and `kernel-linked` is not claimed for it.
 [kernel.link_excluded]
 NativeSdhci = "subclasses IOBlockStorageDevice from IOStorageFamily, which only exists after the prelink merge"
+NativeRamBlock = "subclasses IOBlockStorageDevice from IOStorageFamily, which only exists after the prelink merge"
 
 # TODO: obtain the real userdata GPT geometry (first_lba, last_lba) read-only from the phone.
 

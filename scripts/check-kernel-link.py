@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # the link dropped it; both are the failure this file exists for. board.toml's [kernel] archives
 # list is the single source when it is readable; this is the fallback.
 DEFAULT_EXPECTED = ("ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeLegacyDisplay", "NativeMdss",
-                    "NativeAdreno418")
+                    "NativeAdreno418", "NativeRamBlock", "NativeBootProgress")
 
 # Not every component exports a symbol named after itself. The driver classes are C++ and land in
 # the table as `__ZN11NativeSdhci...`, but NativeLegacyDisplay is a C entry point called by
@@ -37,6 +37,7 @@ DEFAULT_EXPECTED = ("ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeLegacyDispl
 # needles is found.
 SYMBOL_ALIASES = {
     "NativeLegacyDisplay": ("NativeLegacyDisplay", "native_legacy_display_probe"),
+    "NativeBootProgress": ("NativeBootProgress", "native_boot_progress_stage"),
 }
 
 
@@ -167,8 +168,11 @@ def main() -> int:
         enabled = {line.strip() for line in args.config.read_text().splitlines()
                    if line.strip().startswith("CONFIG_")}
         if "CONFIG_XNU_SOURCE_PTHREAD=y" in enabled:
-            providers = ("pthread_start", "source_pthread_bootstrap")
-            missing = [name for name in providers if not find(dump, name)]
+            # Checked through the component's global symbols: the entry point is emitted as a
+            # non-external __startup_EARLY_BOOT_entry_source_pthread_bootstrap_NN into
+            # __BOOTDATA,__init_entry_set, which an `nm -gU --defined-only` dump does not list.
+            providers = ("pthread_init", "pthread_find_owner")
+            missing = [name for name in providers if name not in dump]
             if missing:
                 fail(f"{source} does not link {', '.join(missing)} although "
                      f"{args.config.name} sets CONFIG_XNU_SOURCE_PTHREAD=y: the source pthread "

@@ -1,0 +1,22 @@
+{
+  "schema": "lumia950-control-mark-qemu-v1",
+  "application_sha256": "61704b7bc876494f261fe8f61a14a367a363e0c6b6b578442b162a7277288b18",
+  "panel": {
+    "width": 800,
+    "height": 600
+  },
+  "bars_expected_rgb": [
+    [
+      224,
+      48,
+      48
+    ],
+    [
+      224,
+      192,
+      48
+    ]
+  ],
+  "bars_found": true,
+  "emulator_only": true
+}

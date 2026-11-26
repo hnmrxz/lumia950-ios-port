@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>org.unixnu.NativeRamBlock</string>
+  <key>CFBundleName</key><string>NativeRamBlock</string>
+  <key>CFBundleExecutable</key><string>NativeRamBlock</string>
+  <key>CFBundlePackageType</key><string>KEXT</string>
+  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>OSBundleRequired</key><string>Root</string>
+  <key>IOKitPersonalities</key><dict>
+    <!-- IOResources: the provider that exists in every boot, for a device with no hardware behind it. -->
+    <key>Lumia 950 root media (resources)</key><dict>
+      <key>IOClass</key><string>NativeRamBlock</string>
+      <key>IOProviderClass</key><string>IOResources</string>
+      <key>IOProbeScore</key><integer>800</integer>
+    </dict>
+    <!-- Kept as a second chance: the platform node by class, without a name match. -->
+    <key>Lumia 950 root media (platform)</key><dict>
+      <key>IOClass</key><string>NativeRamBlock</string>
+      <key>IOProviderClass</key><string>IOPlatformExpertDevice</string>
+      <key>IOProbeScore</key><integer>500</integer>
+    </dict>
+  </dict>
+</dict></plist>

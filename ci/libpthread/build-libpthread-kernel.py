@@ -27,6 +27,27 @@ for patch in sorted((ROOT / 'patches/libpthread').glob('*.patch')):
     if subprocess.run(['git', '-C', WORK, 'apply', '--reverse', '--check', patch],
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         subprocess.run(['git', '-C', WORK, 'apply', patch], check=True)
+# Darwin 22 adaptation. These sources are written against the Darwin 23 kernel, which has a
+# `policy_bootarg` tunable; this port's kernel is Darwin 22 and does not. The single assignment is
+# dropped, so the default policy is kept. The substitution is keyed on the exact statement instead of
+# a git context, because a patch file would fail whenever Apple's surrounding lines differ.
+adaptation = WORK / 'kern/kern_support.c'
+if adaptation.exists():
+    text = adaptation.read_text()
+    needle = 'pthread_mutex_default_policy = policy_bootarg;'
+    if needle in text:
+        text = text.replace(
+            needle,
+            '/* policy_bootarg is a Darwin 23 tunable; this kernel is Darwin 22 */')
+    # `proc_get_jit_entitled` is a Darwin 23 accessor in the kernel pthread interface; Darwin 22 has
+    # no such member. Treating the process as not JIT-entitled keeps the default workqueue policy.
+    needle = 'pthread_kern->proc_get_jit_entitled(p)'
+    if needle in text:
+        text = text.replace(
+            needle,
+            '0 /* proc_get_jit_entitled is Darwin 23 only; this kernel is Darwin 22 */')
+    adaptation.write_text(text)
+
 SOURCE = WORK
 OUT = ROOT / 'build/libpthread-kernel'
 OUT.mkdir(parents=True, exist_ok=True)

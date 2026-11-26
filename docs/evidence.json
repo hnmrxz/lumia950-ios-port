@@ -228,6 +228,142 @@
         }
       ],
       "note": "Generated and checked by scripts/check-adt.py and the validate job; no recorded run."
+    },
+    {
+      "id": "xnu-bsd-init-crossed",
+      "what": "The source pthread component links and bsd_init returns: the emulated boot reaches dlil_init and socket memory setup (past_bsd_outcome stopped, not panicked)",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/ci/RUNS.md",
+          "run": "45314032032"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/libpthread/build-libpthread-kernel.py"
+        }
+      ]
+    },
+    {
+      "id": "handset-chain-boot",
+      "what": "The chain booting on the handset: firmware, the deployment tool's ARM32 BootShim, its UEFI.elf, this port's EFI\\BOOT\\BOOTAA64.EFI loader, the UniXNU 0.1.0 menu, and DarwinBoot's hand-off with the kernel read from MainOS over the staged NTFS driver and the real 1080x1920 panel",
+      "label": "hardware-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "scripts/phone-install.py"
+        },
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/2026-11-26-first-hardware-boot.md"
+        }
+      ],
+      "note": "Screen readings only, 2026-11-26: the UniXNU menu reported 'drivers 2 loaded / 0 failed kits 0 acpi 0' and DarwinBoot reported ARM64 va=0xFFFFFFF004004000 pa=0x27004000, video 1080x1920 row 4320 32 bpp at 0x400000, CurrentEL 1, then 'hand-off to the kernel'. No kernel line was observed after the hand-off, so XNU-entry-tested is not claimed and userland is not claimed."
+    },
+    {
+      "id": "handset-adt-emulated-bringup",
+      "what": "The device tree this port ships to the phone, carried through emulation without the QEMU rewrite: arm_vm_init entry and return, kernel bootstrap, and source-provider initialisation, stopping only on a deliberately provoked FIPS integrity check",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/handset-adt-emulated-bringup/dmesg.txt"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/handset-adt-emulated-bringup/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/make-lumia950-adt.py"
+        }
+      ],
+      "limits": "Emulator only, and the run omitted --crypto-post on purpose, which is why the FIPS check failed. This says the tree is good enough to reach BSD initialisation; it says nothing about the handset."
+    },
+    {
+      "id": "loader-control-mark-emulated",
+      "what": "A loader-side control mark: an AArch64 EFI application that draws the same two bars, at the same coordinates and colours, that the kernel instrument would have drawn, then holds the screen so it can be read back from QMP",
+      "label": "EFI-tested",
+      "evidence": [
+        {
+          "label": "EFI-tested",
+          "path": "docs/hardware/control-mark/qemu-panel.ppm"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "docs/hardware/control-mark/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe/LumiaControlMark.c"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/check-control-mark-qemu.py"
+        }
+      ],
+      "limits": "Emulator only. The check found bar 0 exactly at row 120 in colour 0xE03030 and bar 1 at row 140 in 0xE0C030 on an 800x600 panel. It proves the application and its coordinates, not the handset panel."
+    },
+    {
+      "id": "xnu-video-console-emulated",
+      "what": "The kernel's own video console writing to the frame buffer in emulation: the frame buffer dump after BSD initialisation holds 3,795 bright pixels in a monospaced text pattern on a black 800x600 panel",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/console-emulated/framebuffer.ppm"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/console-emulated/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/console-emulated/dmesg.txt"
+        }
+      ],
+      "limits": "Emulator only. It shows the same kernel code paints a panel when the platform expert maps it, so a black handset screen is not explained by the kernel never drawing."
+    },
+    {
+      "id": "handset-control-mark",
+      "what": "The loader-side control mark running on the handset: two bars at y=120 (red) and y=140 (yellow) on a panel the firmware reports as 1080x1920, stride 1080 pixels, BGR, frame buffer at 0x400000",
+      "label": "hardware-tested",
+      "evidence": [
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/control-mark/handset-photo.jpg"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "tools/uefi-probe/LumiaControlMark.c"
+        },
+        {
+          "label": "EFI-tested",
+          "path": "docs/hardware/control-mark/report.json"
+        }
+      ],
+      "limits": "One boot, one photograph. It proves the panel takes our writes at these coordinates and that the firmware reports this mode; it says nothing about the kernel, which is loaded later in the chain."
+    },
+    {
+      "id": "staged-image-fips-post",
+      "what": "Both a staged kernel with the new post-MMU bar and the previous staged kernel panic in the emulator at fipspost_post_integrity (-74), so staging, not this round's injection, breaks the crypto POST",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/staged-fips/bars2-report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/staged-fips/previous-report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/stage-native-bringup.py"
+        }
+      ],
+      "limits": "Emulator only, and it says nothing about the handset except this: the image this port stages for the phone is not the image CI validates, and it fails the kernel's own integrity POST before bsd_init."
     }
   ]
 }

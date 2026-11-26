@@ -1,0 +1,90 @@
+[    7.158496]:  vm_cache_geometry_colors: 16
+[    7.159937]: do_cacheid() - 65536 bytes Unknown cache (I:32768 D:32768 (separate)), 16-way assoc, 64 bytes/line
+[    7.171366]: kprintf initialized
+[    7.174771]: initialize_screen: b=6C7A0000, w=00000320, h=00000258, r=00000C80, d=00000000
+[    7.176212]: pe_arm_init_interrupts: args: 0xfffffff007a86720
+[    7.176402]: pe_arm_map_interrupt_controller: soc_phys:  0x0
+[    7.176516]: pe_arm_init_debug: failed to initialize gSocPhys == 0
+[    7.178216]: Darwin Kernel Version 22.6.0: Thu Nov 26 08:03:27 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+[    7.210598]: pmap_startup() init/release time: 21433 microsec
+[    7.210744]: pmap_startup() delayed init/release of 0 pages
+[    7.211269]: vm_page_bootstrap: 125082 free pages, 5990 wired pages, (up to 0 of which are delayed free)
+[    7.228450]: VM boostrap: 51 maps, 153 entries and 128 holes available
+[    7.237061]: Maximum number of VM swap files: 5
+[    7.242771]: zones                   : 0xfffffff02e800000 - 0xfffffff62e800000 (24G)
+[    7.243358]: gIOKitPageableFixed0    : 0xfffffff62e800000 - 0xfffffff634800000 (96M)
+[    7.243427]: mb                      : 0xfffffff634800000 - 0xfffffff638800000 (64M)
+[    7.243460]: kmem_sprayqtn_range     : 0xfffffff638800000 - 0xfffffff64802c000 (248M)
+[    7.243491]: io_submap               : 0xfffffff64802c000 - 0xfffffff64882c000 (8M)
+[    7.243515]: gIOKitPageableFixed1    : 0xfffffff64882c000 - 0xfffffff64e82c000 (96M)
+[    7.243550]: gIOKitPageableFixed2    : 0xfffffff64e82c000 - 0xfffffff65482c000 (96M)
+[    7.243617]: bsd_pageable            : 0xfffffff65482c000 - 0xfffffff6550ae000 (8M)
+[    7.243687]: gIOKitPageableFixed3    : 0xfffffff6550ae000 - 0xfffffff65b0ae000 (96M)
+[    7.243763]: compressor              : 0xfffffff65b0ae000 - 0xfffffff6a30af000 (1152M)
+[    7.243856]: zone_meta               : 0xfffffff6a30af000 - 0xfffffff6a9244000 (97M)
+[    7.243971]: ipc_kernel_copy_map     : 0xfffffff6a9244000 - 0xfffffff6a9a44000 (8M)
+[    7.244050]: bufferhdr               : 0xfffffff6a9a44000 - 0xfffffff6a9bb4000 (1472K)
+[    7.244117]: kmem_ptr_range          : 0xfffffff6a9bb4000 - 0xfffffff802934000 (5G)
+[    7.244158]: kmem_data_range         : 0xfffffff802934000 - 0xfffffffbfdcf9000 (15G)
+[    7.244193]: kmem_ptr_range_meta     : 0xfffffffbfdcf9000 - 0xfffffffbfddfc000 (1036K)
+[    7.244235]: ipc_kernel_map          : 0xfffffffbfddfc000 - 0xfffffffbffdfc000 (32M)
+[    7.256859]: kmem_large_ranges[1]    : 0 - 0 (0B)
+[    7.256982]: kmem_large_ranges[2]    : 0 - 0 (0B)
+[    7.257017]: kmem_large_ranges[3]    : 0 - 0 (0B)
+[    7.257053]: kmem_large_ranges[4]    : 0xfffffff63a705800 - 0xfffffff64802c000 (217M)
+[    7.257093]: kmem_large_ranges[5]    : 0xfffffff881faca00 - 0xfffffffbfdcf9000 (13G)
+[    7.258053]: "vm_compressor_mode" is 8
+[    7.258154]: mapping deprecated VM_PAGER_FREEZER_DEFAULT to VM_PAGER_FREEZER_COMPRESSOR_NO_SWAP
+[    7.261263]: zone_init: pgzalloc  0xfffffff02e800000:0xfffffff02e8f9000 (996K) [124 slots]
+[    7.262369]: zone_init: map VM    0xfffffff02e8f9000:0xfffffff114f3a000 (3686M)
+[    7.262637]: zone_init: map RO    0xfffffff114f3a000:0xfffffff161bfa000 (1228M)
+[    7.263119]: zone_init: map GEN0  0xfffffff161bfa000:0xfffffff24823b000 (3686M)
+[    7.263396]: zone_init: map GEN1  0xfffffff24823b000:0xfffffff32e87c000 (3686M)
+[    7.263793]: zone_init: map GEN2  0xfffffff32e87c000:0xfffffff414ebd000 (3686M)
+[    7.264021]: zone_init: map GEN3  0xfffffff414ebd000:0xfffffff4fb4fe000 (3686M)
+[    7.264294]: zone_init: map DATA  0xfffffff4fb4fe000:0xfffffff62e800000 (4915M)
+[    7.264812]: zone_init: metadata  0xfffffff6a30bf000:0xfffffff6a90bf000 (96M)
+[    7.264901]: zone_init: metabits  0xfffffff6a90bf000:0xfffffff6a9234000 (1492K)
+[    7.264970]: zone_init: extra     0:0 (0B)
+[    7.274499]: VM bootstrap done: 39 maps, 112 entries and 117 holes left
+[    7.325299]: IOKit IOMD setownership ENABLED
+[    7.325472]: ATM subsystem is initialized
+[    7.334435]: Log queues configured: slot count: 8, per-slot size: 32768, total size: 262144
+[    7.336219]: Firehose configured: 16 chunks, 8 io pages
+[    7.336821]: OSLog stream configured: stream: 8192 bytes, cache: 2112 bytes
+[    7.336864]: OSLog stream verification: 0
+[    7.337173]: Long logs support configured: size: 16384
+[    7.337651]: Telemetry: Sampling all tasks once per 1 second
+[    7.338030]: Scheduler: Default of clutch
+[    7.338104]: Setting scheduler priority decay band limit 18
+[    7.339017]: standard timeslicing quantum is 10000 us
+[    7.339075]: standard background quantum is 2500 us
+[    7.341082]: mig_table_max_displ = 54 mach_kobj_count = 371
+[    7.345734]: BANK subsystem is initialized
+[    7.390107]: Registered coredump handler for kernel
+[    7.390286]: Serial requested, consistent debug disabled or debug boot arg not present, configuring debugging over serial
+[    7.390317]: Initializing serial KDP
+[    7.392909]: corecrypto_kext_start (tracing disabled)
+[    7.393154]: FIPSPOST_KEXT [141867603] fipspost_post:141: [FIPSPOST][Module-ID] Apple corecrypto Module v14.0 [Apple ARM, Kernel, Software, SL1]
+[    7.396625]: FIPSPOST_KEXT [141933544] fipspost_post:149: PASSED: (2 ms) - fipspost_post_hmac
+[    7.453805]: FIPSPOST_KEXT [143022032] fipspost_post_integrity:37: MAC generated: 1BE67BA6335E636A10F8698B6C2863CC97311BB5ABF8788AAE27B9BAEBDC2FDC
+[    7.454423]: FIPSPOST_KEXT [143033869] fipspost_post_integrity:38:   In variable: A86410DCE5346F01DD82F8ADE58FA1CCC132E5A853C839A3845F3BCB399ED17B
+[    7.454768]: FIPSPOST_KEXT [143040286] fipspost_post:153: FAILED: fipspost_post_integrity: -74
+[    7.458614]: FIPSPOST_KEXT [143112688] fipspost_post:157: PASSED: (3 ms) - fipspost_post_indicator
+[    7.459973]: FIPSPOST_KEXT [143138651] fipspost_post:158: PASSED: (1 ms) - fipspost_post_aes_ecb
+[    7.462758]: FIPSPOST_KEXT [143191569] fipspost_post:159: PASSED: (2 ms) - fipspost_post_aes_cbc
+[    7.485217]: FIPSPOST_KEXT [143618253] fipspost_post:160: PASSED: (22 ms) - fipspost_post_rsa_sig
+[    7.561505]: FIPSPOST_KEXT [145067600] fipspost_post:161: PASSED: (75 ms) - fipspost_post_ecdsa
+[    7.567518]: FIPSPOST_KEXT [145182001] fipspost_post:162: PASSED: (5 ms) - fipspost_post_ecdh
+[    7.569625]: FIPSPOST_KEXT [145222084] fipspost_post:163: PASSED: (1 ms) - fipspost_post_aes_ccm
+[    7.571585]: FIPSPOST_KEXT [145259351] fipspost_post:164: PASSED: (1 ms) - fipspost_post_aes_cmac
+[    7.572179]: FIPSPOST_KEXT [145270740] fipspost_post:165: PASSED: (0 ms) - fipspost_post_hkdf
+[    7.604455]: FIPSPOST_KEXT [145883550] fipspost_post:166: PASSED: (31 ms) - fipspost_post_pbkdf
+[    7.605710]: FIPSPOST_KEXT [145907711] fipspost_post:167: PASSED: (1 ms) - fipspost_post_drbg_hmac
+[    7.606320]: FIPSPOST_KEXT [145919338] fipspost_post:169: PASSED: (0 ms) - fipspost_post_kdf_ctr
+[    7.607999]: FIPSPOST_KEXT [145951184] fipspost_post:170: PASSED: (1 ms) - fipspost_post_kdf_ctr_cmac
+[    7.609535]: FIPSPOST_KEXT [145980371] fipspost_post:171: PASSED: (1 ms) - fipspost_post_aes_gcm
+[    7.610335]: FIPSPOST_KEXT [145995461] fipspost_post:172: PASSED: (0 ms) - fipspost_post_aes_xts
+[    7.611488]: FIPSPOST_KEXT [146017519] fipspost_post:173: PASSED: (1 ms) - fipspost_post_tdes_ecb
+[    7.613493]: FIPSPOST_KEXT [146055580] fipspost_post:174: PASSED: (1 ms) - fipspost_post_drbg_ctr
+

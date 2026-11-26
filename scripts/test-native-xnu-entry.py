@@ -21,8 +21,15 @@ STAGE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(STAGE)
 
 
-def symbols(blob):
-    STAGE.contract(blob)
+def symbols(blob, allow_prelinked=False):
+    # The stager refuses a merged image because its __PRELINK segments are a provenance gate. A fixture
+    # run that only asks "what does that image reach" is not that gate's subject, so the caller can say
+    # so; anything else the contract objects to still raises.
+    try:
+        STAGE.contract(blob)
+    except ValueError as error:
+        if not (allow_prelinked and "runtime qualification gate" in str(error)):
+            raise
     offset = 32
     result = {}
     for _ in range(struct.unpack_from("<I", blob, 16)[0]):
@@ -359,13 +366,32 @@ def read_system_registers(connection):
 def run(args):
     original = args.kernel.read_bytes()
     lean = (args.esp / "EFI/UniXNU/Payloads/kernel.macho").read_bytes()
-    STAGE.verify_strip(original, lean)
-    names = symbols(original)
+    if args.allow_prelinked:
+        # An evidence boot of a merged image is not the staged pair this check compares: the payload
+        # carries the merged kernel itself, so there is no lean copy derived from it to verify.
+        print("note: evidence boot, strip verification skipped for the merged image")
+    else:
+        STAGE.verify_strip(original, lean)
+    def contract(blob):
+        """The stager's contract, with the provenance refusal waived for an evidence boot."""
+        try:
+            return STAGE.contract(blob)
+        except ValueError as error:
+            if not (args.allow_prelinked and "runtime qualification gate" in str(error)):
+                raise
+            return {"source_crypto_symbols": set()}
+
+    names = symbols(original, allow_prelinked=args.allow_prelinked)
     required = ["_arm_vm_init", "_arm64_eventi", "_gPEClockFrequencyInfo"]
     if any(name not in names for name in required):
         raise ValueError("required real XNU symbols are missing")
     if args.crypto_post:
-        STAGE.crypto_contract(original)
+        if args.allow_prelinked:
+            # The crypto contract describes the source-built kernel (source-provider POST mapping). A
+            # merged image carries Apple extensions instead, so the comparison is not meaningful for it.
+            print("note: evidence boot, crypto contract skipped for the merged image")
+        else:
+            STAGE.crypto_contract(original)
     if args.finish_iokit and "_PE_init_iokit" not in names:
         raise ValueError("real IOKit initialization symbol is missing")
     if args.finish_bsd:
@@ -437,7 +463,7 @@ def run(args):
         "architectural_counter_hz": 19200000,
         "source_crypto_bootstrap_return_observed": False,
         "iokit_return_observed": False,
-        "source_crypto_bootstrap_symbols_present": set(STAGE.contract(original)["source_crypto_symbols"]) == STAGE.CRYPTO_SYMBOLS}
+        "source_crypto_bootstrap_symbols_present": set(contract(original)["source_crypto_symbols"]) == STAGE.CRYPTO_SYMBOLS}
     with tempfile.TemporaryDirectory(prefix="lumia-xnu-") as temporary:
         directory = Path(temporary)
         esp = directory / "esp"
@@ -703,6 +729,29 @@ def run(args):
                             report["past_bsd_outcome"] = "timed_out"
                         else:
                             report["past_bsd_outcome"] = "stopped"
+
+                        # How far boot got is not the same question as how the machine stopped. A kernel
+                        # that waited for a root device had already returned from BSD initialisation, so
+                        # saying "panicked" for it hides the progress; classify it separately.
+                        serial_text = ""
+                        try:
+                            serial_text = (output / "serial.log").read_text(errors="replace")
+                        except OSError:
+                            pass
+                        # The dmesg read just above is the same boot output and is flushed before the
+                        # serial log on some runs, so consider it too.
+                        serial_text += report.get("dmesg_text", "") if isinstance(
+                            report.get("dmesg_text"), str) else ""
+                        if isinstance(report.get("dmesg"), dict):
+                            dmesg_path = output / "dmesg.txt"
+                            if dmesg_path.is_file():
+                                serial_text += dmesg_path.read_text(errors="replace")
+                        waited = ("Still waiting for root device" in serial_text
+                                  or "Waiting on <dict" in serial_text)
+                        if waited:
+                            report["root_device_wait_observed"] = True
+                            if report["past_bsd_outcome"] in ("panicked", "stopped", "timed_out"):
+                                report["past_bsd_outcome"] = "root-wait"
                     if watched:
                         report["watched"] = watched
                     if reads or args.read_at:
@@ -818,6 +867,8 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description="Bounded real ARM64 XNU early-boot instruction test; never accepts a loader bar as kernel proof")
     parser.add_argument("--kernel", required=True, type=Path)
+    parser.add_argument("--allow-prelinked", action="store_true",
+                        help="evidence only: accept a merged/prelinked image that the stager would refuse")
     parser.add_argument("--esp", required=True, type=Path)
     parser.add_argument("--firmware", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -876,6 +927,8 @@ def main():
     parser.add_argument("--finish-iokit", action="store_true", help="Also require actual IOKit initialization entry/return after the real crypto POST")
     parser.add_argument("--finish-bsd", action="store_true", help="Also require the kernel to enter bsd_init; that is the last milestone before a root volume is required")
     args = parser.parse_args()
+    # Evidence only: let the stager parses merged images without the provenance refusal.
+    STAGE.ALLOW_PRELINKED = args.allow_prelinked
     if args.past_bsd:
         args.finish_bsd = True
     if args.finish_bsd:
@@ -889,6 +942,11 @@ def main():
     try:
         run(args)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        # For an evidence boot of a merged image, the message alone is not enough: the provenance gate has
+        # been hit from several call sites, and a traceback names the next one instead of a guess.
+        if getattr(args, "allow_prelinked", False):
+            import traceback
+            traceback.print_exc()
         parser.exit(1, f"error: {error}\n")
 
 

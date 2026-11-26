@@ -221,7 +221,7 @@ jobs:
               scripts/check-oem-scm-profile.py scripts/test-oem-scm-profile.py \
               scripts/test-gicv2-qemu.py scripts/probe_fat.py scripts/test-probe-fat.py
           bash -n scripts/build-payload.sh scripts/build-probe.sh scripts/test-probe.sh scripts/test-gpu.sh scripts/test-storage.sh \
-              scripts/test-gicv2.sh scripts/build-gicv2-test.sh scripts/test-report.sh
+              scripts/test-gicv2.sh scripts/build-gicv2-test.sh scripts/test-report.sh scripts/test-ramblock.sh
 
       - name: Check the chainload payload configuration
         # The keys and enums are the ones UniXNULib/Config.c reads, so a typo fails here
@@ -356,7 +356,7 @@ jobs:
         # bring-up profile from board.toml instead.
         run: |
           python3 scripts/make-lumia950-adt.py --output build/lumia950.adt \
-              --dram-size 0xC0000000 --unique-chip-id 1122334455667788 --chip-id 0x8015 \
+              --dram-size 0xAF600000 --unique-chip-id 1122334455667788 --chip-id 0x8015 \
               --owned-memory-size 0x20000000 \
               --cpu-regs 0,1,2,3,0x100,0x101 --psci-method hvc
           python3 scripts/check-adt.py --profile target build/lumia950.adt
@@ -370,12 +370,20 @@ jobs:
         run: |
           mkdir -p build
           bash scripts/test-storage.sh
+          bash scripts/test-ramblock.sh
           bash scripts/test-gicv2.sh
           bash scripts/test-gpu.sh
           g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeMdss \
               drivers/NativeMdss/Test/check-mdss-core.cpp \
               drivers/NativeMdss/MdssCore.cpp -o build/check-mdss-core
           ./build/check-mdss-core
+          g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeBootProgress \
+              drivers/NativeBootProgress/Test/check-boot-progress-core.cpp -o build/check-boot-progress-core
+          ./build/check-boot-progress-core
+          g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeBootProgress \
+              drivers/NativeBootProgress/Test/check-boot-progress-writes.cpp \
+              drivers/NativeBootProgress/NativeBootProgress.cpp -o build/check-boot-progress-writes
+          ./build/check-boot-progress-writes
 
       - name: Host tests of the firmware probe and framebuffer renderer
         run: bash scripts/test-probe.sh
@@ -582,6 +590,9 @@ jobs:
       # calls are rate limited per IP; shared runner IPs are usually over the limit.
       # ci-tools/sitecustomize.py adds this token to api.github.com requests only.
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # This port runs xnu-8796.141.3 (Darwin 22); the framework's feed pins the
+      # Darwin 23 pthread source, which cannot link against this kernel.
+      UNIXNU_LIBPTHREAD_COMMIT: ba8e1488a0e6848b710c5daad2e226f66cfed656
       PYTHONPATH: ${{ github.workspace }}/ci-tools
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -666,6 +677,93 @@ jobs:
           python3 unixnu fetch xnu libplatform libdispatch AvailabilityVersions \
               libpthread corecrypto-2023 IOStorageFamily -D "$RUNNER_TEMP/device"
 
+      - name: Use upstream's pthread builder, which accepts a named revision
+        # The pin's builder only knows the Darwin 23 component and this port runs the Darwin 22
+        # kernel. The build tree is copied from the device directory, so the builder goes into both.
+        run: |
+          for directory in unixnu/scripts "$RUNNER_TEMP/device/scripts"; do
+            if [ -d "$directory" ]; then
+              cp ci/libpthread/build-libpthread-kernel.py "$directory/build-libpthread-kernel.py"
+              cp ci/libpthread/kernel_target.py "$directory/kernel_target.py"
+              echo "builder installed in $directory"
+            fi
+          done
+
+      - name: Prepare records and build the pthread component out of band
+        # The driver's own records pass cannot link (it runs before any builder exists) and its feed
+        # resolution re-fetches the Darwin 23 pthread source after every attempt to pin it, so neither
+        # can be used. What is left is the two parts that do work: one build without the component
+        # leaves records and archives, and upstream's builder turns the Darwin 22 sources into the
+        # archive the second build links.
+        run: |
+          config=$(find "$RUNNER_TEMP/device" -name 'lumia950_defconfig' -print -quit)
+          board=$(find "$RUNNER_TEMP/device" -name 'board.toml' -print -quit)
+          cp "$config" "$RUNNER_TEMP/defconfig.saved"
+          # The driver may read its configuration from more than one file, so every file in the
+          # device tree that sets the flag is stripped, and the step stops if any survives.
+          for candidate in $(grep -rl 'CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device" 2>/dev/null); do
+            sed -i '' '/^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=/d' "$candidate"
+            echo "stripped the pthread flag from $candidate"
+          done
+          if grep -rqE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device" 2>/dev/null; then
+            echo "::error::the pthread flag survived the strip"
+            grep -rnE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$RUNNER_TEMP/device"
+            exit 1
+          fi
+          sed -i '' '/build-libpthread-kernel.py/d' "$board"
+          if grep -qE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$config"; then
+            echo "::error::the pthread flag survived the strip, so this build would need the archive"
+            grep -nE '^[[:space:]]*CONFIG_XNU_SOURCE_PTHREAD=' "$config"
+            exit 1
+          fi
+          cd unixnu
+          python3 unixnu build kernel -D "$RUNNER_TEMP/device" 2>&1 | tail -12
+          cp "$RUNNER_TEMP/defconfig.saved" "$config"
+          echo "records and archives exist"
+
+          tree="$UNIXNU_OUT/lumia950/tree"
+          reference="$tree/refer/libpthread"
+          [ -d "$reference/.git" ] || { echo "::error::the build tree has no pthread reference"; exit 1; }
+          git -C "$reference" fetch -q --depth 1 origin \
+              refs/tags/libpthread-519.101.1:refs/tags/libpthread-519.101.1
+          git -C "$reference" -c advice.detachedHead=false checkout -q libpthread-519.101.1
+          echo "reference now at $(git -C "$reference" rev-parse HEAD)"
+          cp "$GITHUB_WORKSPACE/ci/libpthread/build-libpthread-kernel.py" "$tree/scripts/build-libpthread-kernel.py"
+          cp "$GITHUB_WORKSPACE/ci/libpthread/kernel_target.py" "$tree/scripts/kernel_target.py"
+          log="$RUNNER_TEMP/pthread-build.log"
+          if ! ( cd "$tree" && UNIXNU_LIBPTHREAD_COMMIT=ba8e1488a0e6848b710c5daad2e226f66cfed656 \
+              python3 scripts/build-libpthread-kernel.py ) >"$log" 2>&1; then
+            # The step's own log is truncated to its tail, so the diagnostic is reprinted here.
+            echo "::error::the pthread component failed to compile; diagnostics below"
+            # The builder writes each object's compiler output next to it and only prints a summary,
+            # so the diagnostic is in build/libpthread-kernel/*.log, not in the captured stdout.
+            for object_log in "$tree"/build/libpthread-kernel/*.log; do
+              [ -f "$object_log" ] || continue
+              echo "--- $(basename "$object_log") ---"
+              grep -n -i -B3 -A6 'error:' "$object_log" | head -40 || true
+            done
+            exit 1
+          fi
+          ls -l "$tree/build/libpthread-kernel"
+
+      # The instrument lives in the kernel, not in the driver archive: arm_init remembers the panel and draws the two
+      # bootstrap bars, bsd_init prints what it can see and draws the post-MMU bar. This step was withdrawn when the
+      # kernel-side bars were shown to fault, and that withdrawal silently removed the instrument from every build
+      # since -- the archive was force-loaded, but nothing called it. Restored, with --check so the edit is verified.
+      - name: Instrument the kernel entry with the bring-up bars
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --check
+
+      - name: Gate the skmem sysctl publication behind a boot argument
+        # The emulated boot stops at _skmem_sysctl_init+0x18 storing through sysctls->version; the object
+        # is the static sk_sys_obj and the address is unmapped in this port's layout. No sk_* boot
+        # argument gates that publication, so the source is edited here, after the tree exists and before
+        # it is compiled, and the edit is verified rather than assumed.
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --check
+
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this
         # 16.7.16 image, and [kernel.prelink] pins the kernelcache the merge consumes. The
@@ -714,6 +812,21 @@ jobs:
           assert report['loadable'] is False, 'the tool no longer marks the candidate unqualified'
           PY
 
+      - name: Look for the pthread component in the image and the link inputs
+        # The gate below says source_pthread_bootstrap did not reach the link; before believing it,
+        # print what the image actually contains and what the archive directory holds.
+        run: |
+          image=$(find "$UNIXNU_OUT" -name 'mach.development.bcm2837.unstripped' -print -quit || true)
+          ls -l "$UNIXNU_OUT/lumia950/tree/build/libpthread-kernel/" || true
+          if [ -n "$image" ]; then
+            echo "--- symbols mentioning pthread ---"
+            nm -m "$image" 2>/dev/null | grep -i pthread | head -20 || echo "(none)"
+            echo "--- force_load of the component in the kernel log ---"
+            grep -o 'force_load[^ ]*libpthread[^ ]*' "$UNIXNU_OUT/lumia950/logs/kernel.log" | head -5 || echo "(not in the log)"
+            echo "--- did the skmem bypass reach the image? ---"
+            nm -m "$image" 2>/dev/null | grep -i 'skmem_sysctl_skip' | head -3 || echo "(not in the image)"
+          fi
+
       - name: The kernel image actually contains the drivers
         # `ar t` proves a member is in an archive; it does not prove the archive is in the link.
         # This reads the linked image's symbol table and the archive list from board.toml, so a
@@ -747,7 +860,8 @@ jobs:
           [ -n "$menu" ] || { echo "::error::the payload artifact has no menu tree"; exit 1; }
           python3 scripts/stage-kernel.py --kernel "$image" \
               --menu-tree "${menu%/EFI/UniXNU/unixnu.toml}" \
-              --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified
+              --out "$esp" --unique-chip-id 1122334455667788 --allow-unqualified \
+              --args "-v keepsyms=1 debug=0x100 cpus=1 skmem_seg_size=16384 skmem_md_seg_size=16384 skmem_drv_buf_seg_size=65536 skmem_usr_buf_seg_size=16384 skmem_sysctl_skip=1"
           # stage-kernel.py renders the menu for the device route; the fixture turns it into
           # the explicit-choice test menu and matches these two lines exactly, so set them here.
           sed -i '' -e 's/^default = .*/default = "exit"/' \
@@ -755,6 +869,104 @@ jobs:
           firmware=$(find "$(brew --prefix qemu)/share" -name 'edk2-aarch64-code.fd' -print -quit)
           [ -n "$firmware" ] || { echo "::error::no AArch64 UEFI firmware from Homebrew QEMU"; exit 1; }
           python3 scripts/test-native-xnu-entry.py --kernel "$image" --esp "$esp"               --firmware "$firmware" --output out/xnu-entry --timeout 240               --crypto-post --finish-iokit --past-bsd --dump-dmesg --dump-boot-args               --adt-profile qemu --smp 2
+
+          # A second boot of the merged image answers a question the source kernel cannot.
+          set +e
+          merged=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit || true)
+          if [ -n "$merged" ]; then
+            esp2="$RUNNER_TEMP/esp-merged"
+            rm -rf "$esp2"
+            mkdir -p "$esp2"
+            # Start from the ESP the gated assertion just staged: it carries the explicit non-autoboot
+            # menu and the ADT the fixture expects, and only the kernel is swapped.
+            cp -r "$esp/." "$esp2"/ || true
+            mkdir -p "$esp2/EFI/UniXNU/Payloads"
+            cp "$merged" "$esp2/EFI/UniXNU/Payloads/kernel.macho"
+            if [ -f "$esp2/EFI/UniXNU/Payloads/kernel.macho" ]; then
+              python3 scripts/test-native-xnu-entry.py --kernel "$merged" --esp "$esp2" \
+                --firmware "$firmware" --output out/xnu-entry-merged --timeout 240 \
+                --past-bsd --dump-dmesg --adt-profile qemu --smp 2 --allow-prelinked || true
+              echo "--- merged image: did a storage media appear? ---"
+              grep -a -m 16 -E 'NativeRamBlock|NativeSdhci|Apple_HFS|root device|!BSD|panic|Panic' \
+                out/xnu-entry-merged/dmesg.txt || echo "(no media line in the merged boot)"
+              # The kernel's msgbuf is not written when the panic comes before it is usable; the emulator's
+              # serial console is, and that is where an early panic says what it was.
+              echo "--- merged image: the serial console ---"
+              grep -a -m 20 -E 'panic|Panic|IOKit|IOStorage|IOPlatform|!BSD|root device|waiting' \
+                out/xnu-entry-merged/serial.log || true
+              echo "--- merged image: last lines of the serial console ---"
+              tail -40 out/xnu-entry-merged/serial.log || echo "(no serial log)"
+            else
+              echo "::warning::the merged image could not be placed in the evidence ESP"
+            fi
+          else
+            echo "::warning::no merged image was produced, so it was not booted"
+          fi
+          set -e
+
+      - name: Stage the source-built kernel for a handset smoke test
+        # Opt-in through `source_kernel_artifact`. What is staged here is this repository's own compile
+        # of the open-source XNU plus its in-tree drivers -- no Apple kernelcache content is merged in,
+        # which is what the public-upload rule is about. It is not the prelinked image: without the
+        # prelink closure some kexts are absent, so a handset may stop earlier than the emulated run.
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        run: |
+          kernel=$(find "$UNIXNU_OUT/lumia950/tree/build/xnu/ios-obj" -name 'mach.development.bcm2837' -print -quit || true)
+          [ -n "$kernel" ] || { echo "::error::no source kernel in the build tree"; exit 1; }
+          out="$GITHUB_WORKSPACE/out/kernel-source"
+          mkdir -p "$out"
+          cp "$kernel" "$out/kernel.macho"
+          python3 scripts/make-lumia950-adt.py --out "$out/kernel.macho.adt" \
+              --soc-base 0xf9000000 --soc-size 0x1000000 2>/dev/null || \
+            echo "::warning::the ADT was not generated; DarwinBoot will need one beside the kernel"
+          sha256sum "$out"/* | tee "$out/SHA256SUMS.txt"
+          ls -l "$out"
+
+      - name: Stage the prelinked image for the handset
+        # The owner asked for the handset path, so this branch publishes the prelinked image too. It
+        # carries extensions merged out of an Apple kernelcache; the main line still never uploads it,
+        # and this step is gated on the probe branch for that reason.
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        run: |
+          prelinked=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit || true)
+          [ -n "$prelinked" ] || { echo "::error::no prelinked image in the output tree"; exit 1; }
+          out="$GITHUB_WORKSPACE/out/handset"
+          mkdir -p "$out"
+          cp "$prelinked" "$out/kernel.macho"
+          python3 scripts/make-lumia950-adt.py --output "$out/kernel.macho.adt" \
+              --dram-size 0xAF600000 --dram-base 0
+          sha256sum "$out"/* | tee "$out/SHA256SUMS.txt"
+          ls -l "$out"
+
+      - name: Upload the prelinked image for the handset
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lumia950-prelinked
+          path: out/handset/**
+          retention-days: 7
+
+      - name: Upload the source-built kernel
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lumia950-kernel-source
+          path: out/kernel-source/**
+          retention-days: 7
+
+      # The gates boot the unstripped image and pass the crypto POST; the staged copy that goes to the phone does
+      # not, because staging rewrites the image and the kernel's own FIPS integrity check then fails before
+      # bsd_init. Publish the image the gates actually booted so a handset test can use exactly that.
+      - name: Upload the unstripped kernel the gates booted
+        if: github.ref_name == 'probe/pthread-darwin22' || inputs.handset_artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: lumia950-kernel-unstripped
+          path: |
+            out/lumia950/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
+            out/lumia950/tree/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Archive what the emulated boot reached
         if: always()
