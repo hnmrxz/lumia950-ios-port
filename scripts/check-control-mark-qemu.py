@@ -28,7 +28,7 @@ from pathlib import Path
 BAR_HEIGHT = 16
 FIRST_BAR_Y = 120
 BAR_STRIDE = 20
-EXPECTED = (0xE03030, 0xE0C030)  # the two colours LumiaControlMark writes
+EXPECTED = ((0xE0, 0x30, 0x30), (0xE0, 0xC0, 0x30))  # red, green, blue the application asks for
 
 
 def read_ppm(path: Path) -> tuple[int, int, list[bytes]]:
@@ -83,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--port", type=int, default=4444)
     parser.add_argument("--settle", type=float, default=12.0, help="seconds to let firmware boot and draw")
+    parser.add_argument("--resolution", default="",
+                        help="force the emulated panel size, for example 1080x1920 (default: firmware's choice)")
     args = parser.parse_args(argv)
 
     if not args.application.is_file():
@@ -98,7 +100,14 @@ def main(argv: list[str] | None = None) -> int:
         log = args.output / "serial.log"
         command = [
             str(args.qemu), "-machine", "virt,gic-version=2", "-cpu", "cortex-a57", "-m", "768",
-            "-bios", str(args.firmware), "-display", "none", "-device", "ramfb",
+            "-bios", str(args.firmware), "-display", "none",
+            # ramfb is the only display this firmware drives reliably. A forced size is attempted through
+            # virtio-gpu, which is documented here as unreliable: with the pinned edk2 image the firmware itself
+            # takes a synchronous exception inside ArmCpuDxe before any application runs, so a failure at a forced
+            # resolution says nothing about the control mark. The handset's 1080x1920 geometry is covered instead
+            # by the host tests in drivers/NativeBootProgress, which check the offsets for stride 4320.
+            "-device", (("virtio-gpu-pci,xres=%s,yres=%s" % tuple(args.resolution.split("x")))
+                        if "x" in args.resolution else "ramfb"),
             "-drive", f"if=none,id=boot,format=raw,readonly=on,file=fat:ro:{esp.parent.parent}",
             "-device", "virtio-blk-pci,drive=boot",
             "-qmp", f"tcp:127.0.0.1:{args.port},server,nowait",
@@ -127,13 +136,12 @@ def main(argv: list[str] | None = None) -> int:
             top = FIRST_BAR_Y + index * BAR_STRIDE
             found = None
             for row in range(max(0, top - 4), min(height, top + BAR_HEIGHT + 4)):
-                red, green, blue = row_colour(rows, row)
-                if (red << 16 | green << 8 | blue) == wanted:
+                if row_colour(rows, row) == wanted:
                     found = row
                     break
             status = "ok  " if found is not None else "FAIL"
             where = f"row {found}" if found is not None else f"nothing at rows {top}..{top + BAR_HEIGHT}"
-            print(f"  {status} bar {index} colour 0x{wanted:06X}: {where}")
+            print(f"  {status} bar {index} rgb{wanted}: {where}")
             if found is None:
                 failures += 1
 
@@ -141,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             "schema": "lumia950-control-mark-qemu-v1",
             "application_sha256": __import__("hashlib").sha256(args.application.read_bytes()).hexdigest(),
             "panel": {"width": width, "height": height},
-            "bars_expected": [f"0x{value:06X}" for value in EXPECTED],
+            "bars_expected_rgb": [list(value) for value in EXPECTED],
             "bars_found": failures == 0,
             "emulator_only": True,
         }, indent=2) + "\n", encoding="utf-8")

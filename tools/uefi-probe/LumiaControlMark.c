@@ -19,7 +19,29 @@
 #define FIRST_BAR_Y 120u
 #define BAR_STRIDE 20u
 
-static const UINT32 kBarColors[3] = { 0x00E03030u, 0x00E0C030u, 0x0030C060u };
+// Colours are carried as red, green, blue and composed according to the GOP's pixel format: a panel that reports
+// blue-green-red order packs the same colour the other way round, and a bar written without that check is the wrong
+// colour (or invisible against the background) on half the machines in the world.
+static const UINT8 kBarColors[3][3] = {
+    { 0xE0, 0x30, 0x30 },
+    { 0xE0, 0xC0, 0x30 },
+    { 0x30, 0xC0, 0x60 },
+};
+
+static UINT32
+ComposeColor(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINT32 stage)
+{
+    const UINT8 red = kBarColors[stage][0];
+    const UINT8 green = kBarColors[stage][1];
+    const UINT8 blue = kBarColors[stage][2];
+    switch (gop->Mode->Info->PixelFormat) {
+    case PixelRedGreenBlueReserved8BitPerColor:
+        return ((UINT32)blue << 16) | ((UINT32)green << 8) | red;
+    case PixelBlueGreenRedReserved8BitPerColor:
+    default:
+        return ((UINT32)red << 16) | ((UINT32)green << 8) | blue;
+    }
+}
 
 static VOID
 FillBar(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINT32 stage)
@@ -34,11 +56,12 @@ FillBar(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINT32 stage)
     if (top + BAR_HEIGHT > height) {
         return;
     }
+    const UINT32 color = ComposeColor(gop, stage);
     UINT32 *panel = (UINT32 *)(UINTN)gop->Mode->FrameBufferBase;
     for (UINT32 row = top; row < top + BAR_HEIGHT; ++row) {
         UINT32 *line = panel + (UINTN)row * stride;
         for (UINT32 column = 0; column < width; ++column) {
-            line[column] = kBarColors[stage];
+            line[column] = color;
         }
     }
     __asm__ volatile("dsb sy" ::: "memory");
