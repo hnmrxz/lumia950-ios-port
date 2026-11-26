@@ -39,6 +39,7 @@ SOURCES = {
     "osfmk/arm/arm_init.c": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/osfmk/arm/arm_init.c?ref={REV}",
         "bsd/kern/bsd_init.c": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/bsd/kern/bsd_init.c?ref={REV}",
 "iokit/KernelConfigTables.cpp": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/KernelConfigTables.cpp?ref={REV}",
+    "osfmk/prng/prng_random.c": f"https://api.github.com/repos/apple-oss-distributions/xnu/contents/osfmk/prng/prng_random.c?ref={REV}",
 }
 
 SNIPPET = r"""
@@ -143,7 +144,7 @@ def step_rehearse() -> bool:
             shutil.copy2(source, destination)
 
         ok = True
-        for script in ("ci/boot-progress.py", "ci/kernel-personality.py"):
+        for script in ("ci/boot-progress.py", "ci/kernel-personality.py", "ci/prng-single-init.py"):
             for mode in ("--apply", "--check"):
                 result = subprocess.run([sys.executable, str(ROOT / script), "--root", str(tree), mode],
                                         capture_output=True, text=True)

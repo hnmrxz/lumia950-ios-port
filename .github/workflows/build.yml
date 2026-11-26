@@ -750,6 +750,15 @@ jobs:
       # bootstrap bars, bsd_init prints what it can see and draws the post-MMU bar. This step was withdrawn when the
       # kernel-side bars were shown to fault, and that withdrawal silently removed the instrument from every build
       # since -- the archive was force-loaded, but nothing called it. Restored, with --check so the edit is verified.
+      # The merged image initialises the kernel PRNG twice -- the source crypto bootstrap patch and Apple's prelinked
+      # com.apple.kec.corecrypto -- and register_and_init_prng() asserts !prng_ready, so the merged boot stops there
+      # (fixture: panic_args ['!prng_ready']). Making the second registration a no-op is what lets a merged image take a
+      # third-party kext, which is the only kext channel this pin offers without a private API.
+      - name: Let the PRNG be registered once
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/prng-single-init.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/prng-single-init.py" --root "$UNIXNU_OUT" --check
+
       - name: Instrument the kernel entry with the bring-up bars
         run: |
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
