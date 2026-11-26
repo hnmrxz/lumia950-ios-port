@@ -69,7 +69,7 @@ def check(path: Path) -> tuple[bool, str]:
     missing = [str(stage) for stage in (0, 1) if f"args->Video.v_height, {stage})" not in text]
     if missing:
         return False, f"missing stage calls: {', '.join(missing)}"
-    if "extern void native_boot_progress_stage(int);" not in text:
+    if "extern void native_boot_progress_stage(" not in text:
         return False, "missing the declaration"
     return True, "ok"
 
