@@ -133,6 +133,35 @@ description             BootShim Application
     def test_keep_uefi_elf_requires_a_file(self):
         self.assertFalse(self.module.verify_kept_uefi_elf(self.efiesp / "absent.elf"))
 
+    def test_loader_alias_writes_bootaa64(self):
+        kept_shim = self.efiesp / "EFI" / "boot" / "BootShim.efi"
+        kept_shim.parent.mkdir(parents=True, exist_ok=True)
+        make_pe(kept_shim, subsystem=0x10, machine=0x01C4)
+        make_elf(self.efiesp / "UEFI.elf", 0xB7)
+        stage = self.payload / "EFI" / "UniXNU"
+        stage.mkdir(parents=True)
+        make_pe(stage / "UniXNU.efi", subsystem=0x0A)
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--uefi-elf", str(self.uefi), "--layout", "efiesp", "--keep-shim",
+                "--keep-uefi-elf", "--loader-alias", "--apply"]
+        self.assertEqual(self.module.main(argv), 0)
+        self.assertTrue((self.efiesp / "EFI" / "BOOT" / "BOOTAA64.EFI").is_file())
+
+    def test_loader_alias_refuses_a_driver_loader(self):
+        kept_shim = self.efiesp / "EFI" / "boot" / "BootShim.efi"
+        kept_shim.parent.mkdir(parents=True, exist_ok=True)
+        make_pe(kept_shim, subsystem=0x10, machine=0x01C4)
+        make_elf(self.efiesp / "UEFI.elf", 0xB7)
+        stage = self.payload / "EFI" / "UniXNU"
+        stage.mkdir(parents=True)
+        make_pe(stage / "UniXNU.efi", subsystem=0x0B)
+        argv = ["--efiesp", str(self.efiesp), "--mainos", str(self.mainos),
+                "--payload", str(self.payload), "--stage", str(self.payload),
+                "--uefi-elf", str(self.uefi), "--layout", "efiesp", "--keep-shim",
+                "--keep-uefi-elf", "--loader-alias", "--apply"]
+        self.assertNotEqual(self.module.main(argv), 0)
+
     def test_keep_shim_verifies_the_existing_boot_application(self):
         # what the deployment tools put on the {default} path: ARM32, subsystem 0x10
         kept = self.efiesp / "EFI" / "boot" / "BootShim.efi"

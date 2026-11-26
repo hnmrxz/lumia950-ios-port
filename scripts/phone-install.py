@@ -198,6 +198,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
+    parser.add_argument("--loader-alias", action="store_true",
+                        help="also write the UniXNU loader to EFI\\BOOT\\BOOTAA64.EFI, which is where the "
+                             "custom UEFI looks when no boot entry is configured. Measured on the handset, "
+                             "2026-11-26: the UEFI reported 'Failed to boot OS. No usable boot entry found' "
+                             "with the loader only at EFI\\UniXNU\\UniXNU.efi")
     parser.add_argument("--keep-uefi-elf", action="store_true",
                         help="do not write UEFI.elf; verify the one already on EFIESP. The deployment tools "
                              "install their own build there, and it is the file their shim chainloads, so "
@@ -255,6 +260,16 @@ def main(argv: list[str] | None = None) -> int:
         for source in sorted(drivers.iterdir()):
             if source.is_file():
                 ok &= install(source, efiesp / "EFI" / "UniXNU" / "Drivers" / source.name, args.apply)
+
+    if args.loader_alias:
+        loader = args.stage / "EFI" / "UniXNU" / "UniXNU.efi"
+        print("UniXNU loader -> EFI\\BOOT\\BOOTAA64.EFI (what the custom UEFI starts)")
+        if not loader.is_file():
+            print(f"error: {loader} is missing; stage the payload first", file=sys.stderr)
+            ok = False
+        else:
+            ok &= install(loader, efiesp / "EFI" / "BOOT" / "BOOTAA64.EFI", args.apply,
+                          require_subsystem=0x0A)
 
     print("kernel and device tree -> MainOS")
     payloads = args.payload / "EFI" / "UniXNU" / "Payloads"
