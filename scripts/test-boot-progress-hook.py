@@ -16,7 +16,7 @@ SAMPLE = '''#include <pexpert/pexpert.h>
 void
 arm_init(void)
 {
-	PE_init_platform(FALSE, args);
+	PE_init_platform(FALSE, args); /* Get platform expert set up */
 
 	configure_timer_apple_regs();
 

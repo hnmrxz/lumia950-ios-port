@@ -23,7 +23,8 @@ MARKER = "native_boot_progress_stage"
 
 DECLARATION = "\textern void native_boot_progress_stage(int);\n"
 
-AFTER_PLATFORM = "\tPE_init_platform(FALSE, args);\n"
+# The real line carries a trailing comment; measured in the pinned xnu-8796.141.3 source.
+AFTER_PLATFORM = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 
 STAGE_1 = (
