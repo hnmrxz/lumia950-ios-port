@@ -1,79 +1,57 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 //
-// A control mark for the panel, drawn by the loader side.
+// A control mark for the panel, drawn by the loader side, that also writes the mode it found onto the screen.
 //
 // The kernel-side instrument cannot work before arm_vm_init: osfmk/arm64/start.s turns the MMU on (line 744) and
 // maps only the kernel image, so a store to the framebuffer there is a translation fault on every platform. The
-// honest pre-MMU witness therefore has to come from something that already owns a mapping -- firmware running
-// before ExitBootServices. This application draws the same three bars the kernel instrument would have drawn, in the
-// same place, and then returns to firmware.
+// honest pre-MMU witness therefore has to come from something that already owns a mapping -- firmware running before
+// ExitBootServices.
 //
-// Reading it: a mark here proves the panel accepts these coordinates, in these colours, from this loader. A later
-// boot of the kernel that shows nothing above the mark therefore means the kernel never reached its first draw,
-// rather than "the panel does not take our writes".
+// Two bars prove the panel accepts these coordinates and colours from this loader. The text says which mode the
+// firmware actually reported, so a failure is diagnosable without a second trip: if the bars are missing but the
+// text is there, the coordinates or the pixel format are wrong; if nothing at all is visible, the panel is not being
+// written at all.
 
 #include <Uefi.h>
 #include <Protocol/GraphicsOutput.h>
+
+#include "FramebufferCore.h"
+#include "ProbeCore.h"
 
 #define BAR_HEIGHT 16u
 #define FIRST_BAR_Y 120u
 #define BAR_STRIDE 20u
 
-// Colours are carried as red, green, blue and composed according to the GOP's pixel format: a panel that reports
-// blue-green-red order packs the same colour the other way round, and a bar written without that check is the wrong
-// colour (or invisible against the background) on half the machines in the world.
 static const UINT8 kBarColors[3][3] = {
     { 0xE0, 0x30, 0x30 },
     { 0xE0, 0xC0, 0x30 },
     { 0x30, 0xC0, 0x60 },
 };
 
+static void
+Describe(struct ProbeFramebuffer *framebuffer, EFI_GRAPHICS_OUTPUT_PROTOCOL *gop)
+{
+    framebuffer->base = gop->Mode->FrameBufferBase;
+    framebuffer->byte_size = gop->Mode->FrameBufferSize;
+    framebuffer->width = gop->Mode->Info->HorizontalResolution;
+    framebuffer->height = gop->Mode->Info->VerticalResolution;
+    framebuffer->stride = gop->Mode->Info->PixelsPerScanLine;
+    framebuffer->pixel_format = (uint32_t)gop->Mode->Info->PixelFormat;
+}
+
 static UINT32
-ComposeColor(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINT32 stage)
+ComposeColor(uint32_t pixel_format, UINT32 stage)
 {
-    const UINT8 red = kBarColors[stage][0];
-    const UINT8 green = kBarColors[stage][1];
-    const UINT8 blue = kBarColors[stage][2];
-    switch (gop->Mode->Info->PixelFormat) {
-    case PixelRedGreenBlueReserved8BitPerColor:
-        return ((UINT32)blue << 16) | ((UINT32)green << 8) | red;
-    case PixelBlueGreenRedReserved8BitPerColor:
-    default:
-        return ((UINT32)red << 16) | ((UINT32)green << 8) | blue;
-    }
+    return ProbeFramebufferColor(pixel_format, kBarColors[stage][0], kBarColors[stage][1], kBarColors[stage][2]);
 }
 
 static VOID
-FillBar(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINT32 stage)
-{
-    if (stage >= 3u) {
-        return;
-    }
-    const UINT32 width = gop->Mode->Info->HorizontalResolution;
-    const UINT32 height = gop->Mode->Info->VerticalResolution;
-    const UINT32 stride = gop->Mode->Info->PixelsPerScanLine;
-    const UINT32 top = FIRST_BAR_Y + stage * BAR_STRIDE;
-    if (top + BAR_HEIGHT > height) {
-        return;
-    }
-    const UINT32 color = ComposeColor(gop, stage);
-    UINT32 *panel = (UINT32 *)(UINTN)gop->Mode->FrameBufferBase;
-    for (UINT32 row = top; row < top + BAR_HEIGHT; ++row) {
-        UINT32 *line = panel + (UINTN)row * stride;
-        for (UINT32 column = 0; column < width; ++column) {
-            line[column] = color;
-        }
-    }
-    __asm__ volatile("dsb sy" ::: "memory");
-}
-
-static VOID
-FlushPanel(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop)
+FlushPanel(const struct ProbeFramebuffer *framebuffer)
 {
     // The panel is write-combined memory: clean the lines this application touched so the bars are actually
     // visible before firmware takes the screen back.
-    const UINTN base = (UINTN)gop->Mode->FrameBufferBase;
-    const UINTN size = (UINTN)gop->Mode->FrameBufferSize;
+    const UINTN base = (UINTN)framebuffer->base;
+    const UINTN size = (UINTN)framebuffer->byte_size;
     UINT64 cache_type = 0;
     __asm__ volatile("mrs %0, ctr_el0" : "=r"(cache_type));
     const UINTN line = 4u << ((cache_type >> 16) & 15u);
@@ -95,13 +73,43 @@ UefiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
         return EFI_NOT_FOUND;
     }
 
-    FillBar(gop, 0);
-    FillBar(gop, 1);
-    FlushPanel(gop);
+    struct ProbeFramebuffer framebuffer;
+    Describe(&framebuffer, gop);
+    if (!ProbeFramebufferValid(&framebuffer)) {
+        return EFI_DEVICE_ERROR;
+    }
+
+    for (UINT32 stage = 0; stage < 2; ++stage) {
+        const UINT32 top = FIRST_BAR_Y + stage * BAR_STRIDE;
+        if (top + BAR_HEIGHT <= framebuffer.height) {
+            ProbeFillRectangle(&framebuffer, 0, top, framebuffer.width, BAR_HEIGHT,
+                               ComposeColor(framebuffer.pixel_format, stage));
+        }
+    }
+
+    // The mode, written on the panel itself so a photograph carries it even when nothing else works.
+    char line[64];
+    const UINT32 text_color = ProbeFramebufferColor(framebuffer.pixel_format, 0xFF, 0xFF, 0xFF);
+    if (ProbeFormatUnsigned(framebuffer.width, 10, 1, line, sizeof(line))) {
+        ProbeDrawText(&framebuffer, 24, 200, 3, line, text_color);
+    }
+    if (ProbeFormatUnsigned(framebuffer.height, 10, 1, line, sizeof(line))) {
+        ProbeDrawText(&framebuffer, 24, 236, 3, line, text_color);
+    }
+    if (ProbeFormatUnsigned(framebuffer.stride, 10, 1, line, sizeof(line))) {
+        ProbeDrawText(&framebuffer, 24, 272, 3, line, text_color);
+    }
+    if (ProbeFormatUnsigned(framebuffer.pixel_format, 10, 1, line, sizeof(line))) {
+        ProbeDrawText(&framebuffer, 24, 308, 3, line, text_color);
+    }
+    if (ProbeFormatUnsigned(framebuffer.base, 16, 1, line, sizeof(line))) {
+        ProbeDrawText(&framebuffer, 24, 344, 3, line, text_color);
+    }
+
+    FlushPanel(&framebuffer);
     system_table->ConOut->OutputString(system_table->ConOut,
-                                       L"control mark drawn: 2 bars\r\n");
+                                       L"control mark drawn\r\n");
 #ifdef CONTROL_MARK_HOLD
-    // A test build stays on this screen so a screenshot can be taken; the shipped build returns to the menu.
     for (;;) {
         __asm__ volatile("wfe" ::: "memory");
     }
@@ -109,8 +117,6 @@ UefiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     return EFI_SUCCESS;
 }
 
-// The CI build links with /entry:UefiMain; a Zig cross build of the same file targets a UEFI subsystem image whose
-// default entry symbol is EfiMain, so the application offers both names and neither build needs a rename.
 EFI_STATUS
 EFIAPI
 EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
