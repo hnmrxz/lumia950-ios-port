@@ -260,6 +260,26 @@
         }
       ],
       "note": "Screen readings only, 2026-11-26: the UniXNU menu reported 'drivers 2 loaded / 0 failed kits 0 acpi 0' and DarwinBoot reported ARM64 va=0xFFFFFFF004004000 pa=0x27004000, video 1080x1920 row 4320 32 bpp at 0x400000, CurrentEL 1, then 'hand-off to the kernel'. No kernel line was observed after the hand-off, so XNU-entry-tested is not claimed and userland is not claimed."
+    },
+    {
+      "id": "handset-adt-emulated-bringup",
+      "what": "The device tree this port ships to the phone, carried through emulation without the QEMU rewrite: arm_vm_init entry and return, kernel bootstrap, and source-provider initialisation, stopping only on a deliberately provoked FIPS integrity check",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "out/qemu-handset-adt/dmesg.txt"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "out/qemu-handset-adt/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/make-lumia950-adt.py"
+        }
+      ],
+      "limits": "Emulator only, and the run omitted --crypto-post on purpose, which is why the FIPS check failed. This says the tree is good enough to reach BSD initialisation; it says nothing about the handset."
     }
   ]
 }

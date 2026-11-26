@@ -92,6 +92,33 @@ That is the hypothesis the pending handset boot tests. If the bars appear, `arm_
 explanation holds; if they do not, the next instrument must map the framebuffer explicitly (pmap) before drawing,
 which the official documentation's "entry probe" also implies -- its stage 3 is a reset rather than a draw.
 
+## The handset device tree is not the blocker: it boots to BSD init in emulation
+
+The emulated runs in CI swap in the QEMU device tree (`--adt-profile qemu`), which left open the question of
+whether the tree this port actually ships to the phone is good enough. Running the same staged payload locally
+with **no profile rewrite** -- that is, the handset `kernel.macho.adt`, 11,360 bytes, exactly what sits on the
+phone -- answers it:
+
+| milestone | observed |
+|---|---|
+| `arm_vm_init_entry` | yes |
+| `arm_vm_init_return` | yes |
+| `kernel_bootstrap_entry` | yes |
+| `source_crypto_bootstrap_entry` | yes |
+| then | `_panic` at 7.6 s |
+
+The captured dmesg is 7.3 KB of normal bring-up (ATM, OSLog, scheduler, MIG tables, coredump handler, serial KDP)
+and stops on a deliberately provoked FIPS check:
+
+```
+FIPSPOST_KEXT fipspost_post:153: FAILED: fipspost_post_integrity: -74
+```
+
+That failure is this run's own doing -- the evidence boot normally passes `--crypto-post`, which the local run
+omitted -- and not a property of the tree. What matters is the distance travelled: the handset tree carries the
+kernel through VM setup, kernel bootstrap and into source-provider initialisation, so a handset boot that shows
+nothing at all is not explained by the device tree.
+
 ## What is not claimed
 
 - No kernel output had been observed at the time of writing, so **`XNU-entry-tested` is not claimed** for the
