@@ -119,3 +119,22 @@ ADR-0005, and it changes the rollback contract, so it must be decided before any
 - `UniXNU/NativePrelink@2b6ffb50 emit_prelink.py` argument list and `_PrelinkInfoDictionary` lookup
 - `docs/emulation/emulated-branch-limits.md` (why the emulator cannot reach userland either)
 - `ci/ramblock-hook.py` (the hook pattern M2 would have to extend)
+
+### M4 status: the kext exists and the container is packed
+
+The macOS job now produces both halves on every kernel run:
+
+```
+NativeSdhci: arm64 kext bundle, 645 symbols, segments ['__DATA', '__DATA_CONST', '__LINKEDIT',
+             '__TEXT', '__TEXT_EXEC']
+NativeSdhci.mkext: 95,462 bytes, plist at 94,208, checksum 0x13D34362
+```
+
+Four link iterations got there, and each one named its own cause: the step first ran before the XNU build had a compile
+record, then linked macOS against iOS objects, then asked `ld` to keep `_kmod_start` (KMOD_EXPLICIT_DECL stores the
+start routine as a value inside `kmod_info`, so only `_kmod_info` exists), and finally the record was dropped as dead
+code until `-u _kmod_info` held it.
+
+What remains for M4 is the load itself: embed the container in the kernel image, call
+`OSKext::loadFromMkext(0, buffer, length, NULL, NULL)` from `bsd_init` behind a switch, and see whether the personality
+matches `sdhci@f9824900`.

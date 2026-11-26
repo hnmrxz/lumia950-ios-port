@@ -388,6 +388,34 @@
         }
       ],
       "limits": "Emulator only, 800x600. It proves the instrument, its mapping and its switch on this panel size; the handset panel is 1080x1920 with a different stride, and the pixels there are still the open question."
+    },
+    {
+      "id": "native-sdhci-kext-bundle",
+      "what": "NativeSdhci built as a loadable kext bundle and packed into an mkext container on the macOS runner: an arm64 MH_KEXT_BUNDLE with 645 symbols and the kmod record, packed as a 95,462-byte mkext2 with its info dictionaries page-aligned at 94,208",
+      "label": "ABI-compiled",
+      "evidence": [
+        {
+          "label": "ABI-compiled",
+          "path": "drivers/NativeSdhci/Kmod.cpp"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeSdhci/Kmod.cpp"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/build-arm-driver.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/check-kext.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/make-mkext.py"
+        }
+      ],
+      "limits": "Built and structurally checked; never loaded by a kernel yet. The kernel-side call to OSKext::loadFromMkext() is the next step, and nothing here says it will succeed."
     }
   ]
 }
