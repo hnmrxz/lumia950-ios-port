@@ -46,6 +46,7 @@ archives = [
   # this archive through XNU_EXTRA_LD_ARCHIVES.
   "build-arm-driver.py NativeLegacyDisplay",
   "build-arm-driver.py NativeRamBlock",   # synthetic root media for the vfs_mountroot rung
+"build-arm-driver.py NativeBootProgress",  # framebuffer progress instrument
 ]
 # Components whose archive cannot be linked into the source kernel yet, with the reason. The link
 # checker reads this map, so an exclusion is a recorded decision rather than a silent omission.

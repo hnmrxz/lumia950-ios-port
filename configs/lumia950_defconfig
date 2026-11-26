@@ -57,7 +57,7 @@ CONFIG_XNU_BUILD_ARCHIVES=y
 # nothing references it, and force-loading it fails the link with undefined IOBlockStorageDevice symbols.
 # So the storage ABI is genuinely absent from the source link, and these drivers need the prelink closure
 # (XNU_NATIVE_RAM_BLOCK needs XNU_NATIVE_AES) or a kext bundle. Do not force-load them here.
-CONFIG_XNU_EXTRA_LD_ARCHIVES="-Wl,-force_load,{tree}/build/native-legacy-display/libNativeLegacyDisplay.a -Wl,-force_load,{tree}/build/native-mdss/libNativeMdss.a -Wl,-force_load,{tree}/build/native-adreno418/libNativeAdreno418.a"
+CONFIG_XNU_EXTRA_LD_ARCHIVES="-Wl,-force_load,{tree}/build/native-legacy-display/libNativeLegacyDisplay.a -Wl,-force_load,{tree}/build/native-mdss/libNativeMdss.a -Wl,-force_load,{tree}/build/native-adreno418/libNativeAdreno418.a -Wl,-force_load,{tree}/build/native-boot-progress/libNativeBootProgress.a"
 
 # The Data volume is a RAM block until the eMMC write path exists.
 # CONFIG_XNU_NATIVE_RAM_BLOCK is not set

@@ -87,6 +87,13 @@ COMPONENTS = {
         "out": "native-ram-block",
         "include": ["build/storage-abi/include"],
     },
+    "NativeBootProgress": {
+        # Not a matched driver: an instrument the kernel calls from arm_init.c before the MMU is on, so the
+        # handset's panel can show how far the kernel got. See drivers/NativeBootProgress/.
+        "sources": ["drivers/NativeBootProgress/NativeBootProgress.cpp"],
+        "out": "native-boot-progress",
+        "include": ["drivers/NativeBootProgress"],
+    },
 }
 
 RECIPE = ROOT / "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json"

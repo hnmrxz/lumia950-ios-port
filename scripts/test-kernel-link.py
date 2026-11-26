@@ -26,6 +26,7 @@ DUMP = textwrap.dedent("""\
     00000000000a4000 T __ZN19NativeLegacyDisplay5probeEv
     00000000000a5000 T __ZN13ArmDTPlatform5startEv
     00000000000a6000 T __ZN6ArmCpu11interruptsEv
+   00000000000a7000 T _native_boot_progress_stage
     """)
 
 
@@ -90,7 +91,8 @@ class KernelLinkTests(unittest.TestCase):
         names = module.expected_from_board(ROOT / "board.toml")
         self.assertEqual(sorted(names),
                          sorted(["ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeAdreno418",
-                                 "NativeMdss", "NativeLegacyDisplay", "NativeRamBlock"]))
+                                 "NativeMdss", "NativeLegacyDisplay", "NativeRamBlock",
+                                 "NativeBootProgress"]))
         # ... and the fallback list is not allowed to be smaller than the board.
         self.assertTrue(set(names) <= set(module.DEFAULT_EXPECTED))
 

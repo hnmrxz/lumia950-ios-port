@@ -377,6 +377,9 @@ jobs:
               drivers/NativeMdss/Test/check-mdss-core.cpp \
               drivers/NativeMdss/MdssCore.cpp -o build/check-mdss-core
           ./build/check-mdss-core
+          g++ -std=c++17 -Wall -Wextra -Werror -I drivers/NativeBootProgress \
+              drivers/NativeBootProgress/Test/check-boot-progress-core.cpp -o build/check-boot-progress-core
+          ./build/check-boot-progress-core
 
       - name: Host tests of the firmware probe and framebuffer renderer
         run: bash scripts/test-probe.sh
@@ -747,6 +750,8 @@ jobs:
         run: |
           python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/skmem-skip.py" --root "$UNIXNU_OUT" --check
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --check
 
       - name: Build the kernel, the device archives and the prelinked image
         # feeds.toml pins the 16.x tree, so the compile is the right source line for this

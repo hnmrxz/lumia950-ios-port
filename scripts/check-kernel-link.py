@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # the link dropped it; both are the failure this file exists for. board.toml's [kernel] archives
 # list is the single source when it is readable; this is the fallback.
 DEFAULT_EXPECTED = ("ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeLegacyDisplay", "NativeMdss",
-                    "NativeAdreno418", "NativeRamBlock")
+                    "NativeAdreno418", "NativeRamBlock", "NativeBootProgress")
 
 # Not every component exports a symbol named after itself. The driver classes are C++ and land in
 # the table as `__ZN11NativeSdhci...`, but NativeLegacyDisplay is a C entry point called by
@@ -37,6 +37,7 @@ DEFAULT_EXPECTED = ("ArmDTPlatform", "ArmCpu", "NativeSdhci", "NativeLegacyDispl
 # needles is found.
 SYMBOL_ALIASES = {
     "NativeLegacyDisplay": ("NativeLegacyDisplay", "native_legacy_display_probe"),
+    "NativeBootProgress": ("NativeBootProgress", "native_boot_progress_stage"),
 }
 
 

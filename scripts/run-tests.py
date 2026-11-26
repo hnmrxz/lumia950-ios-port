@@ -32,6 +32,7 @@ SELF_CONTAINED = (
     "test-rehearse-phone-install.py",
     "test-rehearse-phone-rollback.py",
     "test-powershell-parses.py",
+    "test-boot-progress-hook.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
