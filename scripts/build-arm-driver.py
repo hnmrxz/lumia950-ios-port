@@ -104,6 +104,10 @@ COMPONENTS = {
             # The only unit here that includes an XNU C++ header: it is where OSKext::loadFromMkext() is called.
             "drivers/NativeBootProgress/KextLoad.cpp",
         ],
+        # Written by the NativeSdhci build earlier in this same archive list: the storage driver's mkext container as a C
+        # array. Naming it here rather than on the command line means the framework's archive runner needs no knowledge
+        # of it -- that runner is what rejected an extra argument in run 45838671275.
+        "extra_sources": ["build/native-sdhci/generated/mkext_blob.cpp"],
         "out": "native-boot-progress",
         "include": ["drivers/NativeBootProgress"],
     },
@@ -177,7 +181,8 @@ def main():
     include_dirs = [ROOT / directory for directory in spec.get("include", [])]
 
     objects = []
-    for source_name in spec["sources"]:
+    source_list = list(spec["sources"]) + list(spec.get("extra_sources", [])) + list(args.extra_source)
+    for source_name in source_list:
         source = ROOT / source_name
         if not source.is_file():
             raise SystemExit(f"{source} is missing: is the module linked into the build tree?")

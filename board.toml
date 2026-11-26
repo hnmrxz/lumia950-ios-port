@@ -46,9 +46,7 @@ archives = [
   # this archive through XNU_EXTRA_LD_ARCHIVES.
   "build-arm-driver.py NativeLegacyDisplay",
   "build-arm-driver.py NativeRamBlock",   # synthetic root media for the vfs_mountroot rung
-"build-arm-driver.py NativeBootProgress --extra-source build/native-sdhci/generated/mkext_blob.cpp",
-  # ^ the last item also carries the storage driver's mkext container: NativeSdhci (above) emits the blob, this
-  #   component compiles it into its archive, and bsd_init hands it to OSKext::loadFromMkext().
+"build-arm-driver.py NativeBootProgress",  # also carries the storage driver's mkext container
 ]
 # Components whose archive cannot be linked into the source kernel yet, with the reason. The link
 # checker reads this map, so an exclusion is a recorded decision rather than a silent omission.
