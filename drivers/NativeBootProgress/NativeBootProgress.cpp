@@ -87,6 +87,9 @@ extern "C" void native_boot_progress_stage(void *base, unsigned long stride, uns
 
 }  // namespace
 
+// Defined in Mapped.cpp, which only the kernel build compiles; weak so a host build links without it (null -> no check).
+extern "C" bool native_boot_progress_ready(const void *, unsigned long, unsigned long) __attribute__((weak));
+
 extern "C" void
 native_boot_progress_remember(void *base, unsigned long stride, unsigned long height, const char *command_line)
 {
@@ -133,6 +136,11 @@ native_boot_progress_stage(void *base, unsigned long stride, unsigned long heigh
             : boot_progress::bar_for(stage, static_cast<uint32_t>(stride / boot_progress::kBytesPerPixel),
                                      static_cast<uint32_t>(height));
     if (base == nullptr || !boot_progress::drawable(rect, stride, static_cast<uint32_t>(height))) {
+        return;
+    }
+
+    // Ask the kernel whether the page is mapped before storing into it (see the weak declaration above).
+    if (native_boot_progress_ready != nullptr && !native_boot_progress_ready(base, stride, height)) {
         return;
     }
 
