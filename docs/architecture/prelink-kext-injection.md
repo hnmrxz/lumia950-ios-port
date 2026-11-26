@@ -114,3 +114,33 @@ inserted org.unixnu.NativeSdhci at offset 39581, 108749 of 110592 bytes used; 17
 
 它**故意不做**符号绑定与重定位修复。缺少这两步的 kext 一旦运行必然 fault，所以下一次启动实验得到的是"还缺绑定"这一信息，
 而不是一次成功的加载。这正是把数周工作切成可观测小步的方式。
+
+## 第一次真正的"放置实验"：容器拆出来了，地址选错了
+
+整条流程在本机跑通（不需要 runner）：
+
+1. 从内核镜像里按 `MKXT` 找到容器（95,462 字节，校验和 0x6329427F）；
+2. 容器内第 52 字节起是 kext 可执行体（5 段：`__TEXT 0x0`、`__TEXT_EXEC 0x4000`、`__DATA 0x8000`、
+   `__DATA_CONST 0xc000`、`__LINKEDIT 0x10000`，共 91,840 字节）；
+3. `_kmod_info` 落在 0x8000，即"放置基址 + 0x8000"；
+4. 用 `append-prelink-kext.py` 放到 0xfffffff009000000，字典里补上条目（含 `_PrelinkKmodInfo`）。
+
+启动结果：
+
+```
+stop       : _fleh_synchronous
+fault_elr  : _mach_vm_allocate_kernel+0x94
+fault_far  : 0xfffffff03b5d97d4
+milestones : ... iokit_entry（没有 iokit_return）
+```
+
+**读法**：条目这次通过了字段校验并进入"真正加载"，内核在为自己的映射分配内存时踩到了坏地址——说明
+**0xfffffff009000000 这个基址与内核的映射安排冲突**（内核的 `__PRELINK_INFO` 到 `0xfffffff0082cc000 + 0x1b000`，
+其后并不是可用的放置区，而且 kext 的段还没有任何绑定）。
+
+下一步的两个具体候选：
+
+1. 换基址：放到与 `__PLK_TEXT_EXEC` 相邻、或内核已映射的 `__PRELINK_TEXT` 区域内（需要连同段大小一起调整）；
+2. 先做符号绑定（把 `_kmod_info` 里的函数指针与 `OSBundleLibraries` 的符号解析好），否则即使地址对了也会在 start 时 fault。
+
+这两步都是 prelinker 的正体；本轮的价值是**把"放置"从纸面变成了可执行的多步实验**，并确定了第一个具体失败点。

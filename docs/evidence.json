@@ -516,6 +516,30 @@
         }
       ],
       "limits": "Emulator only, and the last boot faults because the address points at kernel text on purpose. It shows the entry schema is accepted; it does not show a kext loading."
+    },
+    {
+      "id": "prelink-placement-first-attempt",
+      "what": "The kext container was extracted from the kernel image, its executable placed at a chosen address with a new segment, and described to the loader; the boot then faults inside _mach_vm_allocate_kernel, so the address choice and the missing symbol binding are the next two problems",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-placement/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-placement/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/append-prelink-kext.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/extract-embedded-kext.py"
+        }
+      ],
+      "limits": "Emulator only, and it is a negative result: the placement does not load. It pins the failure to the kernel's own allocation step, which is progress against 'the entry is not read at all'."
     }
   ]
 }
