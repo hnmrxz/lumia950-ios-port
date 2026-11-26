@@ -364,6 +364,30 @@
         }
       ],
       "limits": "Emulator only, and it says nothing about the handset except this: the image this port stages for the phone is not the image CI validates, and it fails the kernel's own integrity POST before bsd_init."
+    },
+    {
+      "id": "post-mmu-bar-emulated",
+      "what": "The post-MMU bring-up bar drawn through the kernel console's own panel mapping: at bsd_init the instrument reports vinfo base=fffffff04f604000 row=3200 height=600 with the full command line, and paints 12,800 pixels of the bottom 16 rows while leaving the two bootstrap bars off",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/post-mmu-bar/lumia-line.txt"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/post-mmu-bar/dmesg.txt"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/post-mmu-bar/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/boot-progress.py"
+        }
+      ],
+      "limits": "Emulator only, 800x600. It proves the instrument, its mapping and its switch on this panel size; the handset panel is 1080x1920 with a different stride, and the pixels there are still the open question."
     }
   ]
 }

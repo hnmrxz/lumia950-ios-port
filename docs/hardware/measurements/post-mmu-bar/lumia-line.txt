@@ -1,0 +1,1 @@
+[    7.635432]: LUMIA: vinfo base=fffffff04f604000 row=3200 height=600 args=-v cpus=1 lumia-bars2 skmem_seg_size=16384 skmem_md_seg_size=16384 skmem_drv_buf_seg_size=65536 skmem_usr_buf_seg_size=16384 skmem_sysctl_skip=1
