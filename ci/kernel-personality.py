@@ -12,6 +12,12 @@ The table is one IOKit matching dictionary string; the framework adds its own en
 `KernelConfigTables.cpo_CFLAGS_ADD=-DXNU_NATIVE_*` defines, and this adds a board entry the same way it
 injects every other edit: a small, idempotent, re-checkable patch.
 
+ORDERING MATTERS: the framework's own xnu patch series edits this same file (run 45774728401:
+'error: patch failed: iokit/KernelConfigTables.cpp:56; patch does not apply' when this ran before the build).
+So this must run after the series has been applied -- through a `zzz-` late patch in the fetched tree, or as a
+post-patch step -- and NOT in the pre-build gate. The script is kept, and its tests, so the mechanism is ready
+when that step exists.
+
 The entry matches by provider class only. `NativeSdhci::mapWindows` already refuses a provider without two
 `reg` windows of the right sizes and logs why, so a platform device that is not the SDHCI node costs one
 probe and one log line rather than a bad mapping. String-valued keys would need escaping inside the C
