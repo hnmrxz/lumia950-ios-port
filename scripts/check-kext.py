@@ -54,22 +54,25 @@ def read_macho(blob: bytes) -> dict:
         offset += length
 
     symbols: list[str] = []
+    values: dict[str, int] = {}
     if symtab:
         symoff, nsyms, stroff = symtab
         for index in range(nsyms):
             entry = symoff + index * 16
             if entry + 16 > len(blob):
                 break
-            string_index = struct.unpack_from("<I", blob, entry)[0]
+            string_index, n_type, n_sect, _desc, n_value = struct.unpack_from("<IBBHQ", blob, entry)
             start = stroff + string_index
             end = start
             while end < len(blob) and blob[end] != 0:
                 end += 1
-            symbols.append(blob[start:end].decode("utf-8", "replace"))
+            name = blob[start:end].decode("utf-8", "replace")
+            symbols.append(name)
+            values[name] = n_value
 
     return {
         "cputype": cputype, "cpusubtype": cpusubtype, "filetype": filetype,
-        "ncmds": ncmds, "sections": sections, "segments": segments, "symbols": symbols,
+        "ncmds": ncmds, "sections": sections, "segments": segments, "symbols": symbols, "values": values,
     }
 
 

@@ -88,3 +88,18 @@ inserted org.unixnu.NativeSdhci at offset 39581, 108749 of 110592 bytes used; 17
 3. 随后它仍然 panic，因为条目里的 `_PrelinkExecutableLoadAddr` 指向的是内核自己的文本，而不是一个真实的模块。
 
 这条结果把"注入路线是否可行"从推断变成了观测：**路是通的，缺的是条目字段与可执行文件的放置**。后者才是数周级的部分。
+
+## 条目字段被加载器逐个"验收"：三个错误依次消失
+
+把条目字段补齐后连续启动三次，加载器的抱怨按顺序推进，这本身就是一份由内核给出的字段规范：
+
+| 条目内容 | 内核的反应 |
+|---|---|
+| 只有 id + 地址 + 大小 | `Kext org.unixnu.NativeSdhci error - CFBundleVersion missing/invalid type.` |
+| 加上 `CFBundleVersion`、`CFBundleExecutable`、`CFBundlePackageType`、`OSBundleLibraries` | `Kext org.unixnu.NativeSdhci can't find prelinked kext kmod_info address.` |
+| 再加上 `_PrelinkKmodInfo` | 不再抱怨字段，直接 `_fleh_synchronous` —— 它去用那个地址，而地址指向内核文本 |
+
+**结论：条目结构已经对上，字段校验全部通过。** 现在缺的是"地址后面真的有我们的模块"——即把 kext 文本放进镜像并让地址指向它。
+这正是预linker 的工作（选地址、追加段、修 PC 相对指令），也是 ADR-0003 评估为"数周级"的那部分。
+
+另一个直接结论：校验顺序是 id → 版本 → kmod 记录 → 使用地址。写注入器时按这个顺序自检可以省下大量真机/模拟器往返。

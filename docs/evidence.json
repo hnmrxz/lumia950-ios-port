@@ -496,6 +496,26 @@
         }
       ],
       "limits": "Emulator only. It proves the edit reaches the kernel's kext loader and that the loader validates the fields; placing a real executable at a real address is the remaining work."
+    },
+    {
+      "id": "prelink-entry-schema",
+      "what": "The prelink loader validates an entry's fields in order -- bundle id/version, then the kmod_info address, then uses it -- as shown by three successive boots whose complaints advance and then stop",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-schema/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-schema/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/add-prelink-entry.py"
+        }
+      ],
+      "limits": "Emulator only, and the last boot faults because the address points at kernel text on purpose. It shows the entry schema is accepted; it does not show a kext loading."
     }
   ]
 }
