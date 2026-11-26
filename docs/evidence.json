@@ -580,6 +580,26 @@
         }
       ],
       "limits": "Emulator only. The refusal is a real load of a real image by the real loader: it proves the edit chain works and names the geometry constraint; it is not a loaded kext."
+    },
+    {
+      "id": "deployed-phone-payload-qemu",
+      "what": "The exact files deployed on the handset -- loader 94,208 B, the UniXNU tree with DarwinBoot.efi, and kernel 7ae95f48 with args '-v cpus=1 lumia-bars2' -- reach bsd_init in emulation and paint the 12,800-pixel bottom bar",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/deployed-payload/report.json"
+        },
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/deployed-payload/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/stage-phone-esp.py"
+        }
+      ],
+      "limits": "Emulator only. It proves the deployed bytes are sound; it does not prove the handset executes them, which is what the bottom-bar photograph is for."
     }
   ]
 }

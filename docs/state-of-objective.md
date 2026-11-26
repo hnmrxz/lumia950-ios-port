@@ -155,3 +155,38 @@ R:\EFI\BOOT\bootarm.efi                         870,856 B   —— 未改动
 4. 或者：菜单/交接页之后**全黑**（那代表内核在真机没执行，或视频初始化失败）。
 
 **请各拍一张：菜单/交接页、以及屏幕最底部**。这张图决定后续所有优先级。
+
+## 手机上的**那一份文件**在本机跑通了：到 `bsd_init` 并画出底部绿条
+
+与其等一次开机来验证布置对不对，不如把手机里的文件原样搬到本机跑一遍。`scripts/stage-phone-esp.py` 做的事：
+
+- 取 `R:\EFI\BOOT\BOOTAA64.EFI`（94,208 B，即恢复后的真加载器）；
+- **整棵** `R:\EFI\UniXNU`（含 `UniXNU.efi`、`Drivers\DarwinBoot.efi` 26,624 B、`Drivers\ntfs.efi`、`unixnu.toml`）；
+- 取 `H:\EFI\UniXNU\Payloads\kernel.macho`（7ae95f48）与其 ADT 边车。
+
+第一次搬漏了 `Drivers\` 目录，菜单当场报 `no loader protocol installed`——**问题在我的搬运，不在手机**。补齐后本机启动结果：
+
+```
+PASS: ... returned from arm_vm_init and the real source-provider POST/bootstrap and
+      PE_init_iokit and bsd_init
+
+milestones : arm_vm_init_entry → arm_vm_init_return → kernel_bootstrap_entry →
+             source_crypto_bootstrap_entry → source_crypto_bootstrap_return →
+             iokit_entry → iokit_return → bsd_init_entry
+[    7.609069]: LUMIA: vinfo base=fffffff059804000 row=3200 height=600 args=-v cpus=1 lumia-bars2
+```
+
+帧缓冲回读（800×600）：
+
+| 区域 | 亮像素 |
+|---|---|
+| **最后 16 行** | **12,800**（= 800 × 16，满宽绿条） |
+| 第 100–140 行 | 4,582（控制台文字等） |
+
+之后的 panic 是 `Calling {k,z}alloc from interrupt disabled context isn't allowed`——那是 CI 用 `skmem_*` 参数绕过的已知问题，
+发生在**绿条之后**，不影响这次要的证据。
+
+### 这条结论的价值
+
+**部署在手机上的那一份文件，内容上是被验证过的**：它在本机能穿过 IOKit 进入 `bsd_init` 并画出底部绿条。
+剩下的唯一未知是"这台手机的实际硬件会不会跑它"——那正是需要一次开机照片的东西。
