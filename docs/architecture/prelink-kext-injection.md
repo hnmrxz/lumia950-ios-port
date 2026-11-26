@@ -38,3 +38,19 @@ pin 的 XNU 源码里没有 `bsd/hfs`，也没有 `md`（内存盘）。合并�
 1. **先在真机上确认内核执行**（等一张底部绿条的照片）——它决定这一切是否值得做；
 2. 若真机也到 `bsd_init`，则评估：写 prelinker（贵但通用） vs 先用 RAM 介质 + 公开 loader（便宜但依赖文件系统）；
 3. 两条都不做之前，不要声称"存储已通"——现在成立的是：kext 产物、容器、嵌入与调用诊断，**不是介质**。
+
+## 已经能读它了：`scripts/inspect-prelink.py`
+
+写入之前先证明能读。这个工具解析镜像的段表、取出 `__PRELINK_INFO` 的内容、把发射器那种"没有 plist 外壳、整数写成
+`<integer size="64">0x...`"的片段规范化后用标准解析器读出来，并列出每个 kext 的 `_PrelinkExecutableLoadAddr` 与大小。
+对真实的合并镜像（54 MB，run 45832509015）实跑：
+
+```
+16 prelinked kexts, prelink info segment 110592 bytes
+  com.apple.kpi.bsd                              load=0xfffffff004004000 size=0x7c78
+  com.apple.iokit.IOStorageFamily                load=0xfffffff00400b280 size=0x1fc0
+  com.apple.filesystems.apfs                     load=0xfffffff004337000 size=0x3ca15
+  ...
+```
+
+这一步本身有价值：任何"把我们的 kext 加进去"的尝试，都要先能读懂这张表；现在它可读、可断言（6 个主机测试）。

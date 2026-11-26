@@ -41,6 +41,7 @@ SELF_CONTAINED = (
     "test-check-kext.py",
     "test-embed-blob.py",
     "test-prng-single-init.py",
+    "test-inspect-prelink.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
