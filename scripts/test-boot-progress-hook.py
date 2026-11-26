@@ -13,8 +13,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 SAMPLE = '''#include <pexpert/pexpert.h>
 
+void arm_init(boot_args * args);
+
 void
-arm_init(void)
+arm_init(
+	boot_args       *args)
 {
 	int early = 0;
 
@@ -54,7 +57,7 @@ class BootProgressHookTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def test_stage_zero_is_the_first_statement_of_arm_init(self):
+    def test_stage_zero_is_inside_arm_init_and_before_the_platform_call(self):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
@@ -63,6 +66,8 @@ class BootProgressHookTests(unittest.TestCase):
         stage0 = text.index("args->Video.v_height, 0)")
         self.assertGreater(stage0, body, "stage 0 must be inside arm_init")
         self.assertLess(stage0, text.index("PE_init_platform"), "stage 0 must come before the platform call")
+        declarations = text.index("int early = 0;")
+        self.assertLess(declarations, stage0, "stage 0 must not precede the declarations")
 
     def test_stage_one_sits_before_arm_vm_init(self):
         ok, message = self.module.apply_to(self.file)

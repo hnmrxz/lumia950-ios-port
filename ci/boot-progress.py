@@ -31,6 +31,7 @@ DECLARATION = ("\textern void native_boot_progress_stage(unsigned long base, uns
                "unsigned long height, int stage);\n")
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
+PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 
 STAGE_0 = (
     "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
@@ -51,10 +52,15 @@ def find(root: Path) -> list[Path]:
 
 
 def arm_init_body(text: str):
-    """The index just past the opening brace of arm_init(void), or None."""
-    match = re.search(r"\nvoid\s*\narm_init\s*\(\s*void\s*\)\s*\n\{", text)
-    if not match:
-        match = re.search(r"\narm_init\s*\(\s*void\s*\)\s*\n\{", text)
+    """The index just past the opening brace of the arm_init definition, or None.
+
+    The pinned source writes it as the name on one line and the parameter on the next:
+
+        arm_init(
+            boot_args       *args)
+        {
+    """
+    match = re.search(r"\narm_init\s*\([^)]*\)\s*\n?\{", text)
     if not match:
         return None
     return match.end()
@@ -67,13 +73,13 @@ def apply_to(path: Path) -> tuple[bool, str]:
     if BEFORE_VM_INIT not in text:
         return False, "skipped: no arm_vm_init call in this copy"
 
-    # Stage 0 goes at the top of arm_init, not after PE_init_platform: the whole of start.s, the exception
-    # vectors and the boot_args hand-off sit above PE_init_platform, and "nothing drawn" has to mean "the
-    # kernel never reached arm_init", not "it stopped somewhere in the first statements of it".
-    body = arm_init_body(text)
-    if body is None:
-        return False, "arm_init(void) not found; refusing to guess"
-    text = text[:body] + STAGE_0 + text[body:]
+    if PLATFORM_CALL not in text:
+        return False, "skipped: no PE_init_platform(FALSE, args) call in this copy"
+
+    # Stage 0 goes immediately before the first statement of arm_init, not at the top of the body: the body
+    # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
+    # declaration a declaration-after-statement.
+    text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
     text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
@@ -87,6 +93,9 @@ def check(path: Path) -> tuple[bool, str]:
     body = arm_init_body(text)
     if body is not None and text.find("args->Video.v_height, 0)") < body:
         return False, "stage 0 is above arm_init instead of inside it"
+    platform = text.find("PE_init_platform(FALSE, args);")
+    if platform >= 0 and text.find("args->Video.v_height, 0)") > platform:
+        return False, "stage 0 landed after the platform call"
     if "extern void native_boot_progress_stage(" not in text:
         return False, "missing the declaration"
     return True, "ok"
