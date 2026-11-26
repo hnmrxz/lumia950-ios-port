@@ -128,6 +128,37 @@ def verify_bcd(enum_file: Path, layout: str) -> bool:
 BOOT_APP_SUBSYSTEMS = {0x0A, 0x10}
 
 
+
+def elf_machine(path: Path) -> int | None:
+    """Return the ELF e_machine, or None for anything that is not an ELF64 image."""
+    try:
+        data = path.read_bytes()[:64]
+    except OSError:
+        return None
+    if data[:4] != b"\x7fELF" or len(data) < 20:
+        return None
+    little = data[5] == 1
+    if data[4] != 2:  # ELFCLASS64
+        return None
+    return int.from_bytes(data[18:20], "little" if little else "big")
+
+
+def verify_kept_uefi_elf(destination: Path) -> bool:
+    """Check the UEFI image already on EFIESP instead of overwriting it."""
+    if not destination.is_file():
+        print(f"error: --keep-uefi-elf was given but {destination} does not exist", file=sys.stderr)
+        return False
+    machine = elf_machine(destination)
+    print(f"  {destination.name:32} {destination.stat().st_size:>10} B  "
+          f"sha256 {digest(destination)[:16]}" + ("" if machine is None else f" ELF e_machine=0x{machine:X}"))
+    print("UEFI.elf kept: the file the deployment tools installed is the one their shim chainloads")
+    if machine != 0xB7:  # EM_AARCH64
+        print(f"error: {destination.name} is not an AArch64 ELF (e_machine={machine}); the shim would not "
+              "be able to chainload it", file=sys.stderr)
+        return False
+    return True
+
+
 def verify_kept_shim(destination: Path) -> bool:
     """Check the shim already on the volume instead of overwriting it."""
     if not destination.is_file():
@@ -167,6 +198,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--uefi-elf", type=Path,
                         default=STAGING / "xlpkg" / "extracted" / "MSM8992 UEFI (Lumia 950)" / "ELF" / "UEFI.elf")
     parser.add_argument("--apply", action="store_true", help="actually write")
+    parser.add_argument("--keep-uefi-elf", action="store_true",
+                        help="do not write UEFI.elf; verify the one already on EFIESP. The deployment tools "
+                             "install their own build there, and it is the file their shim chainloads, so "
+                             "replacing it would change a chain that is already configured")
     parser.add_argument("--keep-shim", action="store_true",
                         help="do not write the shim; verify the one already at the layout's destination. "
                              "The Lumia firmware's bootmgr is ARM32 and starts subsystem 0x10 boot "
@@ -204,8 +239,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"shim source: {shim}")
         ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A)
 
-    print("UEFI.elf -> EFIESP root")
-    ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)
+    if args.keep_uefi_elf:
+        ok &= verify_kept_uefi_elf(efiesp / "UEFI.elf")
+    else:
+        print("UEFI.elf -> EFIESP root")
+        ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)
 
     print("UniXNU payload -> EFIESP")
     for name in ("UniXNU.efi", "unixnu.toml"):

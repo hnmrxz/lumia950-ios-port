@@ -33,6 +33,17 @@ def make_pe(path, subsystem, machine=0xAA64):
     path.write_bytes(bytes(data))
 
 
+def make_elf(path, machine, elf_class=2):
+    """A minimal ELF header with a chosen e_machine."""
+    header = bytearray(64)
+    header[0:4] = b"\x7fELF"
+    header[4] = elf_class
+    header[5] = 1  # little endian
+    header[6] = 1
+    header[18:20] = int(machine).to_bytes(2, "little")
+    path.write_bytes(bytes(header))
+
+
 class PhoneInstallLayoutTests(unittest.TestCase):
     def setUp(self):
         self.module = load()
@@ -103,6 +114,24 @@ description             BootShim Application
 
     def test_verify_bcd_reports_a_missing_file(self):
         self.assertFalse(self.module.verify_bcd(self.efiesp / "absent.txt", "mainos"))
+
+    def test_keep_uefi_elf_accepts_an_aarch64_elf(self):
+        kept = self.efiesp / "UEFI.elf"
+        make_elf(kept, 0xB7)
+        self.assertTrue(self.module.verify_kept_uefi_elf(kept))
+
+    def test_keep_uefi_elf_refuses_a_pe_image(self):
+        kept = self.efiesp / "UEFI.elf"
+        make_pe(kept, subsystem=0x0A)
+        self.assertFalse(self.module.verify_kept_uefi_elf(kept))
+
+    def test_keep_uefi_elf_refuses_a_foreign_machine(self):
+        kept = self.efiesp / "UEFI.elf"
+        make_elf(kept, 0x3E)
+        self.assertFalse(self.module.verify_kept_uefi_elf(kept))
+
+    def test_keep_uefi_elf_requires_a_file(self):
+        self.assertFalse(self.module.verify_kept_uefi_elf(self.efiesp / "absent.elf"))
 
     def test_keep_shim_verifies_the_existing_boot_application(self):
         # what the deployment tools put on the {default} path: ARM32, subsystem 0x10
