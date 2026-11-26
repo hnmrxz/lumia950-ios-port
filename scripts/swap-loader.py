@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -48,7 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--show", action="store_true", help="report the current state and do nothing else")
     args = parser.parse_args(argv)
 
-    volume = Path(args.efiesp.rstrip("\\/") + "\\")
+    # "R:" alone is a drive-relative path, not a directory; a POSIX path must be left exactly as given, which is what
+    # the host tests use -- appending a separator unconditionally made every test on Linux take the "not mounted" path.
+    volume = Path(args.efiesp)
+    if re.fullmatch(r"[A-Za-z]:", str(volume)):
+        volume = Path(str(volume) + "\\")
     if not volume.is_dir():
         print(f"error: EFIESP is not mounted at {volume}", file=sys.stderr)
         return 2
