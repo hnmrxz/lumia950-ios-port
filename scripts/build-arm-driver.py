@@ -209,7 +209,9 @@ def main():
             # -u keeps the kmod record: the objects come from the archive, nothing references the record, and a
             # dead-stripped kext is one the loader will refuse.
             [linker, "-arch", "arm64", "-kext", "-undefined", "dynamic_lookup",
-             "-u", "_kmod_info", "-u", "_kmod_start",
+             # Only the record: KMOD_EXPLICIT_DECL stores the start/stop routines as values inside kmod_info, so
+             # there is no _kmod_start symbol to name and asking for one fails the link.
+             "-u", "_kmod_info",
              # The driver objects come from the iPhoneOS SDK recipe, so the bundle is an iOS kext, and they were
              # compiled for iOS 17.0; linking at 16.0 only earns a warning and is worth avoiding.
              "-platform_version", "ios", "17.0", "17.0",
