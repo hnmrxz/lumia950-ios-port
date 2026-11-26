@@ -181,7 +181,7 @@ def main():
     include_dirs = [ROOT / directory for directory in spec.get("include", [])]
 
     objects = []
-    source_list = list(spec["sources"]) + list(spec.get("extra_sources", [])) + list(args.extra_source)
+    source_list = list(spec["sources"]) + list(spec.get("extra_sources", []))
     for source_name in source_list:
         source = ROOT / source_name
         if not source.is_file():
