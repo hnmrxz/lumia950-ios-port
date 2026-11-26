@@ -41,6 +41,24 @@ Two things worth noting against the emulator run: the panel is the real one (**1
 32 bpp at 0x400000**, matching the firmware's measured GOP) and the kernel was found on **another volume**,
 so the NTFS driver staged at `EFI\UniXNU\Drivers\ntfs.efi` did its job.
 
+## The kernel rung on hardware: silence after the hand-off
+
+The screen stayed exactly on the hand-off page (green bar, the DarwinBoot lines, `Exiting boot services. A green
+bar across the top marks the loader before branching to XNU.` and did not change again. That is the same
+symptom the merged image showed in QEMU, where the serial console also ended at the hand-off.
+
+Two readings are possible and this boot cannot separate them:
+
+1. XNU ran and printed nothing -- the image deployed at this step was the **prelinked** one
+   (56,619,008 B, sha256 17866f70195040e8), whose console may not reach this panel;
+2. XNU faulted immediately after the branch, with no console to say so.
+
+The next boot swaps in the **source-built** kernel (15,298,424 B, sha256 0001c3fbc1ecb63e, built by the same
+CI run and carrying the `skmem_sysctl_skip` guard) because that image is the one this repository has seen print
+`arm_vm_init`-era lines and `Still waiting for root device` -- if the panel shows any of that, the kernel rung
+is `XNU-entry-tested` on hardware; if the panel stays silent for both images, the next instrument is a
+framebuffer write from a driver that runs before anything else.
+
 ## What is not claimed
 
 - No kernel output had been observed at the time of writing, so **`XNU-entry-tested` is not claimed** for the
