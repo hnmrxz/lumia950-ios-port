@@ -27,7 +27,9 @@ MARKER = "native_boot_progress_stage"
 # The panel parameters come from boot_args.Video, measured in pexpert/pexpert/arm/boot.h of the pinned
 # source: `unsigned long v_baseAddr, v_rowBytes, v_height`. Hard-coding them drew into unmapped space
 # in QEMU (run 45764900801, synchronous exception before VM setup).
-DECLARATION = ("\textern void native_boot_progress_stage(void *base, unsigned long stride, "
+DECLARATION = ("\textern void native_boot_progress_remember(void *base, unsigned long stride, "
+               "unsigned long height, const char *command_line);\n"
+               "\textern void native_boot_progress_stage(void *base, unsigned long stride, "
                "unsigned long height, const char *command_line, int stage);\n")
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
@@ -35,23 +37,20 @@ PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up 
 # The third stage runs after the platform expert has installed the video console, so pexpert has mapped the
 # framebuffer and translated its address: this is the first draw that does not depend on the bootstrap map.
 BSD_ANCHOR = "\tthrottle_init();\n"
-BSD_DECLARATION = ("\textern void native_boot_progress_stage(void *base, unsigned long stride, "
-                   "unsigned long height, const char *command_line, int stage);\n")
-BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, drawn once the panel has a mapping. */\n"
-             + BSD_DECLARATION
-             + "\tnative_boot_progress_stage((void *)PE_state.video.v_baseAddr, PE_state.video.v_rowBytes, "
-             + "\t                           PE_state.video.v_height, PE_boot_args()->CommandLine, 2);\n")
-
+BSD_STAGE = ("\n\t/* Bring-up instrument: third bar, after mapping the panel ourselves. */\n"
+             + "\textern void native_boot_progress_stage_mapped(int stage);\n"
+             + "\tnative_boot_progress_stage_mapped(2);\n")
 
 STAGE_0 = (
-    "\n\t/* Bring-up instrument: one bar per stage reaches the panel before the MMU is on. */\n"
+    "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
     + DECLARATION
+    + "\tnative_boot_progress_remember((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
+    + "args->Video.v_height, args->CommandLine);\n"
     + "\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
     + "args->Video.v_height, args->CommandLine, 0);\n"
 )
 STAGE_2 = ("\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
            "args->Video.v_height, args->CommandLine, 1);\n")
-
 
 def find(root: Path) -> list[Path]:
     found: list[Path] = []
@@ -116,7 +115,7 @@ def apply_bsd(path: Path) -> tuple[bool, str]:
 
 def check_bsd(path: Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "PE_boot_args()->CommandLine, 2)" not in text:
+    if "native_boot_progress_stage_mapped(2)" not in text:
         if BSD_ANCHOR not in text:
             return False, "skipped: no throttle_init() in this copy of bsd_init.c"
         return False, "missing the third stage"

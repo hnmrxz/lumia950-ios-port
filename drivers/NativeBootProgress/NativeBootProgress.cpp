@@ -54,6 +54,64 @@ contains(const char *haystack, const char *needle)
 // before VM setup (runs 45764900801, 45774728401), and the kernel must not be killed by its own instrument.
 constexpr const char *kSwitch = "lumia-bars";
 
+namespace {
+
+// What arm_init learned from boot_args, kept for the later stage. Nothing here is an ABI guess: arm_init passes
+// the values straight through, and the later call only needs them again after the MMU has been configured.
+struct Remembered {
+    void *base;
+    unsigned long stride;
+    unsigned long height;
+    const char *command_line;
+};
+
+Remembered remembered = {nullptr, 0ul, 0ul, nullptr};
+
+extern "C" void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
+                                       const char *command_line, int stage);
+
+}  // namespace
+
+extern "C" void
+native_boot_progress_remember(void *base, unsigned long stride, unsigned long height, const char *command_line)
+{
+    remembered.base = base;
+    remembered.stride = stride;
+    remembered.height = height;
+    remembered.command_line = command_line;
+}
+
+// Map the panel ourselves, then draw: by the time this runs the pmap exists, and a mapping made here does not
+// depend on whether the platform expert mapped the panel or on how its own video struct is laid out.
+#if defined(__aarch64__)
+extern "C" unsigned long ml_io_map(unsigned long phys, unsigned long size);
+#endif
+
+extern "C" void
+native_boot_progress_stage_mapped(int stage)
+{
+    if (remembered.base == nullptr || remembered.stride == 0ul || remembered.height == 0ul) {
+        return;
+    }
+#if defined(__aarch64__)
+    const unsigned long span = remembered.stride * remembered.height;
+    const unsigned long mapped = ml_io_map(reinterpret_cast<unsigned long>(remembered.base), span);
+    if (mapped == 0ul) {
+        return;
+    }
+    void *panel = reinterpret_cast<void *>(mapped);
+#else
+    void *panel = remembered.base;  // a host build passes a buffer that is already addressable
+#endif
+    native_boot_progress_stage(panel, remembered.stride, remembered.height, remembered.command_line, stage);
+}
+
+extern "C" int
+native_boot_progress_switch(const char *command_line, const char *want)
+{
+    return contains(command_line, want) ? 1 : 0;
+}
+
 extern "C" void
 native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,
                            const char *command_line, int stage)
