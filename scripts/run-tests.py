@@ -34,6 +34,7 @@ SELF_CONTAINED = (
     "test-powershell-parses.py",
     "test-boot-progress-hook.py",
     "test-kernel-personality.py",
+    "test-deploy-kernel.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",
