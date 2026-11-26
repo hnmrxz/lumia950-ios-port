@@ -560,6 +560,26 @@
         }
       ],
       "limits": "Emulator only, and a negative result. The earlier placement runs are superseded: they used a merged image built before the PRNG guard, which is recorded in the note."
+    },
+    {
+      "id": "prelink-segment-growth",
+      "what": "Growing a mapped segment to hold the kext is implemented and its output is read by the loader, which refuses it with 'overlapping virtual segments' because the chosen segment ends where the next one begins",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/prelink-growth/dmesg.txt"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/grow-prelink-segment.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/architecture/prelink-kext-injection.md"
+        }
+      ],
+      "limits": "Emulator only. The refusal is a real load of a real image by the real loader: it proves the edit chain works and names the geometry constraint; it is not a loaded kext."
     }
   ]
 }

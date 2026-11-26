@@ -44,6 +44,7 @@ SELF_CONTAINED = (
     "test-inspect-prelink.py",
     "test-add-prelink-entry.py",
     "test-append-prelink-kext.py",
+    "test-grow-prelink-segment.py",
     "test-check-bcd-layout.py",
     "test-check-host-tests-portable.py",
     "test-summarize-xnu-entry.py",

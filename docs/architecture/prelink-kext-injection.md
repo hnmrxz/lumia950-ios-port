@@ -162,3 +162,24 @@ panic 是 `!prng_ready`，这暴露了实验基准不对。换成 run 4585898640
 
 下一步（明确）：按发射器的做法，让段地址与 `__PRELINK_TEXT` 的 **slide** 语义一致——即把我们的 kext 放进
 `__PRELINK_TEXT` 的地址空间内（增长该段），而不是新造一个绝对地址的段。这也解释了为什么"换基址"两次都没有改变 fault 形态。
+
+## 按发射器的方式"长段"，被我们自己的加载器挡了一次——这次是好事
+
+发射器不是凭空造映射，而是把 kext 塞进**内核已声明的占位段**（`__PRELINK_TEXT`、`__PLK_TEXT_EXEC` 等）。照这个思路写了
+`scripts/grow-prelink-segment.py`：把字节插到目标段的文件末尾、把该段 `filesize`/`vmsize` 与首个 section 一起增大、
+把插入点之后的所有文件偏移（段、section、`LC_SYMTAB` 等）整体后移。
+
+对真实镜像把 91,840 字节的 kext 放进 `__PLK_TEXT_EXEC`（插入点 0x30a4000，增长 94,208 字节），启动时 **DarwinBoot 直接拒绝**：
+
+```
+error: overlapping virtual segments
+```
+
+这不是失败，而是**验证**：
+
+- 我们改出来的镜像**结构和段几何被加载器读到并检查了**；
+- 拒绝的原因具体：`__PLK_TEXT_EXEC` 的结尾正好是 `__PLK_DATA_CONST` 的起点，**该段没有 VA 余量**，一长大就与下一段重叠。
+
+所以下一步不是"要不要长段"，而是"**长哪个段**"：`__PLK_DATA_CONST` 之后有约 10 MB 的 VA 空隙，但它是数据段（不可执行）；
+可执行的 `__PRELINK_TEXT`/`__PLK_TEXT_EXEC` 都与后继段首尾相接。因此正确做法是**连同后继段的 VA 一起上移**，或者把模块拆成
+"文本进可执行段、数据进数据段"——这正是发射器 `append_segment()` 在做的事（它要求 4K 对齐、拒绝与既有映射碰撞）。
