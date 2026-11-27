@@ -76,8 +76,11 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("lumia-early-map-notlbi", self.block)
         self.assertIn("if (!no_tlbi)", self.block, "the TLB invalidate is its own group")
         self.assertIn("if (!no_clean)", self.block, "so is the cache clean")
-        self.assertLess(self.block.index("if (!no_tlbi)"), self.block.index("for (row = 8;"), "maintenance before the stores")
-        self.assertLess(self.block.index("for (row = 8;"), self.block.index("if (!no_clean)"), "and the clean after them")
+        panel = self.block[self.block.index("if (usable && !dry_run && !selftest)"):]
+        self.assertLess(panel.index("if (!no_tlbi)"), panel.index("for (row = 8; row < 16; row++)"),
+                        "maintenance before the stores")
+        self.assertLess(panel.index("for (row = 8; row < 16; row++)"), panel.index("if (!no_clean)"),
+                        "and the clean after them")
 
     def test_every_table_entry_is_checked_before_it_is_followed(self):
         self.assertIn("(l1_entry & 3) == 3", self.block, "a table at the gigabyte level is followed")
@@ -131,24 +134,33 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertEqual(self.text.count("PE_init_platform(FALSE, args)"), 1)
         self.assertLess(self.text.index("Bring-up marker"), self.text.index("PE_init_platform(FALSE, args)"))
 
-    def test_the_self_test_has_its_own_buffer_and_geometry(self):
-        """The first self-test pointed the drawing loop at a 4 KB page with the panel's stride and width, which overran it."""
-        self.assertIn("lumia_test_pixels[4096]", self.block, "its own buffer, sized in words")
+    def test_the_self_test_has_its_own_buffer_and_the_handset_geometry(self):
+        """Its own 72 KB buffer, and the handset's stride and width -- those numbers are executed rather than only calculated."""
+        self.assertIn("lumia_test_pixels[18432]", self.block, "72 KB, sized for the rows it draws")
         self.assertIn("if (selftest) {", self.block)
-        self.assertIn("stride = 256;", self.block)
-        self.assertIn("width = 64;", self.block)
-        self.assertIn("height = 16;", self.block)
+        self.assertIn("stride = 4320;", self.block, "the handset stride")
+        self.assertIn("width = 1080;", self.block, "the handset width")
+        self.assertIn("height = 1920;", self.block, "the handset height")
+
+    def test_the_self_test_buffer_holds_the_rows_it_draws(self):
+        rows = 8
+        stride_words = 4320 // 4
+        start = 16
+        end = start + (16 * stride_words)  # rows 8..15 inclusive of the last row's words
+        self.assertLess(end, 18400, "the drawn rows must end before the trailing sentinel")
+        self.assertGreater(end, start + rows * stride_words - stride_words, "and cover the rows asked for")
 
     def test_the_self_test_keeps_sentinels_inside_the_same_buffer(self):
         self.assertIn("buffer[column] = 0x5AA5C33Cu;", self.block)
-        self.assertIn("buffer[4080 + column] = 0xC33C5AA5u;", self.block)
+        self.assertIn("buffer[18400 + column] = 0xC33C5AA5u;", self.block)
         self.assertIn("0x5AA5C33Cu", self.block)
         self.assertIn("0xC33C5AA5u", self.block)
 
     def test_the_self_test_stays_inside_the_sentinels(self):
-        """Drawing starts at word 16 and covers at most 8 rows of 64 words, ending well before word 4080."""
+        """Drawing starts at word 16 and covers rows 8..15 of the handset geometry, ending before word 18,400."""
         self.assertIn("buffer[16 + (row * stride) / 4 + column]", self.block)
-        self.assertLess(16 + 8 * 256 // 4, 4080, "the drawn region must not reach the trailing sentinel")
+        self.assertIn("for (row = 8; row < 16; row++)", self.block.split("if (usable && selftest)")[1])
+        self.assertLess(16 + 16 * (4320 // 4), 18400, "the drawn region must not reach the trailing sentinel")
 
     def test_the_self_test_reports_the_branch_it_took(self):
         self.assertIn("created_table = 1", self.block)
