@@ -74,3 +74,27 @@
 
 RAM mailbox + 热复位：把阶段标记写进内核镜像内（V=P 已映射）的变量，热复位后由加载器读出并显示。
 优点是不触碰 MMU；缺点是需要加载器改动，且"热复位后 DRAM 仍可读"尚未验证。若路线 A 的 QEMU 原型回归太多，就转 B。
+
+## 8. 实测：框架自己也会改 `start.s`，所以我们的映射补丁不能先打
+
+第一次尝试按第 3 节直接改 `start.s`，runner 的回答是：
+
+```
+error: patch failed: osfmk/arm/pmap/pmap.h:115
+error: osfmk/arm64/start.s:426: patch does not apply
+error: osfmk/arm64/genassym.c:270: patch does not apply
+```
+
+原因是框架在归档之后会跑 `scripts/build-xnu-4k-baseline.sh`，它要应用一套**同时改 `pmap.h`、`start.s`、`genassym.c`** 的补丁；
+我们在 workflow 里先改了 `start.s`，这套补丁整体失败（一个 hunk 失败会让整份补丁拒绝应用），内核构建随之中止。
+
+### 结论
+
+1. 路线 A 的 C 侧标记（`lumia-early-map`）可以留在树里，但**没有 start.s 的映射它不会生效**，也不会改变普通启动（token 不在参数里）；
+2. `start.s` 的映射必须**追加到框架那套补丁里**（或在补丁应用之后、编译之前插入），不能在我们的 workflow 步骤里抢跑；
+3. 这条约束也说明为什么"先写代码再看能不能过"在这里代价高：框架的补丁顺序本身是一道门禁。
+
+### 下一步（下一轮）
+
+先取回框架那份 patch 文件（`unixnu/patches/...` 里被 `build-xnu-4k-baseline.sh` 引用的那一份），确认它的格式与文件列表，然后把我们的
+hunk **追加**为最后一段，再用 `git apply` 复验：应用后 `start.s` 同时包含框架的 4K 基线与我们的映射。这样只有一次构建，也不与框架争顺序。
