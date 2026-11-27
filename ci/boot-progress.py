@@ -87,6 +87,11 @@ SWITCHED_CALLS = {
     "lumia-skip-timercall": "\ttimer_call_init();\n",
     "lumia-skip-cpuinit": "\tcpu_init();\n",
     "lumia-skip-processor": "\tprocessor_bootstrap();\n",
+    # The handset still shows nothing with the five above skipped, so the stop is earlier. These cover what is left between the
+    # platform expert and the VM work: the WFE timeout configuration and the bootstrap startup routines. They are the two remaining
+    # candidates that talk to hardware the emulator does not model.
+    "lumia-skip-wfe": "\twfe_timeout_configure();\n\twfe_timeout_init();\n",
+    "lumia-skip-startup": "\tkernel_startup_bootstrap();\n",
 }
 
 AFTER_VM_INIT_MARKER = (
