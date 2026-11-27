@@ -1040,6 +1040,22 @@
         }
       ],
       "limits": "A reading of the prelink tool source, not a run of it: no merge was attempted locally, and the two candidate routes (framework manifest change, loader delivery) are both unstarted."
+    },
+    {
+      "id": "storage-route-c",
+      "what": "The polling layer of the storage driver (PollingHost, SdhciCore) includes no IOKit headers, so it can be compiled into the image through the same channel as the GPT parser -- a third route that could reach real eMMC reads before kext delivery is solved, but not IOMedia publication",
+      "label": "source-reviewed",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/m2-storage-integration-plan.md"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeSdhci/PollingHost.cpp"
+        }
+      ],
+      "limits": "A source-level observation and a documented route. Route C is not started: it cannot be validated in QEMU, its power/clock sequencing is unknown, and it would not satisfy the IOMedia part of M2."
     }
   ]
 }
