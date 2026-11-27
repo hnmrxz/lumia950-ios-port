@@ -128,3 +128,12 @@ M3 要求"只读读取 GPT 并用独立基准核对"。在真机可用之前，�
 
 边界不变：镜像仍是**合成 fixture**。这一步证明的是"内核解析器与独立参考读者口径一致"，
 **不是**真机 GPT 的证据；真机 M3 仍需一次只读 dump。
+
+### M3 解析器的编译证据
+
+| 证据 | 内容 |
+|---|---|
+| host-tested | 与 Python 参考读者在合成镜像上逐字段一致；四种损坏同样被拒 |
+| ABI-compiled（arm64 交叉编译） | `zig cc -target aarch64-windows-gnu -std=c11 -Wall -Wextra -Werror -c`，产出 arm64 目标文件 |
+
+**仍未包含**：链接进 XNU（`kernel-linked`）与读真机磁盘（`hardware-tested`）。这两项都要等真机与内核集成。

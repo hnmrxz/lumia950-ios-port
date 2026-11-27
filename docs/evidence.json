@@ -931,8 +931,8 @@
     },
     {
       "id": "gpt-parser-parity",
-      "what": "The kernel-side read-only GPT parser (drivers/Common/GptRead.c) compiles clean with -Wall -Wextra -Werror and agrees field by field with the Python reference reader on the same synthetic image, including refusing the same four corruptions for the same reasons",
-      "label": "host-tested",
+      "what": "The kernel-side read-only GPT parser (drivers/Common/GptRead.c) compiles clean with -Wall -Wextra -Werror, cross-compiles for arm64, and agrees field by field with the Python reference reader on the same synthetic image, refusing the same four corruptions for the same reasons",
+      "label": "ABI-compiled",
       "evidence": [
         {
           "label": "host-tested",
@@ -945,9 +945,13 @@
         {
           "label": "source-reviewed",
           "path": "tools/gpt-harness/main.c"
+        },
+        {
+          "label": "ABI-compiled",
+          "path": "drivers/Common/GptRead.c"
         }
       ],
-      "limits": "Host compilation and the synthetic fixture only. The parser has not run inside XNU, and no real disk has been read."
+      "limits": "Host compilation, an arm64 cross-compile and a synthetic image. The parser has not been linked into XNU and no real disk has been read, so neither kernel-linked nor hardware-tested is claimed."
     }
   ]
 }

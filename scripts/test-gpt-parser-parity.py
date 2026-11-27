@@ -100,6 +100,16 @@ class GptParserParityTests(unittest.TestCase):
         with self.assertRaises(self.reader.GptError):
             self.reader.parse(image.read_bytes())
 
+    def test_the_parser_cross_compiles_for_arm64(self):
+        """The kernel side is arm64; a parser that only builds on the host would be a host-only claim."""
+        target = self.base / "gptread-arm64.o"
+        result = subprocess.run([ZIG, "cc", "-target", "aarch64-windows-gnu", "-std=c11",
+                                 "-Wall", "-Wextra", "-Werror", "-c",
+                                 str(ROOT / "drivers" / "Common" / "GptRead.c"), "-o", str(target)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr[-600:])
+        self.assertTrue(target.is_file() and target.stat().st_size > 0, "no object file was produced")
+
 
 if __name__ == "__main__":
     unittest.main()
