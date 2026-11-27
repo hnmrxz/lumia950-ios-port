@@ -329,7 +329,10 @@ def read_system_registers(connection):
     result = {}
     number = 0
     visited = set()
-    wanted = {"elr_el1", "esr_el1", "far_el1", "sctlr_el1", "tcr_el1", "cntfrq_el0"}
+    # ttbr0/ttbr1 are here because the early-marker work needs to know which tables the CPU is actually walking: a mapping the
+    # kernel builds and the mapping the CPU uses are not the same question, and the evidence for both has to come from the hardware
+    # registers rather than from an assumption about which table start.s left in place.
+    wanted = {"elr_el1", "esr_el1", "far_el1", "sctlr_el1", "tcr_el1", "cntfrq_el0", "ttbr0_el1", "ttbr1_el1"}
 
     def feature(name):
         nonlocal number
