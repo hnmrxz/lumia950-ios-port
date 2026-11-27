@@ -1,0 +1,53 @@
+{
+  "what": "The register probe (this repository's EFI application) run on the handset: it printed the panel mode and eight EL1 registers, then held the screen",
+  "captured": "2026-11-27 (Asia/Shanghai), supplied by the device owner",
+  "photo": "handset-photo.jpg",
+  "panel": {
+    "width": 1080,
+    "height": 1920,
+    "stride_pixels": 1080,
+    "stride_bytes": 4320,
+    "pixel_format": 1,
+    "base": "0x400000"
+  },
+  "registers": {
+    "CNTFRQ_EL0": {
+      "raw": "0x124F800",
+      "decimal": 19200000,
+      "note": "19.2 MHz, matching the counter the loader reports"
+    },
+    "MIDR_EL1": {
+      "raw": "0x410FD033",
+      "note": "ARM implementer 0x41, part 0xD03 = Cortex-A53, r0p3"
+    },
+    "MPIDR_EL1": {
+      "raw": "0x80000000",
+      "note": "bit 31 set: uniprocessor, affinity 0"
+    },
+    "CurrentEL": {
+      "raw": "0x4",
+      "note": "EL1"
+    },
+    "SCTLR_EL1": {
+      "raw": "0xC0180D",
+      "note": "MMU and data cache on, instruction cache off at this point"
+    },
+    "TCR_EL1": {
+      "raw": "0x280003518",
+      "note": "matches the value the loader prints on its hand-off page"
+    },
+    "TTBR0_EL1": {
+      "raw": "0x2778F000",
+      "note": "the firmware's identity tables"
+    },
+    "TTBR1_EL1": {
+      "raw": "0x0",
+      "note": "no high-half mapping before the loader installs one"
+    }
+  },
+  "reading": [
+    "The machine looks ordinary at EL1: a Cortex-A53 r0p3, a 19.2 MHz counter, the firmware's identity tables, and the panel in the geometry the loader reported (1080x1920, 4320-byte rows, 32 bpp, base 0x400000).",
+    "Nothing here explains a kernel that stops before printing: the timer frequency is correct, the CPU is an A53 (the same architecture the emulator's cortex-a53 offers), the exception level is EL1 and TCR matches what the loader saw.",
+    "Because the kernel cannot print before arm_vm_init, the next instrument has to be inside the kernel: either a mapping for the framebuffer made from the kernel's own bootstrap page tables, or a check placed after the VM work and bisected backwards."
+  ]
+}

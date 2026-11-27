@@ -700,6 +700,26 @@
         }
       ],
       "limits": "One photograph of one boot, corrected by the device owner: it shows the screen the device stays on after the hand-off. It does not say whether the kernel hung or faulted."
+    },
+    {
+      "id": "handset-register-probe",
+      "what": "The handset at EL1 reports Cortex-A53 r0p3 (MIDR 0x410FD033), a 19.2 MHz counter (CNTFRQ 0x124F800), the firmware's identity tables (TTBR0 0x2778F000, TTBR1 0), TCR 0x280003518 and the panel at 1080x1920, stride 1080 px, base 0x400000",
+      "label": "hardware-tested",
+      "evidence": [
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/measurements/register-probe/handset-photo.jpg"
+        },
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/measurements/register-probe/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/build-control-mark.py"
+        }
+      ],
+      "limits": "One photograph of one probe run. It records the EL1 environment at the moment the probe ran, which is before the loader installs its own mapping; it does not show the state at the kernel's entry."
     }
   ]
 }
