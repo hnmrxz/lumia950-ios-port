@@ -92,3 +92,18 @@ python scripts/deploy-early-map.py --efiesp R: --kernel out/earlymap/mach.develo
 
 `test-deploy-early-map.py`（7 条）覆盖：dry run 不写、缺备份被拒、缺闸门被拒、齐备则写入并把旧内核留到备份、
 token 只加一次、哈希不符被拒、非本链条的手机被拒。
+
+## 9. 流程已端到端预演（2026-11-28）
+
+`scripts/rehearse-handset-run.py` 把**真机要跑的那套流程**在一份暂存 EFIESP 副本上完整走了一遍（副本在临时目录，不碰手机）：
+
+| 检查 | 结果 |
+|---|---|
+| dry run 不写任何东西 | ✅ |
+| apply 写入新内核 | ✅ 目标哈希 = 工件哈希 `661770a9…` |
+| 旧内核进备份 | ✅ 备份哈希 = 原内核 `3b65f550…` |
+| 启动参数只加一次 | ✅ |
+| boot-chain 闸门放行并记录 reason/verify | ✅ |
+| 运行记录 `handset-run.txt` | ✅ 含工件哈希、被替换内核哈希、参数、写入前配置 |
+
+**因此真机那一步只剩"连接 + 运行 + 拍照"**，脚本路径本身已经验证过一遍。

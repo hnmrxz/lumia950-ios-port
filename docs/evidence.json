@@ -1076,6 +1076,22 @@
         }
       ],
       "limits": "QEMU has no SDHCI controller, so this measures the probe's wiring and the mapping, not the controller. No register has been read from real hardware."
+    },
+    {
+      "id": "handset-run-rehearsal",
+      "what": "The handset deployment procedure was rehearsed end to end on a copy of the staged EFIESP tree: the dry run wrote nothing, apply wrote the artifact, kept the previous kernel in the backup, appended the boot argument once, passed the boot-chain gate and wrote the runbook",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/rehearse-handset-run.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/m1-early-map-handset-plan.md"
+        }
+      ],
+      "limits": "A copy of the staged tree, not the phone: no handset file was touched and no boot was performed"
     }
   ]
 }
