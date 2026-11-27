@@ -1056,6 +1056,26 @@
         }
       ],
       "limits": "A source-level observation and a documented route. Route C is not started: it cannot be validated in QEMU, its power/clock sequencing is unknown, and it would not satisfy the IOMedia part of M2."
+    },
+    {
+      "id": "sdhci-probe",
+      "what": "The SDHCI identification probe executes in QEMU when its boot argument is present: the boot reaches the VM return, the marker and the GPT self-check, then faults on the first read of the SDHCI window (ESR 0x96000010 at the mapped KVA); without the argument all six marker forms still reach root-wait",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/sdhci-probe/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/verify-sdhci-probe.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/sdhci-probe.py"
+        }
+      ],
+      "limits": "QEMU has no SDHCI controller, so this measures the probe's wiring and the mapping, not the controller. No register has been read from real hardware."
     }
   ]
 }

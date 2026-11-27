@@ -1,0 +1,36 @@
+{
+  "what": "The SDHCI identification probe, run in QEMU",
+  "artifact": {
+    "kernel_sha256": "661770a93051a375087a26f0a4ac3a3aafe51a7403e2d76f9ed47eb171488139",
+    "commit": "37abf24",
+    "build": "46034996420"
+  },
+  "runs": {
+    "without the argument": {
+      "six_forms": {
+        "off": 4,
+        "dry": 1,
+        "draw": 0,
+        "noclean": 0,
+        "notlbi": 0,
+        "selftest": 30
+      },
+      "outcome": "root-wait in every form"
+    },
+    "with lumia-sdhci-probe": {
+      "outcome": "stopped",
+      "esr_el1": "0x96000010",
+      "far_el1": "0xfffffff0406009fe",
+      "dmesg_tail": [
+        "LUMIA: arm_vm_init returned, entering the rest of arm_init",
+        "LUMIA: early map state 4",
+        "LUMIA: gpt self-check 0"
+      ],
+      "reading": "The probe ran, ml_io_map returned a virtual address, and the first register read faulted: under QEMU there is no device at 0xf9824900, so the mapping has nothing behind it. On the handset that window is the SDHCI controller, which is the difference the probe is meant to measure."
+    }
+  },
+  "risk_recorded": [
+    "A fault inside the probe stops the kernel, so it may only ever run behind its own boot argument -- which is how it is wired.",
+    "Under QEMU the fault is expected; on the handset it would mean the window is not usable from XNU, which is itself an answer."
+  ]
+}

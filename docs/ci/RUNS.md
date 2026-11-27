@@ -28,6 +28,7 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [46020217201](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46020217201) | `78564f2` | manual | kernel and the fast jobs | success | first artifact carrying the GPT parser (gpt_parse present); six marker forms still pass |
 | [46024353060](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46024353060) | `e25a91d` | manual | kernel and the fast jobs | success | first artifact with the in-kernel GPT self-check (result 0); six marker forms still pass |
 | [46028655982](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46028655982) | `1392022` | manual | kernel and the fast jobs | success | kext container built before its consumer; zero archive-step failures (previously the blob was missing) |
+| [46034996420](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46034996420) | `37abf24` | manual | kernel and the fast jobs | success | SDHCI probe in the image; with its argument the read of the unmapped window faults, without it all six marker forms pass |
 
 The last row is the definitive one. In addition to the three artifacts it is the first run in which
 **the linked kernel was executed**: `xnu-entry-qemu` boots the same run's kernel through the
