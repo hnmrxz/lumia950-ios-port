@@ -174,11 +174,27 @@ artifact `661770a9…`（build 46034996420，commit `37abf24`）。
 3. **软件复位分支写成了地址范围**，把紧邻的中断状态寄存器（0x30）也吞了 ⇒ 每次应答都把整个模型复位，表现为读块超时。
    改成只匹配 `kRegSoftwareReset` 本身。
 
-### 12.2 关于驱动的两条未决问题（不是模型能决定的）
+### 12.2 两条问题的结论（2026-11-28）
 
-- 驱动写命令寄存器用 `(index << 8) | flags`（`PollingHost.cpp:149`），模型**跟随驱动**；
-  "这是否符合 SDHCI 规范"仍未核对。
-- 驱动对所有 R1 响应做 `kCardErrors = 0xffff0000 | (1<<7)` 检查，**会拒绝 R6**（CMD3 的 RCA 在这些位上），
-  而驱动没有 R6 类型；真实初始化路径里 CMD3 怎么发仍未核对（`kCmd3SetRelativeAddr` 目前无调用点）。
+**(1) 命令字编码：与参考实现一致 —— 问题关闭。**
+
+EDK2 的 SDHCI 主机驱动（`MdeModulePkg/Bus/Pci/SdMmcPciHcDxe/SdMmcPciHci.c`）这样组装命令寄存器：
+
+```
+Cmd = (UINT16)LShiftU64 (Packet->SdMmcCmdBlk->CommandIndex, 8);     // 行 2302：index 在 bit 8..13
+Cmd |= (BIT1 | BIT3 | BIT4);   // R1/R5/R6/R7：响应类型 + CRC 校验 + index 校验
+Cmd |= (BIT0 | BIT3);          // R2
+Cmd |= BIT5;                   // data present
+```
+
+本仓库驱动写的是 `(index << 8) | flags`，其中 `kCmdResponse48 = 0x02`、`kCmdCrcCheck = 0x08`、`kCmdIndexCheck = 0x10`、
+`kCmdDataPresent = 0x20`——**逐位相同**。模型原先按"规范"把 index 解在低 6 位才是错的。
+
+**(2) R1 掩码会拒绝 R6 —— 目前不触发，但记在案。**
+
+驱动对所有 R1 响应做 `kCardErrors = 0xffff0000 | (1<<7)` 检查，而 R6 的低位是 RCA。
+不过现在的初始化是**"热卡"路径**：`WarmCard::attach()` 用 `kCmd13SendStatus`/`kCmd9SendCsd`/`kCmd7SelectCard`
+（并假定固件已经初始化过卡），**根本不发 CMD0/1/2/3**。所以这条只在将来增加"冷启动"路径时才成为缺陷：
+届时 CMD3 若按 R1 发出，会被自己的掩码判成卡错误。
 
 **边界**：这是"驱动的读序列对**这个模型**合法"，不是"对真机合法"：Lumia 的窗口、时钟与卡都还没有被测过。

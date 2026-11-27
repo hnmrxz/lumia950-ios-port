@@ -160,8 +160,9 @@ private:
 
     void issueCommand(u16 command)
     {
-        /* The model follows the driver's encoding -- index in bits 8..13, flags below it. Whether that encoding matches the SDHCI
-           specification is an open question recorded in the milestone notes, not something this model is allowed to decide. */
+        /* The driver's encoding -- index in bits 8..13, flags below -- is the same one EDK2's SDHCI host driver builds
+           (SdMmcPciHci.c: Cmd = CommandIndex << 8, then BIT1|BIT3|BIT4 for R1/R5/R6/R7 and BIT5 for data present). So the model follows a
+           reference implementation, not a guess. */
         const u32 index = (command >> 8) & 0x3F;
         const u32 argument = get32(kRegArgument);
         u32 status = get32(kRegInterruptStatus) | kIntCommandComplete;

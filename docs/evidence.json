@@ -1108,6 +1108,26 @@
         }
       ],
       "limits": "A model of the controller, not the controller: it proves the driver's sequence is legal for this model, and says nothing about the Lumia's SDHCI window, clock or card"
+    },
+    {
+      "id": "sdhci-command-encoding",
+      "what": "The driver encoded the SDHCI command register as (index << 8) | flags, which matches the reference implementation in EDK2 SdMmcPciHci.c: index shifted into bits 8..13, BIT1|BIT3|BIT4 for R1/R5/R6/R7, BIT0|BIT3 for R2, BIT5 for data present; the register model follows that encoding",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeSdhci/PollingHost.cpp"
+        },
+        {
+          "label": "host-tested",
+          "path": "drivers/NativeSdhci/Test/ModelSdhci.h"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/m2-storage-integration-plan.md"
+        }
+      ],
+      "limits": "Compared against a published reference implementation, not against the controller: the encoding is right, the registers still have not answered on the phone"
     }
   ]
 }
