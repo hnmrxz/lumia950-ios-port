@@ -15,6 +15,8 @@ CASES = {
     "off": "",
     "dry": "lumia-early-map-dry",
     "draw": "lumia-early-map",
+    "noclean": "lumia-early-map-noclean",
+    "notlbi": "lumia-early-map-notlbi",
 }
 BASE_ARGS = "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1"
 
@@ -59,5 +61,5 @@ def run_case(name: str, extra: str) -> dict:
 
 for name, extra in CASES.items():
     result = run_case(name, extra)
-    print(f"{result['case']:5s} outcome={result.get('outcome')} esr={result.get('esr')} far={result.get('far')} "
+    print(f"{result['case']:7s} outcome={result.get('outcome')} esr={result.get('esr')} far={result.get('far')} "
           f"state={result.get('state')} stop={result.get('stop')} {result.get('error', '')}")

@@ -185,61 +185,33 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
 # that is no longer there.
 # 4 = token absent, 3 = invalid panel arguments, 2 = the guard refused, 1 = mapping installed, 0 = drawn. A static local of arm_init so
 # both the marker and the post-VM report see the same object without touching anything at file scope.
-EARLY_STATE = "\n\tstatic volatile unsigned int lumia_early_map_state = 4;\n"
+EARLY_STATE = (
+    "\n\tstatic volatile unsigned int lumia_early_map_state = 4;\n"
+    "\tstatic int lumia_token_at(const char *p, const char *want)\n"
+    "\t{\n"
+    "\t\tconst char *a = p;\n"
+    "\t\tconst char *b = want;\n"
+    "\t\twhile (*a != '\\0' && *b != '\\0' && *a == *b) { a++; b++; }\n"
+    "\t\treturn *b == '\\0' && (*a == '\\0' || *a == ' ' || *a == '\\t');\n"
+    "\t}\n"
+)
 
-# A marker that can reach the panel before the VM work. It installs its own mapping, because that is the only thing that exists that
-# early and start.s is patched by the framework's 4K-baseline series.
+# A marker that can reach the panel before the VM work: the mapping is measured safe, and the drawing path is split so each of its steps
+# can be left out by its own boot argument.
 #
-# It reports what it did in the same value the post-VM kprintf prints: 0 mapping installed and drawn, 1 installed but not drawn, 2 refused by
-# the guard, 3 invalid panel arguments, 4 boot argument absent, 5 no root entry for the chosen address, 6 index out of range, 7 the L1 slot
-# was already taken. The last QEMU run reported 2, which is why the address now shares the kernel's root entry: the previous one,
-# 0xFFFFFFF0E0000000, had no root entry at all, and this marker may not create intermediate levels.
-# A marker that can reach the panel before the VM work. It installs its own mapping under the kernel's root entry, because that is the
-# only thing that exists that early and start.s is patched by the framework's 4K-baseline series.
+#   lumia-early-map           map and draw
+#   lumia-early-map-dry       map only                      (state 1: installed, nothing drawn)
+#   lumia-early-map-noclean   draw without the cache clean
+#   lumia-early-map-notlbi    draw without the TLB invalidate
 #
-# It reports what it did in the same value the post-VM kprintf prints: 0 installed and drawn, 1 installed not drawn, 2 refused, 3 bad panel
-# arguments, 4 boot argument absent, 5 no root entry, 6 index out of range, 7 the chosen L1 slot was taken, 8 no empty L1 slot. The QEMU runs
-# have already used this to move twice: 2 (the address had no root entry at all) and then 7 (a fixed mid-table slot was in use), so the slot
-# is now the highest one that reads back empty.
-# A marker that can reach the panel before the VM work, in the safest form the measurements allow: it reports why it cannot install
-# rather than risking the boot.
+# Measured context: at arm_vm_init TTBR0_EL1 points at bootstrap_pagetables, indexed at 1 GB, only the kernel's own gigabyte carries a table
+# (entry 1 -> physical 0x4818f000), and the gigabyte holding the QEMU framebuffer is empty. Writing that entry and the leaf block is safe;
+# what still faults sits in the drawing path.
 #
-# Measured history, one build each: writing an L1 entry without checking it (fault, FAR 0x158); reading TTBR1 instead of assuming the L1
-# offset (reaches root-wait); a fixed address with no root entry (state 2); a fixed mid-table slot (state 7); and the highest empty slot
-# (build 45969556167, no console at all, so filling an arbitrary L1 entry is not safe while arm_vm_init still consumes these tables).
-#
-# It reports through the post-VM console: 0 installed and drawn, 1 installed not drawn, 2 refused, 3 bad panel arguments, 4 token absent,
-# 5 no root entry, 6 index out of range, 7 the L1 slot was taken, 8 no empty slot (unused since the scan was withdrawn).
-# A marker that can reach the panel before the VM work, by completing the identity map XNU itself builds in start.s.
-#
-# The source says why this is the right table. `arm_replace_identity_map()` in arm_vm_init.c bzeroes the whole V=P L1 table and rebuilds
-# only the page it needs to turn the MMU on -- the identity map is temporary by design. The kernel-VA (TTBR1) tables are the ones
-# pmap_bootstrap keeps, and an entry added there was measured to kill the boot outright (build 45969556167: no console at all). So this
-# adds one block entry to the identity map for the 2 MB / 32 MB block holding boot_args.Video.v_baseAddr, guarded by the block already
-# being mapped or the slot being empty, and then writes the marker through the physical address, which is the same as the virtual one there.
-#
-# Report through the post-VM console: 0 installed and drawn, 1 installed not drawn, 2 refused, 3 bad panel arguments, 4 token absent,
-# 5 no identity table for the block, 6 index out of range, 7 the slot holds a different mapping.
-# A marker that can reach the panel before the VM work, without ever replacing a mapping the kernel relies on.
-#
-# The measurement behind this shape: breaking at arm_vm_init shows TTBR0_EL1 = 0x4818d000 and TTBR1_EL1 = 0x4818e000, two adjacent pages of
-# bootstrap_pagetables, and start.s maps the identity range from physBase. A framebuffer that lies inside RAM is therefore already mapped, and
-# a marker only has to check. The three earlier failures all replaced an existing block entry at an intermediate level with a table, which
-# discarded the identity mapping for a whole gigabyte.
-#
-# Report through the post-VM console: 0 drawn, 1 usable (already mapped or newly added) but not drawn, 2 refused, 3 bad panel arguments,
-# 4 token absent, 5 no table at the root, 6 index out of range, 7 the leaf slot holds another block, 9 a block entry stands in the way and
-# this marker will not split it.
-# A marker that can reach the panel before the VM work, without ever replacing a mapping the kernel relies on, and with a dry form that
-# installs the mapping but writes nothing -- the split needed to tell "the table write faults" from "the framebuffer store faults".
-#
-# Measured, not assumed: at arm_vm_init TTBR0_EL1 points at bootstrap_pagetables, the table is indexed at 1 GB, and only the kernel's own
-# gigabyte carries a table (entry 1 -> physical 0x4818f000); the gigabyte holding the QEMU framebuffer (entry 3) is empty.
-#
-# Report through the post-VM console: 0 drawn, 1 usable but not drawn (dry run, or a covering block), 2 refused, 3 bad panel arguments,
-# 4 token absent, 6 index out of range, 7 the leaf slot holds another block, 9 a block stands in the way and will not be split.
+# States: 0 drawn, 1 usable but not drawn, 2 refused, 3 bad panel arguments, 4 token absent, 6 index out of range, 7 the leaf slot holds
+# another block, 9 a block stands in the way and will not be split.
 EARLY_MAP = (
-    '\n\t/* Bring-up marker: map the framebuffer through the identity tables, then draw -- or only map, for the dry run. */\n\t{\n\t\tconst char *line = args->CommandLine;\n\t\tconst char *want = "lumia-early-map";\n\t\tconst char *dry = "lumia-early-map-dry";\n\t\tint hit = 0;\n\t\tint dry_run = 0;\n\t\tconst char *p = line;\n\t\twhile (*p != \'\\0\' && !(hit && dry_run)) {\n\t\t\tconst char *a = p;\n\t\t\tconst char *b = want;\n\t\t\tconst char *c = dry;\n\t\t\tif (a != line && a[-1] != \' \' && a[-1] != \'\\t\') { p++; continue; }\n\t\t\twhile (*a != \'\\0\' && *b != \'\\0\' && *a == *b) { a++; b++; }\n\t\t\tif (*b == \'\\0\' && (*a == \'\\0\' || *a == \' \' || *a == \'\\t\')) { hit = 1; p++; continue; }\n\t\t\ta = p;\n\t\t\twhile (*a != \'\\0\' && *c != \'\\0\' && *a == *c) { a++; c++; }\n\t\t\tif (*c == \'\\0\' && (*a == \'\\0\' || *a == \' \' || *a == \'\\t\')) { hit = 1; dry_run = 1; }\n\t\t\tp++;\n\t\t}\n\t\tif (hit) {\n\t\t\t/* Measured at arm_vm_init: TTBR0_EL1 = bootstrap_pagetables, indexed at 1 GB, and only the kernel\'s own gigabyte has a table\n\t\t\t * (entry 1 -> physical 0x4818f000). The gigabyte that holds the QEMU framebuffer (entry 3) is empty, which is the state 5 this\n\t\t\t * marker reported. A block entry is never replaced here -- three earlier faults came from writing tables where the kernel\n\t\t\t * already had a mapping -- and the dry token separates "the table write" from "the framebuffer store". */\n\t\t\tstatic uint64_t lumia_l2[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n\t\t\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);\n\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n\t\t\tconst uint64_t to_va = (uint64_t)args->virtBase - (uint64_t)args->physBase;\n\t\t\tconst uint64_t l2_pa = (uint64_t)lumia_l2 - to_va;\n\t\t\tuint64_t ttbr0;\n\t\t\tuint64_t *l1;\n\t\t\tuint64_t l1_index;\n\t\t\tuint64_t l1_entry;\n\t\t\tuint64_t *l2;\n\t\t\tuint64_t l2_index;\n\t\t\tint usable = 0;\n\t\t\tlumia_early_map_state = 2;\n\t\t\t__asm__ volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));\n\t\t\tl1 = (uint64_t *)((ttbr0 & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\tif (pa == 0 || args->Video.v_rowBytes == 0 || args->Video.v_width == 0 || args->Video.v_height == 0) {\n\t\t\t\tlumia_early_map_state = 3;\n\t\t\t} else {\n\t\t\t\tl1_index = (block_pa & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n\t\t\t\tif (l1_index >= entries) {\n\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t} else {\n\t\t\t\t\tl1_entry = l1[l1_index];\n\t\t\t\t\tif ((l1_entry & 3) == 1) {\n\t\t\t\t\t\t/* a block already covers this gigabyte: usable only if it covers the framebuffer, and never split */\n\t\t\t\t\t\tlumia_early_map_state = (l1_entry & ARM_TTE_TABLE_MASK) <= block_pa ? 1 : 9;\n\t\t\t\t\t\tusable = (lumia_early_map_state == 1);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tif ((l1_entry & 3) == 3) {\n\t\t\t\t\t\t\tl2 = (uint64_t *)((l1_entry & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2 = lumia_l2;\n\t\t\t\t\t\t\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (l2_pa & ARM_TTE_TABLE_MASK);\n\t\t\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tl2_index = (block_pa & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n\t\t\t\t\t\tif (l2_index >= entries) {\n\t\t\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t\t\t} else if (l2[l2_index] != 0 && (l2[l2_index] & (block - 1)) != block_pa) {\n\t\t\t\t\t\t\tlumia_early_map_state = 7;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n\t\t\t\t\t\t\tlumia_early_map_state = 1;\n\t\t\t\t\t\t\tusable = 1;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\tif (usable && !dry_run) {\n\t\t\t\tvolatile unsigned int *fb;\n\t\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n\t\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n\t\t\t\tunsigned long height = (unsigned long)args->Video.v_height;\n\t\t\t\tunsigned long row;\n\t\t\t\tunsigned long column;\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("tlbi vmalle1" ::: "memory");\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("isb" ::: "memory");\n\t\t\t\tfb = (volatile unsigned int *)pa;\n\t\t\t\tif (height > 136 && width <= 16384 && stride <= 65536) {\n\t\t\t\t\tfor (row = 120; row < 136; row++) {\n\t\t\t\t\t\tfor (column = 0; column < width; column++) {\n\t\t\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n\t\t\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n\t\t\t\t\t\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");\n\t\t\t\t\t}\n\t\t\t\t\t__asm__ volatile("dsb sy" ::: "memory");\n\t\t\t\t\tlumia_early_map_state = 0;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n'
+    '\n\t/* Bring-up marker: map the framebuffer through the identity tables, then draw -- with the maintenance steps selectable. */\n\t{\n\t\tconst char *line = args->CommandLine;\n\t\tint hit = 0;\n\t\tint dry_run = 0;\n\t\tint no_clean = 0;\n\t\tint no_tlbi = 0;\n\t\tconst char *p = line;\n\t\twhile (*p != \'\\0\') {\n\t\t\tif (p != line && p[-1] != \' \' && p[-1] != \'\\t\') { p++; continue; }\n\t\t\tif (lumia_token_at(p, "lumia-early-map")) { hit = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-dry")) { hit = 1; dry_run = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-noclean")) { hit = 1; no_clean = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-notlbi")) { hit = 1; no_tlbi = 1; }\n\t\t\tp++;\n\t\t}\n\t\tif (hit) {\n\t\t\t/* Measured: at arm_vm_init TTBR0_EL1 points at bootstrap_pagetables, indexed at 1 GB, only the kernel\'s gigabyte carries a\n\t\t\t * table, and the gigabyte holding the QEMU framebuffer is empty. Writing that entry and the leaf block was then proven safe by\n\t\t\t * the dry form, which reaches root-wait with the mapping installed. What still faults is the drawing path, so each of its steps\n\t\t\t * can be left out by its own boot argument to name the group responsible. */\n\t\t\tstatic uint64_t lumia_l2[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n\t\t\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);\n\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n\t\t\tconst uint64_t to_va = (uint64_t)args->virtBase - (uint64_t)args->physBase;\n\t\t\tconst uint64_t l2_pa = (uint64_t)lumia_l2 - to_va;\n\t\t\tuint64_t ttbr0;\n\t\t\tuint64_t *l1;\n\t\t\tuint64_t l1_index;\n\t\t\tuint64_t l1_entry;\n\t\t\tuint64_t *l2;\n\t\t\tuint64_t l2_index;\n\t\t\tint usable = 0;\n\t\t\tlumia_early_map_state = 2;\n\t\t\t__asm__ volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));\n\t\t\tl1 = (uint64_t *)((ttbr0 & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\tif (pa == 0 || args->Video.v_rowBytes == 0 || args->Video.v_width == 0 || args->Video.v_height == 0) {\n\t\t\t\tlumia_early_map_state = 3;\n\t\t\t} else {\n\t\t\t\tl1_index = (block_pa & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n\t\t\t\tif (l1_index >= entries) {\n\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t} else {\n\t\t\t\t\tl1_entry = l1[l1_index];\n\t\t\t\t\tif ((l1_entry & 3) == 1) {\n\t\t\t\t\t\tlumia_early_map_state = (l1_entry & ARM_TTE_TABLE_MASK) <= block_pa ? 1 : 9;\n\t\t\t\t\t\tusable = (lumia_early_map_state == 1);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tif ((l1_entry & 3) == 3) {\n\t\t\t\t\t\t\tl2 = (uint64_t *)((l1_entry & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2 = lumia_l2;\n\t\t\t\t\t\t\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (l2_pa & ARM_TTE_TABLE_MASK);\n\t\t\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tl2_index = (block_pa & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n\t\t\t\t\t\tif (l2_index >= entries) {\n\t\t\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t\t\t} else if (l2[l2_index] != 0 && (l2[l2_index] & (block - 1)) != block_pa) {\n\t\t\t\t\t\t\tlumia_early_map_state = 7;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n\t\t\t\t\t\t\tlumia_early_map_state = 1;\n\t\t\t\t\t\t\tusable = 1;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\tif (usable && !dry_run) {\n\t\t\t\tvolatile unsigned int *fb;\n\t\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n\t\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n\t\t\t\tunsigned long height = (unsigned long)args->Video.v_height;\n\t\t\t\tunsigned long row;\n\t\t\t\tunsigned long column;\n\t\t\t\tif (!no_tlbi) {\n\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t__asm__ volatile("tlbi vmalle1" ::: "memory");\n\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t__asm__ volatile("isb" ::: "memory");\n\t\t\t\t}\n\t\t\t\tfb = (volatile unsigned int *)pa;\n\t\t\t\tif (height > 136 && width <= 16384 && stride <= 65536) {\n\t\t\t\t\tfor (row = 120; row < 136; row++) {\n\t\t\t\t\t\tfor (column = 0; column < width; column++) {\n\t\t\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tif (!no_clean) {\n\t\t\t\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n\t\t\t\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n\t\t\t\t\t\t\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");\n\t\t\t\t\t\t}\n\t\t\t\t\t\t__asm__ volatile("dsb sy" ::: "memory");\n\t\t\t\t\t}\n\t\t\t\t\tlumia_early_map_state = 0;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n'
 )
 
 STAGE_0 = (

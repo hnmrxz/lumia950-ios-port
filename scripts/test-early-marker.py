@@ -46,7 +46,7 @@ class EarlyMarkerTests(unittest.TestCase):
         cls.block = cls.text[cls.text.index("Bring-up marker"):cls.text.index("PE_init_platform")]
 
     def test_the_marker_is_injected_once_and_behind_its_token(self):
-        self.assertEqual(self.text.count('const char *want = "lumia-early-map"'), 1)
+        self.assertEqual(self.text.count("lumia_token_at(p, \"lumia-early-map\")"), 1)
         self.assertLess(self.block.index("lumia-early-map"), self.block.index("0x00E03030u"))
 
     def test_nothing_is_drawn_unless_the_address_is_usable(self):
@@ -67,6 +67,14 @@ class EarlyMarkerTests(unittest.TestCase):
     def test_the_dry_run_installs_the_mapping_without_writing(self):
         self.assertIn("lumia-early-map-dry", self.block)
         self.assertIn("if (usable && !dry_run)", self.block, "the store is the part a dry run skips")
+
+    def test_each_drawing_step_can_be_left_out(self):
+        self.assertIn("lumia-early-map-noclean", self.block)
+        self.assertIn("lumia-early-map-notlbi", self.block)
+        self.assertIn("if (!no_tlbi)", self.block, "the TLB invalidate is its own group")
+        self.assertIn("if (!no_clean)", self.block, "so is the cache clean")
+        self.assertLess(self.block.index("if (!no_tlbi)"), self.block.index("for (row = 120;"), "maintenance before the stores")
+        self.assertLess(self.block.index("for (row = 120;"), self.block.index("if (!no_clean)"), "and the clean after them")
 
     def test_every_table_entry_is_checked_before_it_is_followed(self):
         self.assertIn("(l1_entry & 3) == 3", self.block, "a table at the gigabyte level is followed")
