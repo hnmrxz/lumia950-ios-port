@@ -350,3 +350,28 @@ build 45969556167（扫描最高空槽）的结果是**内核在 `arm_vm_init` �
 - `scripts/kernel-symbols.py`：从 unstripped Mach-O 解析符号地址（`--break-at` 只接受地址）；
 - `scripts/trace-page-tables.py`：在两个断点读 TTBR0/TTBR1；
 - `scripts/read-identity-tables.py`：读取并保存表的原始字节（结果落在 `report.json` 的 `read` 字段）。
+
+## 17. 三态切分：写表是安全的，fault 在画屏路径里（2026-11-27）
+
+同一份 artifact（`094b9d30…`，build 45990792338，commit `35e9c85`）上跑三种形态：
+
+| 形态 | 结果 | ESR | 状态码 |
+|---|---|---|---|
+| 关 | root-wait | `0x0` | 4（参数缺失） |
+| **dry（只建映射、不画）** | **root-wait** | **`0x0`** | **1（映射已装、未画）** |
+| draw（建映射并画） | stopped | `0x96000005` | 无（FAR `0x158`） |
+
+### 17.1 结论
+
+**写 identity 表项 + 写叶子 block 表项是安全的**——dry 形态装好了映射，内核照样到 root-wait。
+fault 在**画屏路径**里，而画屏路径只有四件事：TLB 失效、行写入、缓存清理、结尾屏障；dry 一件都不做。
+
+### 17.2 一个必须记下的修正
+
+第一次跑 dry 时状态码是 **4**（参数缺失）：启动参数里只有 `lumia-early-map-dry`，不含 `lumia-early-map` 这个词，标记根本没运行，
+那次 dry 与“关”等价。**已修**：dry 匹配时同时置位 `hit` 与 `dry_run`。
+
+### 17.3 下一步
+
+再加两种形态：**写入但不清理缓存**、**写入但不做 TLB 失效**，与现有三种在同一 artifact 上跑；
+哪一组让内核活下来，就点名了那一组指令。

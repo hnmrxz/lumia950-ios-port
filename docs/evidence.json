@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The identity table start.s builds was read from the running kernel: at arm_vm_init only entry 1 is live (a table at physical 0x4818f000) and the gigabyte holding the QEMU framebuffer (entry 3) is empty, which is exactly the state 5 the marker reports; the marker itself keeps both configurations at root-wait with ESR 0x0",
+      "what": "The mapping itself is safe in QEMU: with the identity-table entry and leaf block installed but nothing drawn, the kernel reaches root-wait (state 1, ESR 0x0), while the form that also draws stops with ESR 0x96000005 / FAR 0x158",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -856,14 +856,14 @@
         },
         {
           "label": "host-tested",
-          "path": "scripts/trace-page-tables.py"
+          "path": "scripts/verify-early-split.py"
         },
         {
           "label": "host-tested",
           "path": "scripts/test-early-marker.py"
         }
       ],
-      "limits": "QEMU only. The marker does not draw yet, so nothing is proven about the handset's pre-VM stop; the handset was not touched."
+      "limits": "QEMU only. The drawing path still faults, so nothing is proven about the handset's pre-VM stop; the handset was not touched."
     }
   ]
 }

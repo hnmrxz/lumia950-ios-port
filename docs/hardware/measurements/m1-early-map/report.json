@@ -221,5 +221,43 @@
       "This also removes the earlier idea that a block entry was being replaced: at this level the entry to change is empty. The faults in the versions that wrote it therefore came from something else, and the next run has to read the table back immediately after the write to see whether the entry landed where intended."
     ],
     "next_step": "Break just after the marker with the boot argument, read the same 128 bytes plus the L2 page the marker points at, and compare: which entry changed, and does the walk root -> L1 -> L2 reach 0xEC000000 afterwards."
+  },
+  "round_171": {
+    "what": "Three-way split on one artifact: off, map-only (dry) and map-and-draw",
+    "artifact": {
+      "kernel_sha256": "094b9d30c548453c96710889049eba3d766311c9124b14e16093f20678d6c1ed",
+      "commit": "35e9c85",
+      "build": "45990792338",
+      "script": "scripts/verify-early-split.py"
+    },
+    "results": {
+      "off": {
+        "past_bsd_outcome": "root-wait",
+        "esr_el1": "0x0",
+        "state": 4,
+        "meaning": "token absent"
+      },
+      "dry": {
+        "past_bsd_outcome": "root-wait",
+        "esr_el1": "0x0",
+        "state": 1,
+        "meaning": "the mapping was installed (identity table entry written, leaf block written) and nothing was drawn"
+      },
+      "draw": {
+        "past_bsd_outcome": "stopped",
+        "esr_el1": "0x96000005",
+        "far_el1": "0x158",
+        "state": null,
+        "stop_symbols": [
+          "_sleh_synchronous_sp1"
+        ]
+      }
+    },
+    "reading": [
+      "This is the cut the split was for: writing the identity-table entry and the leaf block is safe -- the dry run installs both and the kernel still reaches root-wait with ESR 0x0 -- so the fault lives in the drawing path itself.",
+      "The drawing path is four things: TLB invalidate, the row stores, the cache clean, and the trailing barrier. The dry run does none of them, so the next split has to separate them; FAR 0x158 has appeared in every failing variant and is not the framebuffer address, which is why a store-only or maintenance-only variant is the next measurement rather than another theory.",
+      "A related correction from this round: the first attempt at the dry token armed nothing, because the boot argument contains no plain 'lumia-early-map' token, and the run looked identical to off (state 4). The token now sets both flags."
+    ],
+    "next_step": "Add a third form that stores without the cache clean, and one that stores without the TLB invalidate, and run all forms on one artifact: whichever keeps the kernel alive names the instruction group."
   }
 }
