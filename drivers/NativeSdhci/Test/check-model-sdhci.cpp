@@ -8,7 +8,6 @@
  */
 
 #include <cstdio>
-#include <cstring>
 
 #include "ModelSdhci.h"
 #include "PollingHost.h"
@@ -19,24 +18,22 @@ using namespace sdhci;
 
 namespace {
 
-sdhci::ModelSdhci g_model(0);
+ModelSdhci g_model;
 
-sdhci::u8 modelRead8(void *, sdhci::u32 offset) { return g_model.read8(offset); }
-sdhci::u32 modelRead32(void *, sdhci::u32 offset) { return g_model.read32(offset); }
-void modelWrite8(void *, sdhci::u32 offset, sdhci::u8 value) { g_model.write8(offset, value); }
-void modelWrite16(void *, sdhci::u32 offset, sdhci::u16 value) { g_model.write16(offset, value); }
-void modelWrite32(void *, sdhci::u32 offset, sdhci::u32 value) { g_model.write32(offset, value); }
-void modelDelay(void *, sdhci::u32) {}
+u8 modelRead8(void *, u32 offset) { return g_model.read8(offset); }
+u32 modelRead32(void *, u32 offset) { return g_model.read32(offset); }
+void modelWrite8(void *, u32 offset, u8 value) { g_model.write8(offset, value); }
+void modelWrite16(void *, u32 offset, u16 value) { g_model.write16(offset, value); }
+void modelWrite32(void *, u32 offset, u32 value) { g_model.write32(offset, value); }
+void modelDelay(void *, u32) {}
 
 int failures = 0;
 
 void check(bool condition, const char *what)
 {
+    std::printf("%s %s\n", condition ? "ok  " : "FAIL", what);
     if (!condition) {
-        std::printf("FAIL %s\n", what);
         ++failures;
-    } else {
-        std::printf("ok   %s\n", what);
     }
 }
 
@@ -46,7 +43,7 @@ int main()
 {
     g_model.fillPattern(0x40);
 
-    sdhci::RegisterIo io = {};
+    RegisterIo io = {};
     io.context = &g_model;
     io.read8 = modelRead8;
     io.read32 = modelRead32;
@@ -55,27 +52,20 @@ int main()
     io.write32 = modelWrite32;
     io.delayUs = modelDelay;
 
-    sdhci::PollingHost host;
+    PollingHost host;
     check(host.configure(io), "configure accepts a complete register interface");
     check(host.start(), "start resets and powers the controller");
 
     u32 response[4] = {};
-    const bool cmd0 = host.command(0, 0, sdhci::ResponseType::None, response);
-    std::printf("  CMD0 error=%s phase=%u interrupt=0x%x\n", hostErrorName(host.result().error),
-                static_cast<unsigned>(host.result().phase), host.result().interruptStatus);
-    check(cmd0, "CMD0 goes out");
-    check(host.command(1, 0x40FF8080u, sdhci::ResponseType::R1, response), "CMD1 goes out");
-    check(host.command(2, 0, sdhci::ResponseType::R2, response), "CMD2 goes out");
-    /* CMD3 answers R6, whose RCA sits in the bits the driver masks as card errors; the driver has no R6 type, so the test asks for no
-       response and records that as a finding rather than pretending the mask is satisfied. */
-    check(host.command(3, 1u << 16, sdhci::ResponseType::None, response), "CMD3 assigns an address");
+    check(host.command(0, 0, ResponseType::None, response), "CMD0 goes out");
+    check(host.command(1, 0x40FF8080u, ResponseType::R1, response), "CMD1 goes out");
+    check(host.command(2, 0, ResponseType::R2, response), "CMD2 goes out");
+    /* CMD3 answers R6, whose relative address sits in the bits the driver masks as card errors; the driver has no R6 type, so the test asks
+       for no response and records that as a finding rather than pretending the mask is satisfied. */
+    check(host.command(3, 1u << 16, ResponseType::None, response), "CMD3 assigns an address");
 
     u8 block[512] = {};
-    const bool read = host.read512(sdhci::kCmd17ReadSingleBlock, 0, block);
-    std::printf("  CMD17 error=%s phase=%u interrupt=0x%x bytes=%u\n", hostErrorName(host.result().error),
-                static_cast<unsigned>(host.result().phase), host.result().interruptStatus,
-                host.result().bytesTransferred);
-    check(read, "CMD17 reads a block");
+    check(host.read512(kCmd17ReadSingleBlock, 0, block), "CMD17 reads a block");
     bool matches = true;
     for (u32 index = 0; index < 512; ++index) {
         if (block[index] != static_cast<u8>(0x40 + index)) {
@@ -84,9 +74,9 @@ int main()
         }
     }
     check(matches, "the block matches the model's pattern");
+    check(host.result().bytesTransferred == 512, "the transfer reports 512 bytes");
     check(g_model.writeCommands == 0, "no write or erase command was issued");
 
-    sdhci::PollingHost refusing = host;
-    (void)refusing;
+    std::printf("%s\n", failures == 0 ? "PASS: the driver's read sequence is accepted by the model" : "FAILED");
     return failures == 0 ? 0 : 1;
 }

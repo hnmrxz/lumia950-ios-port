@@ -33,6 +33,7 @@ SELF_CONTAINED = (
     "test-gpt-parser-parity.py",
     "test-deploy-early-map.py",
     "test-storage-read-only.py",
+    "test-sdhci-model.py",
     "test-protection-is-wired.py",
     "test-prelinked-guard.py",
     "test-checkpoints.py",

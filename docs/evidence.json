@@ -1095,19 +1095,19 @@
     },
     {
       "id": "sdhci-register-model",
-      "what": "A register model of the SDHCI controller with the real polling layer wired to it on the host: configure, start and CMD0..CMD3 pass (CMD3 only without a response, because the driver masks R6s RCA bits as card errors); the block read still times out and is being located in the driver, not hidden",
+      "what": "The storage driver's read sequence runs against a host register model of the SDHCI controller and is accepted: configure, start, CMD0..CMD3, a 512-byte CMD17 whose bytes match the pattern, a 512-byte transfer report, and no write or erase command issued",
       "label": "host-tested",
       "evidence": [
         {
           "label": "host-tested",
-          "path": "drivers/NativeSdhci/Test/check-model-sdhci.cpp"
+          "path": "scripts/test-sdhci-model.py"
         },
         {
           "label": "source-reviewed",
           "path": "drivers/NativeSdhci/Test/ModelSdhci.h"
         }
       ],
-      "limits": "Work in progress. Five checks pass and the block read does not; the model is not yet evidence about the read path, and it says nothing about real hardware."
+      "limits": "A model of the controller, not the controller: it proves the driver's sequence is legal for this model, and says nothing about the Lumia's SDHCI window, clock or card"
     }
   ]
 }
