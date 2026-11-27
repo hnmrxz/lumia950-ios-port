@@ -367,3 +367,19 @@ drivers/NativeBootProgress/Mapped.cpp:16:10: fatal error: 'arm/pmap.h' file not 
 1. 扩展 prelink 发射器（把我们的 kext 当 module 放进占位段）——数周级，ADR 已写明；
 2. 让源码内核自带的 `NativeRamBlock` 真正发布 IOMedia——需要 IOStorageFamily 在链接期可见，除非把它一起编进内核；
 3. 以上两条都需要先有"真机到 bsd_init"这个前提，否则是在给未验证的假设加代码。
+
+## 实测：`arm_init` 里还不能 kprintf（一次失败换来的事实）
+
+想在真机上"看见内核是否启动"，最直接的办法是在 `PE_init_platform()` 之后打一行 `kprintf`——那正是图形控制台被安装的时刻。
+试了，结果是：
+
+```
+error: early native kernel boot stopped before VM setup: ['_sleh_synchronous_sp1']
+```
+
+**`_sleh_synchronous_sp1` = EL1 上的同步异常，位置在 VM 初始化之前。** 也就是说：平台专家装了控制台，但控制台的写入路径
+（它自己的帧缓冲映射）**要到 VM 工作之后才可用**；在此之前 `kprintf` 会踩空。同一点的色块之所以能画，是因为它直接往加载器
+报告的那个地址写，走的是另一条路。
+
+因此这条尝试被撤回，并记在这个注记里：**内核的第一行文字只能出现在 `arm_vm_init` 之后**，本移植现在就是 `bsd_init` 里那一行
+（`LUMIA: vinfo …`）。这也解释了真机那张照片为什么只有加载器页面：如果内核死在 VM 之前，它**没有任何办法**把话说出来。
