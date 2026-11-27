@@ -549,29 +549,8 @@ jobs:
           ld.lld --version | head -1
 
       - name: Repair a framework submodule pinned to a commit the remote no longer serves
-        # The framework records a gitlink per driver. NativeMetal's recorded commit (c6d29caa) is unreachable on its remote since the
-        # 2026-11-25 force-push, and git refuses to initialize the submodule, which stops every kernel build before compiling. This
-        # step re-points only that submodule, only when its recorded commit is really gone, and says so in the log. It is a CI repair
-        # for an upstream break, not a change to the build: the same code path decides the archive list.
-        run: |
-          set -euo pipefail
-          path=drivers/NativeMetal
-          recorded=$(git -C unixnu ls-tree HEAD "$path" | awk '{print $3}')
-          url=$(git -C unixnu config -f .gitmodules --get "submodule.$path.url")
-          echo "recorded: $recorded"
-          echo "url: $url"
-          if git ls-remote "$url" "$recorded" | grep -q .; then
-            echo "the recorded commit is still served; nothing to repair"
-            exit 0
-          fi
-          fallback=$(git ls-remote "$url" HEAD | awk '{print $1}')
-          echo "::warning::$path is pinned to $recorded, which $url no longer serves; re-pointing to $fallback"
-          rm -rf "unixnu/$path"
-          git clone --depth 1 "$url" "unixnu/$path"
-          git -C "unixnu/$path" checkout --detach "$fallback"
-          # record the substitution in the framework index so its own submodule update keeps it
-          git -C unixnu update-index --add --cacheinfo "160000,$fallback,$path"
-          echo "$path = $fallback" >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/repair-framework-submodules.sh unixnu drivers/NativeMetal
+
       - name: Fetch the DarwinBoot submodule
         run: git -C unixnu submodule update --init --depth 1 drivers/DarwinBoot
 
@@ -658,6 +637,10 @@ jobs:
         with:
           name: lumia950-payload
           path: out/payload
+
+      - name: Repair a framework submodule pinned to a commit the remote no longer serves
+        # Same repair as in the payload job: each job initializes the framework's submodules itself.
+        run: bash scripts/repair-framework-submodules.sh unixnu drivers/NativeMetal
 
       - name: Make the framework build print its kernel archive list
         # The failing link is the only place that knows which archives and which device
