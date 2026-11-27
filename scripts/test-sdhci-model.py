@@ -32,7 +32,14 @@ def main() -> int:
         if build.returncode != 0:
             print(build.stderr[-1500:])
             return 1
-        run = subprocess.run([str(binary)], capture_output=True, text=True)
+        # the same synthetic GPT image the Python reader and the parser parity test use, so both sides parse identical bytes
+        fixture = pathlib.Path(temporary) / "gpt.img"
+        make = subprocess.run([sys.executable, str(ROOT / "scripts" / "make-gpt-fixture.py"), "--out", str(fixture)],
+                              capture_output=True, text=True)
+        if make.returncode != 0:
+            print(make.stderr[-600:])
+            return 1
+        run = subprocess.run([str(binary), str(fixture)], capture_output=True, text=True)
         print(run.stdout.strip())
         if run.stderr.strip():
             print(run.stderr.strip()[-500:])

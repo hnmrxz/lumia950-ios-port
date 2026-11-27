@@ -1128,6 +1128,22 @@
         }
       ],
       "limits": "Compared against a published reference implementation, not against the controller: the encoding is right, the registers still have not answered on the phone"
+    },
+    {
+      "id": "gpt-through-driver",
+      "what": "The GPT parser reads its sectors through the storage driver's warm-card path against the register model: the parser accepts the synthetic table, reports both partitions, the EFI/SYSTEM and Microsoft types and their extents, and the whole read issues no write or erase command -- the same interface M3 needs on the phone",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "drivers/NativeSdhci/Test/check-model-sdhci.cpp"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-sdhci-model.py"
+        }
+      ],
+      "limits": "The sectors come from a model of the controller, not from eMMC: this proves the interface between the driver and the parser, not that the handset's disk can be read"
     }
   ]
 }

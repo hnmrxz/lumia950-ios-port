@@ -8,11 +8,15 @@
  */
 
 #include <cstdio>
+#include <cstdlib>
+#include <vector>
 
 #include "ModelSdhci.h"
 #include "PollingHost.h"
+#include "../../Common/GptRead.h"
 #include "PollingHost.cpp"
 #include "SdhciCore.cpp"
+#include "../../Common/GptRead.c"
 
 using namespace sdhci;
 
@@ -39,7 +43,7 @@ void check(bool condition, const char *what)
 
 }  // namespace
 
-int main()
+int main(int argc, char **argv)
 {
     g_model.fillPattern(0x40);
 
@@ -101,6 +105,40 @@ int main()
     }
     check(g_model.writeCommands == 0, "the warm path issued no write or erase command");
 
-    std::printf("%s\n", failures == 0 ? "PASS: the driver's read sequence is accepted by the model" : "FAILED");
+    /* The interface M3 needs: the GPT parser reads sectors through the driver's card. The image is the synthetic fixture the Python reader
+       and the parser parity test already use, passed in by the runner so both sides parse the same bytes. */
+    if (argc >= 2) {
+        std::FILE *file = std::fopen(argv[1], "rb");
+        if (file == nullptr) {
+            std::printf("FAIL the image %s could not be opened\n", argv[1]);
+            return 1;
+        }
+        std::vector<unsigned char> bytes(8u << 20);
+        const size_t read = std::fread(bytes.data(), 1, bytes.size(), file);
+        std::fclose(file);
+        g_model.loadImage(bytes.data(), static_cast<u32>(read / 512u));
+
+        PollingHost gptHost;
+        check(gptHost.configure(io), "the GPT host configures");
+        WarmCard gptCard;
+        check(gptCard.attach(gptHost, candidates, 1), "the GPT card attaches");
+        gpt_info info = {};
+        const gpt_status status = gpt_parse(
+            [](void *context, uint64_t lba, void *buffer) -> int {
+                WarmCard *card = static_cast<WarmCard *>(context);
+                return card->readBlock(lba, static_cast<u8 *>(buffer)) ? 0 : -1;
+            },
+            &gptCard, &info);
+        check(status == kGptOk, "the GPT parser accepts the table read through the driver");
+        /* the fixture declares two partitions, the same two the Python reader reports */
+        check(info.partition_count == 2, "both partitions come back through the driver");
+        check(info.partitions[0].type == kGptTypeEfiSystem, "the first is EFI System");
+        check(info.partitions[0].first_lba == 2048u && info.partitions[0].last_lba == 4095u,
+              "and its extent is the one the image declares");
+        check(info.partitions[1].type == kGptTypeMicrosoftData, "the second is Microsoft basic data");
+        check(g_model.writeCommands == 0, "the GPT read issued no write or erase command");
+    }
+
+    std::printf("%s\n", failures == 0 ? "PASS: the driver's read sequence is accepted by the model, and a GPT table reads through it" : "FAILED");
     return failures == 0 ? 0 : 1;
 }

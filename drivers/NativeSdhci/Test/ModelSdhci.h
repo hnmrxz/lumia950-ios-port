@@ -59,12 +59,28 @@ public:
         csd[3] = 0x00D00000u;
     }
 
+    /* Every read is served from the image; fillPattern makes every sector carry the same pattern so a byte check stays simple, and
+       loadImage lets a real image (a synthetic GPT, say) be read sector by sector. */
     void fillPattern(u8 seed)
     {
-        for (u32 index = 0; index < 512; ++index) {
-            card.data[index] = static_cast<u8>(seed + index);
+        for (u32 sector = 0; sector < kImageSectors; ++sector) {
+            for (u32 index = 0; index < 512; ++index) {
+                image[sector][index] = static_cast<u8>(seed + index);
+            }
         }
     }
+
+    void loadImage(const u8 *bytes, u32 sectorCount)
+    {
+        const u32 usable = sectorCount > kImageSectors ? kImageSectors : sectorCount;
+        for (u32 sector = 0; sector < usable; ++sector) {
+            for (u32 index = 0; index < 512; ++index) {
+                image[sector][index] = bytes[sector * 512u + index];
+            }
+        }
+    }
+
+    static constexpr u32 kImageSectors = 4096;
 
     u8 read8(u32 offset) { return regs[offset % sizeof(regs)]; }
 
@@ -240,12 +256,17 @@ private:
             dataSource = extCsd;
             put32(kRegResponse, statusWord());
             break;
-        case kCmd17ReadSingleBlock:
+        case kCmd17ReadSingleBlock: {
+            const u32 lba = argument % kImageSectors;
+            for (u32 index = 0; index < 512; ++index) {
+                card.data[index] = image[lba][index];
+            }
             card.dataIndex = 0;
             pendingData = true;
             dataSource = card.data;
             put32(kRegResponse, statusWord());
             break;
+        }
         case kCmd13SendStatus:
             /* R1 card status: bits 31:16 are the error/exception flags the driver masks, bit 8 is READY_FOR_DATA and bits 12:9 are
                CURRENT_STATE. The relative address is not part of R1 -- it rides in R6 -- so putting it here was the model's bug. */
@@ -280,6 +301,7 @@ private:
     bool transferComplete = false;
     u32 blockLength = 0;
     u8 extCsd[512] = {};
+    u8 image[kImageSectors][512] = {};
     const u8 *dataSource = nullptr;
     u32 csd[4] = {};
     ModelCard card = {};
