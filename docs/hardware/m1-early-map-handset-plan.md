@@ -66,3 +66,29 @@ QEMU 里已经证明：内核能在 `arm_vm_init` **之前**建立帧缓冲映�
 
 因此真机验证时，**分支风险已降低**，剩下的风险是数值（真机 stride/行范围，已由 `scripts/test-early-map-arithmetic.py` 对两种面板验算）
 与真机硬件本身。
+
+## 8. 一条命令完成部署（`scripts/deploy-early-map.py`）
+
+手机接上后，部署不再是手工步骤，而是一个带闸门的脚本：
+
+```
+# 预演（默认）：只报告会改什么，不写任何东西
+python scripts/deploy-early-map.py --efiesp R: --kernel out/earlymap/mach.development.bcm2837.unstripped
+
+# 实做：保留被替换的内核，并走 boot-chain 闸门
+python scripts/deploy-early-map.py --efiesp R: --kernel out/earlymap/mach.development.bcm2837.unstripped     --expect-sha256 717752f741d8597fcf1f497b964ba3a0d27da55978cf197a261d9e617da1e8f0     --apply --backup out/phone-backups/kernel.before
+```
+
+它做的事与拒绝条件：
+
+| 步骤 | 拒绝条件 |
+|---|---|
+| 核对工件 SHA-256 | `--expect-sha256` 不匹配 ⇒ 退出 1 |
+| 确认手机是这条链 | 没有 `EFI/UniXNU/unixnu.toml` ⇒ 退出 2 |
+| 替换 `kernel.macho` | 目标已存在而没给 `--backup` ⇒ 退出 1 |
+| 受保护对象闸门 | `boot-chain-io` 的四项证据缺一 ⇒ 退出 1 |
+| 追加启动参数 | `args` 里已有该 token ⇒ 不重复追加 |
+| 写入后校验 | 目标哈希与工件不符 ⇒ 退出 1 |
+
+`test-deploy-early-map.py`（7 条）覆盖：dry run 不写、缺备份被拒、缺闸门被拒、齐备则写入并把旧内核留到备份、
+token 只加一次、哈希不符被拒、非本链条的手机被拒。

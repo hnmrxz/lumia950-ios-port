@@ -880,6 +880,22 @@
         }
       ],
       "limits": "Arithmetic and source only: the handset has not run this kernel, and the handset branch (an existing gigabyte entry, so only a leaf entry is added) has not been executed anywhere yet."
+    },
+    {
+      "id": "early-map-deploy-guarded",
+      "what": "The handset deployment of the early-map kernel is a script with guards: artifact hash, chain presence, a kept copy of the replaced kernel, and the boot-chain gate; a dry run writes nothing and the boot argument is added once",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-deploy-early-map.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/deploy-early-map.py"
+        }
+      ],
+      "limits": "Host tests against temporary volumes. The script has not run against the phone, because the phone is not connected."
     }
   ]
 }
