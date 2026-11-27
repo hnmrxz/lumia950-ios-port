@@ -589,5 +589,49 @@
       "It is still a synthetic disk held in memory. There is no block device, so nothing has been read from eMMC and no real GPT has been parsed.",
       "The marker forms are unchanged, so carrying the parser and its self-check costs nothing at boot."
     ]
+  },
+  "round_199": {
+    "what": "Repeatability of the pre-VM marker on one artifact: three sweeps of the six forms, 18 boots",
+    "artifact": {
+      "kernel_sha256": "661770a93051a375087a26f0a4ac3a3aafe51a7403e2d76f9ed47eb171488139",
+      "commit": "37abf24",
+      "build": "46034996420"
+    },
+    "sweeps": [
+      {
+        "when": "round 191",
+        "off": 4,
+        "dry": 1,
+        "draw": 0,
+        "noclean": 0,
+        "notlbi": 0,
+        "selftest": 30,
+        "esr": "0x0"
+      },
+      {
+        "when": "round 199a",
+        "off": 4,
+        "dry": 1,
+        "draw": 0,
+        "noclean": 0,
+        "notlbi": 0,
+        "selftest": 30,
+        "esr": "0x0"
+      },
+      {
+        "when": "round 199b",
+        "off": 4,
+        "dry": 1,
+        "draw": 0,
+        "noclean": 0,
+        "notlbi": 0,
+        "selftest": 30,
+        "esr": "0x0"
+      }
+    ],
+    "reading": [
+      "Same artifact, same six forms, three times: every boot reaches root-wait with ESR 0 and the same state code per form. That is what repeatability looks like in the emulator, and it is the strongest statement available without the handset.",
+      "It does not touch the handset clause at all: no boot on the phone has happened, so nothing here is handset evidence."
+    ]
   }
 }

@@ -1144,6 +1144,22 @@
         }
       ],
       "limits": "The sectors come from a model of the controller, not from eMMC: this proves the interface between the driver and the parser, not that the handset's disk can be read"
+    },
+    {
+      "id": "marker-repeatability",
+      "what": "Three sweeps of the six marker forms on one artifact -- eighteen boots -- produce identical results: off 4, dry 1, draw 0, noclean 0, notlbi 0, selftest 30, every one reaching root-wait with ESR 0x0",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/m1-early-map/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/verify-early-split.py"
+        }
+      ],
+      "limits": "Emulator repeatability on one artifact. It says the instrument is deterministic where it has run; it says nothing about the handset, which has never run this kernel"
     }
   ]
 }
