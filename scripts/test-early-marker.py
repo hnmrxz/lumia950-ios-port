@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """Behavioural tests for the early marker in the generated arm_init.c.
 
-These read the file the injector actually produces and check properties of it, not the strings of a template:
-
-  * the marker exists once, behind the 'lumia-early-map' token, and nothing is drawn without it;
-  * the mapping is only installed into an L1 slot that reads back empty, with both indices bounds checked;
-  * nothing is written to the framebuffer unless the mapping was installed;
-  * the addresses the marker uses are the mapped virtual ones, never the physical address from the boot arguments;
-  * the cache maintenance covers exactly the rows that were written;
-  * a second apply changes nothing.
+The marker completes the identity (V=P) map that start.s builds -- the tables XNU itself treats as temporary, since
+arm_replace_identity_map() bzeroes the V=P L1 table -- and writes through the physical address, which is the same as the virtual one
+there. These tests read the file the injector actually produces, not a template.
 """
 
 from __future__ import annotations
 
 import importlib.util
-import re
 import sys
 import tempfile
 import unittest
@@ -49,52 +43,62 @@ class EarlyMarkerTests(unittest.TestCase):
         if not SOURCE.is_file():
             raise unittest.SkipTest(f"{SOURCE} is not cached; run scripts/preflight-injectors.py first")
         cls.text = generated()
+        cls.block = cls.text[cls.text.index("Bring-up marker"):cls.text.index("PE_init_platform")]
 
     def test_the_marker_is_injected_once_and_behind_its_token(self):
         self.assertEqual(self.text.count("lumia-early-map"), 1, "the marker must appear once")
-        marker = self.text.index("lumia-early-map")
-        drawing = self.text.index("0x00E03030u")
-        self.assertLess(marker, drawing, "the token test has to precede the drawing")
+        self.assertLess(self.block.index("lumia-early-map"), self.block.index("0x00E03030u"),
+                        "the token test has to precede the drawing")
 
     def test_nothing_is_drawn_without_the_token(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        # every store to the framebuffer sits inside the `if (installed)` branch
-        installed = block.index("if (installed)")
-        drawing = block.index("0x00E03030u")
-        self.assertLess(installed, drawing)
+        self.assertLess(self.block.index("if (installed)"), self.block.index("0x00E03030u"),
+                        "every framebuffer store sits inside the installed branch")
 
-    def test_the_mapping_only_uses_an_empty_l1_slot(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("l1[l1_index] != 0", block, "an occupied slot must be refused, not overwritten")
-        self.assertIn("l2_index >= entries", block)
-        self.assertIn("(root[root_index] & 3) != 3", block, "the root entry has to be a table before it is followed")
+    def test_the_mapping_goes_into_the_identity_tables(self):
+        self.assertIn("ttbr0_el1", self.block, "the identity map is TTBR0")
+        self.assertNotIn("ttbr1_el1", self.block, "the kernel-VA tables must not be touched")
+
+    def test_the_identity_table_is_checked_before_it_is_followed(self):
+        self.assertIn("(l1_entry & 3) != 3", self.block, "the L1 entry has to be a table")
+        self.assertIn("root_index >= entries", self.block)
+        self.assertIn("l2_index >= entries", self.block)
+
+    def test_an_occupied_slot_is_not_overwritten_with_a_different_mapping(self):
+        self.assertIn("(l2[l2_index] & (block - 1)) != block_pa", self.block,
+                      "a slot holding some other block must be refused")
+        self.assertIn("(l2[l2_index] & (block - 1)) == block_pa", self.block,
+                      "a slot already mapping this block is the good case")
 
     def test_nothing_is_drawn_unless_the_mapping_was_installed(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("installed = 0", block)
-        self.assertIn("installed = 1", block)
+        self.assertIn("installed = 0", self.block)
+        self.assertIn("installed = 1", self.block)
 
-    def test_the_framebuffer_pointer_is_the_mapped_address(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("fb = (volatile unsigned int *)(va + (pa - block_pa))", block)
-        self.assertNotRegex(block, r"fb\s*=\s*\(volatile unsigned int \*\)pa\b",
-                            "the physical address must never be used as a pointer")
+    def test_the_framebuffer_pointer_is_the_identity_address(self):
+        self.assertIn("fb = (volatile unsigned int *)pa", self.block,
+                      "in the identity map the physical address is the virtual one")
 
     def test_the_cache_clean_covers_the_rows_that_were_written(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("(120 * stride) / 64", block)
-        self.assertIn("(136 * stride) / 64", block)
-        self.assertIn("dc civac", block)
+        self.assertIn("(120 * stride) / 64", self.block)
+        self.assertIn("(136 * stride) / 64", self.block)
+        self.assertIn("dc civac", self.block)
 
     def test_invalid_panel_arguments_skip_the_marker(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("pa == 0", block)
-        self.assertIn("v_rowBytes == 0", block)
-        self.assertIn("v_width == 0", block)
-        self.assertIn("v_height == 0", block)
-        self.assertIn("height > 136", block)
-        self.assertIn("width <= 16384", block, "an absurd width must not be multiplied out")
-        self.assertIn("stride <= 65536", block, "nor an absurd stride")
+        self.assertIn("pa != 0", self.block)
+        self.assertIn("v_rowBytes != 0", self.block)
+        self.assertIn("v_width != 0", self.block)
+        self.assertIn("v_height != 0", self.block)
+        self.assertIn("height > 136", self.block)
+        self.assertIn("width <= 16384", self.block)
+        self.assertIn("stride <= 65536", self.block)
+
+    def test_every_outcome_has_its_own_state_code(self):
+        for code, meaning in ((2, "refused"), (3, "bad panel"), (5, "no identity table"), (6, "index"),
+                              (7, "slot has another mapping"), (1, "installed"), (0, "drawn")):
+            self.assertIn(f"lumia_early_map_state = {code}", self.block, meaning)
+
+    def test_the_state_is_reported_after_the_vm_work(self):
+        self.assertIn("LUMIA: early map state", self.text)
+        self.assertLess(self.text.index("arm_vm_init"), self.text.index("LUMIA: early map state"))
 
     def test_applying_twice_changes_nothing(self):
         module = load()
@@ -108,22 +112,8 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertEqual(once, twice)
 
     def test_the_default_path_is_unchanged(self):
-        # the injected block is the only addition before the platform call; the call itself still happens exactly once
         self.assertEqual(self.text.count("PE_init_platform(FALSE, args)"), 1)
         self.assertLess(self.text.index("Bring-up marker"), self.text.index("PE_init_platform(FALSE, args)"))
-
-    def test_every_outcome_has_its_own_state_code(self):
-        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("lumia_early_map_state = 2", block, "refused by default")
-        self.assertIn("lumia_early_map_state = 5", block, "no root entry")
-        self.assertIn("lumia_early_map_state = 6", block, "index out of range")
-        self.assertIn("lumia_early_map_state = 3", block, "invalid panel arguments")
-        self.assertIn("lumia_early_map_state = 1", block, "installed but not drawn")
-        self.assertIn("lumia_early_map_state = 0", block, "installed and drawn")
-
-    def test_the_state_is_reported_after_the_vm_work(self):
-        self.assertIn("LUMIA: early map state", self.text)
-        self.assertLess(self.text.index("arm_vm_init"), self.text.index("LUMIA: early map state"))
 
 
 if __name__ == "__main__":
