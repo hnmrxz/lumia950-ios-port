@@ -1,18 +1,22 @@
 {
-  "what": "Handset photograph of the UniXNU menu after the hand-off attempt, with the previous boot's DarwinBoot page still visible behind it and the menu counting down to boot the same entry again",
-  "captured": "2026-11-27 (Asia/Shanghai), supplied by the device owner",
+  "what": "Handset photograph of the boot log overlaid on the UniXNU menu screen, taken during one boot that did not move past the hand-off",
+  "captured": "2026-11-27 (Asia/Shanghai), supplied by the device owner; the owner corrected this session's first reading",
   "photo": "handset-photo.jpg",
+  "corrections": [
+    "The earlier reading of this photograph -- 'the device returned to the menu after the hand-off' -- was wrong, and the device owner said so: the device did not go back to the menu. The menu text ('Booting iOS 16.7.16 in 1 s', the key help, 'drivers 2 loaded / 0 failed') is the menu screen that was already drawn, and the boot log lines are printed over it without clearing the panel.",
+    "So this is the same single boot as the hand-off photograph, not a second one: menu drawn, then DarwinBoot's log and the hand-off page printed on top, and nothing after that."
+  ],
   "observations": {
-    "menu": "UniXNU 0.1.0, config \\EFI\\UniXNU\\unixnu.toml, entry 1 'iOS 16.7.16' (xnu) selected, 'Booting iOS 16.7.16 in 1 s'",
+    "menu_text": "UniXNU 0.1.0, config \\EFI\\UniXNU\\unixnu.toml, entry 1 'iOS 16.7.16' (xnu), 'Booting iOS 16.7.16 in 1 s'",
     "menu_footer": "Up/Down: select   Enter: boot   1-9: boot entry   Esc: stop timer   drivers 2 loaded / 0 failed   kits 0   acpi 0",
-    "leftover_darwinboot_text": "the previous boot's DARWINBOOT lines and hand-off page are still drawn on the panel behind the menu",
+    "boot_log": "DARWINBOOT lines and the hand-off page printed over the menu, exactly as in the hand-off photograph",
     "loader_bar": "green bar at the top of the screen",
     "kernel_bar": "no bottom green bar",
-    "kernel_text": "no kernel console text"
+    "kernel_text": "no kernel console text",
+    "device_state": "the screen stayed on this page; the device did not return to the menu and did not visibly reset"
   },
   "reading": [
-    "The device is back at the loader's menu after the hand-off, which is the loader running again rather than the kernel showing progress: the menu footer says the two drivers loaded and no kernel output appears anywhere on the panel.",
-    "The DarwinBoot page from the earlier attempt is still on the panel, so the menu redraws over old pixels rather than clearing them; that is why both pages are visible at once.",
-    "Together with the hand-off photograph this says the chain runs up to the branch and the kernel produces nothing afterwards. Whether the device reset by itself or was restarted was not recorded by the photograph."
+    "The chain runs to the branch to XNU and then the handset shows nothing further, on a screen that stays put rather than restarting -- the shell of the failure is a hang or a quiet fault, not a reset loop.",
+    "A kernel that faults into its own early vectors before the console mapping exists has no way to print, which matches this picture exactly; a kernel that hangs in early setup would look the same."
   ]
 }

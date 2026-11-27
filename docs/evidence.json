@@ -682,8 +682,8 @@
       "limits": "The photograph establishes the hand-off, not kernel execution: it shows no kernel console output and no bottom bar, and does not record whether the screen changed afterwards."
     },
     {
-      "id": "handset-menu-after-handoff",
-      "what": "After the hand-off the handset is back at the UniXNU menu with the previous DarwinBoot page still on screen: the chain runs to the branch, and no kernel output ever reaches the panel",
+      "id": "handset-boot-log-over-menu",
+      "what": "The boot log and hand-off page are printed over the UniXNU menu screen and nothing follows: the handset stays on that page, and the owner confirmed the device does not return to the menu",
       "label": "hardware-tested",
       "evidence": [
         {
@@ -699,7 +699,7 @@
           "path": "docs/hardware/2026-11-27-handset-handoff.md"
         }
       ],
-      "limits": "A photograph of one moment: it does not record whether the device reset by itself or was restarted, and it does not show any kernel output."
+      "limits": "One photograph of one boot, corrected by the device owner: it shows the screen the device stays on after the hand-off. It does not say whether the kernel hung or faulted."
     }
   ]
 }
