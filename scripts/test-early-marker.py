@@ -58,16 +58,24 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("ttbr0_el1", self.block, "the identity map is TTBR0")
         self.assertNotIn("ttbr1_el1", self.block, "the kernel-VA tables must not be touched")
 
-    def test_the_identity_table_is_checked_before_it_is_followed(self):
-        self.assertIn("(l1_entry & 3) != 3", self.block, "the L1 entry has to be a table")
+    def test_every_table_entry_is_checked_before_it_is_followed(self):
+        self.assertIn("(root_entry & 3) == 3", self.block, "a root entry is followed only when it is a table")
+        self.assertIn("(l1[l1_index] & 3) != 3", self.block, "and so is an L1 entry")
         self.assertIn("root_index >= entries", self.block)
+        self.assertIn("l1_index >= entries", self.block)
         self.assertIn("l2_index >= entries", self.block)
 
     def test_an_occupied_slot_is_not_overwritten_with_a_different_mapping(self):
         self.assertIn("(l2[l2_index] & (block - 1)) != block_pa", self.block,
                       "a slot holding some other block must be refused")
-        self.assertIn("(l2[l2_index] & (block - 1)) == block_pa", self.block,
-                      "a slot already mapping this block is the good case")
+
+    def test_the_walk_goes_through_the_root_when_the_levels_differ(self):
+        self.assertIn("ARM_TT_ROOT_SHIFT == ARM_TT_L1_SHIFT", self.block,
+                      "the two levels coincide on the 16 KB granule only")
+        self.assertIn("root[root_index] = ARM_TTE_BOOT_TABLE", self.block,
+                      "a gigabyte the identity map does not reach gets a table of this marker's own")
+        self.assertIn("l1[l1_index] = ARM_TTE_BOOT_TABLE", self.block,
+                      "and the next level down likewise")
 
     def test_nothing_is_drawn_unless_the_mapping_was_installed(self):
         self.assertIn("installed = 0", self.block)
@@ -83,16 +91,16 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("dc civac", self.block)
 
     def test_invalid_panel_arguments_skip_the_marker(self):
-        self.assertIn("pa != 0", self.block)
-        self.assertIn("v_rowBytes != 0", self.block)
-        self.assertIn("v_width != 0", self.block)
-        self.assertIn("v_height != 0", self.block)
+        self.assertIn("pa == 0", self.block)
+        self.assertIn("v_rowBytes == 0", self.block)
+        self.assertIn("v_width == 0", self.block)
+        self.assertIn("v_height == 0", self.block)
         self.assertIn("height > 136", self.block)
         self.assertIn("width <= 16384", self.block)
         self.assertIn("stride <= 65536", self.block)
 
     def test_every_outcome_has_its_own_state_code(self):
-        for code, meaning in ((2, "refused"), (3, "bad panel"), (5, "no identity table"), (6, "index"),
+        for code, meaning in ((2, "refused"), (3, "bad panel"), (6, "index"),
                               (7, "slot has another mapping"), (1, "installed"), (0, "drawn")):
             self.assertIn(f"lumia_early_map_state = {code}", self.block, meaning)
 
