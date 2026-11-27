@@ -10,3 +10,6 @@ out/
 *.log
 status.txt
 __pycache__/
+
+# a local clone of the prelink tool, kept out of the repository
+tools/NativePrelink/

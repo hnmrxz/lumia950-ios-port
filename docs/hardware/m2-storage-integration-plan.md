@@ -84,3 +84,32 @@ S6 要求"整个过程中**没有**发出 CMD24/25/38"，而且要是**运行时
 而 `SdhciRegs.h` 也不声明 CMD38——"没声明"不等于"不会到达"，所以计数器三种都覆盖。
 
 **仍未成立的是运行时读数**：驱动还没有在 QEMU/真机里跑过，S6 的判据（计数为 0）要等 S4 之后才能读。
+
+## 9. S2 为什么被拒：读 prelink 工具源码得到的答案（2026-11-28）
+
+把 `UniXNU/NativePrelink` 的 `native_prelink.py` 读了一遍（本地临时 clone 用于阅读，不入库）。它判断"哪些东西算组件、各自占哪段地址"的方式是：
+
+| 行 | 规则 |
+|---|---|
+| 161–171 | 组件来自**父镜像自己的 plist 条目**，用条目的 `_PrelinkExecutableLoadAddr` 找到它的 Mach-O，并要求 `MH_KEXT_BUNDLE` |
+| 167 | 那个地址必须**已经落在父镜像的段里**（`backed_offset(parent, va, …)`）——不是"写在旁边"，而是"必须被父镜像装下" |
+| 172–174 | 组件的每个非 `__LINKEDIT` 段都被登记为一段**归属区间** |
+| 182–185 | 归属区间按地址排序后**不允许互相重叠**，否则 `Overlapping component extents` |
+
+也就是说：**追加一个第三方 kext 不是"加一条 plist"，而是要一个布局槽位**——它的代码必须被父镜像的某个段覆盖，且所有段的地址区间不能与既有组件相交。
+框架自己的 `fileset_layout.py` 正是为**它 manifest 里的组件**计算这种槽位的（"places native segments in space freed by the replaced kernel and omitted entries"）；
+我们手工追加的条目没有参与那次布局计算，所以段的虚拟地址必然与已有内容相交——这正是之前 `overlapping virtual segments` 的来源。
+
+### 9.1 因此 S2 要满足的四件事（缺一不可）
+
+1. 一个**不与任何既有组件相交**的虚拟地址区间（由布局计算给出，或手工验证过整个镜像的空洞）；
+2. 把 kext 的字节放进父镜像的某个段里，使 `backed_offset` 能取到它；
+3. 在 plist 里写 `_PrelinkExecutableLoadAddr` / `_PrelinkExecutableSize` / `_PrelinkKmodInfo` 等字段；
+4. 组件之间段区间不重叠（工具会逐段校验）。
+
+### 9.2 结论
+
+- **S2 不是"再写一个注入器"能解决的**：它需要参与**布局计算**。可行路径只有两条：
+  (a) 让框架的布局工具把 `NativeSdhci` 当组件看待（改框架/manifest，需单独评审）；
+  (b) 走**加载器投递**（路线 B），不动 prelinked 镜像的布局。
+- 本仓库现有的 `scripts/add-prelink-entry.py` 做的是"插入条目"，而**布局**不在它手里，所以它永远会撞上第 4 条。

@@ -1028,6 +1028,18 @@
         }
       ],
       "limits": "Instrumentation only: the counters are compiled for arm64 and checked by source tests, but the driver does not run yet, so no counter has ever been read at run time"
+    },
+    {
+      "id": "prelink-slot-requirement",
+      "what": "Reading the prelink tool shows why a hand-appended kext entry is refused: components are discovered from the image own plist, their code must be backed by the image segments, and their extents may not overlap -- so S2 needs a layout slot, not another injector",
+      "label": "source-reviewed",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/m2-storage-integration-plan.md"
+        }
+      ],
+      "limits": "A reading of the prelink tool source, not a run of it: no merge was attempted locally, and the two candidate routes (framework manifest change, loader delivery) are both unstarted."
     }
   ]
 }
