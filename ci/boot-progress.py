@@ -98,6 +98,12 @@ AFTER_VM_INIT_MARKER = (
     "\tkprintf(\"LUMIA: arm_vm_init returned, entering the rest of arm_init\\n\");\n"
 
     "\tkprintf(\"LUMIA: early map state %u\\n\", lumia_early_map_state);\n"
+    "\t{\n"
+    "\t\textern unsigned int lumia_gpt_selfcheck(void);\n"
+    "\t\tunsigned int gpt_state = lumia_gpt_selfcheck();\n"
+    "\t\tkprintf(\"LUMIA: gpt self-check %u (0 ok, 1 valid refused, 2 wrong partition, 3 corrupt accepted, 4 wrong reason)\\n\",\n"
+    "\t\t        gpt_state);\n"
+    "\t}\n"
 )
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 # The third bar is drawn after the platform expert has installed the video console, through the same mapping the

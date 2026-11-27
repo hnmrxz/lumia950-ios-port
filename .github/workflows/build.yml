@@ -770,9 +770,10 @@ jobs:
         run: |
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --check
+
       - name: Compile the read-only GPT parser into the image
         # The parser is host-tested against the reference reader; this puts it in the kernel image so the evidence is about the
-        # image and not only about the host. Nothing calls it yet -- the block device it reads through does not exist.
+        # image and not only about the host. The post-VM report runs it against a synthetic disk, so the parser executes inside the kernel.
         run: |
           python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --check

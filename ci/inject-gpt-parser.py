@@ -21,7 +21,9 @@ import re
 import sys
 
 MARKER = "LUMIA_GPT_PARSER"
-SOURCE = pathlib.Path(__file__).resolve().parent.parent / "drivers" / "Common" / "GptRead.c"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SOURCE = ROOT / "drivers" / "Common" / "GptRead.c"
+SELF_CHECK = ROOT / "drivers" / "Common" / "GptSelfCheck.c"
 
 
 def payload() -> str:
@@ -39,12 +41,16 @@ def payload() -> str:
     body = body.replace("static uint64_t load_le64", "static __attribute__((unused)) uint64_t load_le64")
     body = body.replace("static int is_zero_guid", "static __attribute__((unused)) int is_zero_guid")
     body = body.replace("static gpt_type classify", "static __attribute__((unused)) gpt_type classify")
+    check = SELF_CHECK.read_text(encoding="utf-8")
+    check = re.sub(r'^#include "GptRead\.h"\n', "", check, flags=re.M)
     return (
-        f"\n/* {MARKER}: the read-only GPT parser, compiled into the image so its evidence is about the kernel and not only the host. */\n"
+        f"\n/* {MARKER}: the read-only GPT parser, and an in-kernel self-check that runs it, compiled into the image. */\n"
         "#ifndef LUMIA_GPT_PARSER_INCLUDED\n#define LUMIA_GPT_PARSER_INCLUDED\n"
         + header
         + "\n"
         + body
+        + "\n"
+        + check
         + "\n#endif /* LUMIA_GPT_PARSER_INCLUDED */\n"
     )
 
@@ -79,7 +85,7 @@ def check(path: pathlib.Path) -> tuple[bool, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     if MARKER not in text:
         return False, "does not carry the parser"
-    if "gpt_parse(gpt_read_sector" not in text:
+    if "lumia_gpt_selfcheck" not in text or "gpt_parse(gpt_read_sector" not in text:
         return False, "the marker is present but the function is not"
     return True, "ok"
 
