@@ -76,8 +76,8 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("lumia-early-map-notlbi", self.block)
         self.assertIn("if (!no_tlbi)", self.block, "the TLB invalidate is its own group")
         self.assertIn("if (!no_clean)", self.block, "so is the cache clean")
-        self.assertLess(self.block.index("if (!no_tlbi)"), self.block.index("for (row = 120;"), "maintenance before the stores")
-        self.assertLess(self.block.index("for (row = 120;"), self.block.index("if (!no_clean)"), "and the clean after them")
+        self.assertLess(self.block.index("if (!no_tlbi)"), self.block.index("for (row = 8;"), "maintenance before the stores")
+        self.assertLess(self.block.index("for (row = 8;"), self.block.index("if (!no_clean)"), "and the clean after them")
 
     def test_every_table_entry_is_checked_before_it_is_followed(self):
         self.assertIn("(l1_entry & 3) == 3", self.block, "a table at the gigabyte level is followed")
