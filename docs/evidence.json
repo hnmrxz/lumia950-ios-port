@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "Both QEMU configurations reach root-wait with ESR 0x0 after the identity-map change; without the boot argument the marker reports 4 (token absent) and with it 5 (the identity map does not cover the framebuffer's block), so it refuses safely",
+      "what": "The refusing identity-map marker keeps QEMU at root-wait with ESR 0x0 (state 4 without the boot argument, 5 with it), while both attempts to actually install the mapping -- an entry in the kernel-VA tables and an added level in the identity map -- faulted",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -863,7 +863,7 @@
           "path": "scripts/test-early-marker.py"
         }
       ],
-      "limits": "QEMU only. The mapping is not installed, so nothing is proven about the handset's pre-VM stop; the handset was not touched."
+      "limits": "QEMU only, and the mapping is not installed: the marker proves nothing about the handset's pre-VM stop. The handset was not touched."
     }
   ]
 }
