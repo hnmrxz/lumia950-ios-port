@@ -744,6 +744,26 @@
         }
       ],
       "limits": "Emulator only, but it is a measurement of the kernel's own structure at a named instruction, so it carries to any platform that runs this kernel: the ordering is in the source, not in the emulator."
+    },
+    {
+      "id": "boot-chain-preservation-audit",
+      "what": "A read-only audit of the working handset chain and of the MainOS question: the file inventory with the values measured this session, the three records that disagree with the phone (CRITICAL hashes, the EFIESP image size and hash, the BCD size), the absence of any per-file inventory of the unlock patches, and why formatting MainOS is not a recoverable step",
+      "label": "source-reviewed",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/boot-chain-preservation.md"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/unlock-partition-dependencies.md"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/mainos-replacement-readiness.md"
+        }
+      ],
+      "limits": "Documentation and repository records only. The values quoted from the handset were read earlier in this session while the phone was in mass storage mode; the phone is now disconnected, so nothing was re-measured for this audit."
     }
   ]
 }
