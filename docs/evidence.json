@@ -952,6 +952,26 @@
         }
       ],
       "limits": "Host compilation, an arm64 cross-compile and a synthetic image. The parser has not been linked into XNU and no real disk has been read, so neither kernel-linked nor hardware-tested is claimed."
+    },
+    {
+      "id": "gpt-parser-in-image",
+      "what": "The read-only GPT parser is compiled into the kernel image: gpt_parse and gpt_status_text have addresses in the unstripped kernel (0xfffffff0073fb088 and 0xfffffff0073fb828), and the six early-marker forms still reach root-wait on the same artifact",
+      "label": "kernel-linked",
+      "evidence": [
+        {
+          "label": "kernel-linked",
+          "path": "docs/hardware/measurements/m1-early-map/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/inject-gpt-parser.py"
+        },
+        {
+          "label": "ABI-compiled",
+          "path": "drivers/Common/GptRead.c"
+        }
+      ],
+      "limits": "The parser is in the image but nothing calls it: no block device, no disk read, so hardware-tested is not claimed and no real GPT has been parsed"
     }
   ]
 }

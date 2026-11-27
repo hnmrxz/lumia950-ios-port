@@ -137,3 +137,19 @@ M3 要求"只读读取 GPT 并用独立基准核对"。在真机可用之前，�
 | ABI-compiled（arm64 交叉编译） | `zig cc -target aarch64-windows-gnu -std=c11 -Wall -Wextra -Werror -c`，产出 arm64 目标文件 |
 
 **仍未包含**：链接进 XNU（`kernel-linked`）与读真机磁盘（`hardware-tested`）。这两项都要等真机与内核集成。
+
+## M3：解析器已进入内核镜像（2026-11-27）
+
+`ci/inject-gpt-parser.py` 把 `drivers/Common/GptRead.c` 追加到 `arm_init.c`（内核构建本来就在编译的文件），
+于是解析器**进入镜像**：
+
+| 证据 | 内容 |
+|---|---|
+| ABI-compiled | arm64 交叉编译通过 |
+| **kernel-linked** | 在 unstripped 内核里能查到符号：`gpt_parse` @ `0xfffffff0073fb088`、`gpt_status_text` @ `0xfffffff0073fb828` |
+| QEMU 无回归 | 同一份 artifact 的六种标记形态仍全部到 root-wait（4 / 1 / 0 / 0 / 0 / 30） |
+
+**注入是惰性的**：辅助函数标 `__attribute__((unused))`，`gpt_parse` 为全局以便链接保留；**没有任何调用者**，
+因为能喂给它的块设备还不存在。
+
+**因此这一步只买到 `kernel-linked`**：没有调用、没有磁盘读取、没有真机 GPT ⇒ 不声明 `hardware-tested`。

@@ -485,5 +485,55 @@
       "qemu_bsd_init": true,
       "handset_bsd_init": false
     }
+  },
+  "round_183": {
+    "what": "The GPT parser is compiled into the kernel image, and the early marker is unaffected",
+    "artifact": {
+      "kernel_sha256": "ab0d55d09ff4aac928a38a44f1a27566e6e72b424a2fd31856c4e25c2156a820",
+      "commit": "78564f2",
+      "build": "46020217201"
+    },
+    "symbols": {
+      "gpt_parse": "0xfffffff0073fb088",
+      "gpt_status_text": "0xfffffff0073fb828",
+      "_lumia_early_map_state": "0xfffffff007a61630"
+    },
+    "six_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "noclean": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "notlbi": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "selftest": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 30
+      }
+    },
+    "reading": [
+      "The parser reaching the image is what M3 needs next: host tests and an arm64 cross-compile said the code is portable, and the symbol in the unstripped kernel says the image carries it.",
+      "Nothing calls it. The block device that would feed it does not exist, so no disk has been read and no real GPT parsed.",
+      "The marker results are identical to the previous artifact, so adding the parser to arm_init.c disturbed nothing."
+    ]
   }
 }
