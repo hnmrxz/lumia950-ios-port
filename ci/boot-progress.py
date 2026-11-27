@@ -125,8 +125,22 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
 # The block template is write-back normal memory, so every line the marker writes is cleaned with `dc civac`; without that the panel
 # may never see the data. The physical address comes from boot_args.Video, and the mapped KVA base is the constant the start.s patch
 # uses, so the two halves cannot drift.
+# A marker that can reach the panel before the VM work, built from the two facts the measurements left:
+#
+#   * the kernel's bootstrap page tables are the only mapping that exists that early, and start.s is patched by the framework's own
+#     4K-baseline series -- so this code builds the one extra mapping itself, in C, from `bootstrap_pagetables` (a global in
+#     arm_vm_init.c), which needs no change to start.s and no fight with a patch series;
+#   * `ARM_TTE_BOOT_BLOCK` is write-back normal memory, so every line the marker touches is cleaned with `dc civac` afterwards.
+#
+# The layout it relies on is the one start.s builds: `bootstrap_pagetables + 0` is the V=P L1 table, `+ PGBYTES` the KVA L1 table, and
+# the L2 tables follow. The L1 entry is pointed at a page in this file's own BSS instead of the array's next free page, so a mistaken
+# page-count cannot overwrite a table the kernel is using; the BSS page's physical address comes from the boot arguments' physBase and
+# virtBase, the same relation start.s uses.
+#
+# It is behind 'lumia-early-map', matched with a plain scan of CommandLine rather than PE_parse_boot_argn -- the call the withdrawn skip
+# switches had in common with their failure.
 EARLY_MAP = (
-    "\n\t/* Bring-up marker: draw before the VM work, through the mapping ci/framebuffer-map.py adds. */\n"
+    "\n\t/* Bring-up marker: build one framebuffer mapping from the bootstrap tables, then draw before the VM work. */\n"
     "\t{\n"
     "\t\tconst char *line = args->CommandLine;\n"
     "\t\tconst char *want = \"lumia-early-map\";\n"
@@ -141,14 +155,28 @@ EARLY_MAP = (
     "\t\t\tp++;\n"
     "\t\t}\n"
     "\t\tif (hit) {\n"
-    "\t\t\tconst unsigned long block = 0x2000000UL;\n"
-    "\t\t\tconst unsigned long base = 0xFFFFFFF0E0000000UL;\n"
-    "\t\t\tconst unsigned long pa = (unsigned long)args->Video.v_baseAddr;\n"
-    "\t\t\tvolatile unsigned int *fb = (volatile unsigned int *)(base + (pa & (block - 1)));\n"
-    "\t\t\tconst unsigned long stride = (unsigned long)args->Video.v_rowBytes;\n"
-    "\t\t\tconst unsigned long width = (unsigned long)args->Video.v_width;\n"
+    "\t\t\textern uint8_t bootstrap_pagetables[];\n"
+    "\t\t\tstatic uint64_t lumia_table[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n"
+    "\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n"
+    "\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n"
+    "\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n"
+    "\t\t\tconst uint64_t va = 0xFFFFFFF0E0000000ULL;\n"
+    "\t\t\tconst uint64_t table_pa = (uint64_t)lumia_table - (uint64_t)args->virtBase + (uint64_t)args->physBase;\n"
+    "\t\t\tuint64_t *l1 = (uint64_t *)(bootstrap_pagetables + ARM_PGBYTES);\n"
+    "\t\t\tuint64_t index = (va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n"
+    "\t\t\tvolatile unsigned int *fb;\n"
+    "\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n"
+    "\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n"
     "\t\t\tunsigned long row;\n"
     "\t\t\tunsigned long column;\n"
+    "\t\t\tl1[index] = ARM_TTE_BOOT_TABLE | (table_pa & ARM_TTE_TABLE_MASK);\n"
+    "\t\t\tindex = (va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n"
+    "\t\t\tlumia_table[index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n"
+    "\t\t\t__asm__ volatile(\"dsb ish\" ::: \"memory\");\n"
+    "\t\t\t__asm__ volatile(\"tlbi vmalle1\" ::: \"memory\");\n"
+    "\t\t\t__asm__ volatile(\"dsb ish\" ::: \"memory\");\n"
+    "\t\t\t__asm__ volatile(\"isb\" ::: \"memory\");\n"
+    "\t\t\tfb = (volatile unsigned int *)(va + (pa - block_pa));\n"
     "\t\t\tfor (row = 120; row < 136; row++) {\n"
     "\t\t\t\tfor (column = 0; column < width; column++) {\n"
     "\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n"
