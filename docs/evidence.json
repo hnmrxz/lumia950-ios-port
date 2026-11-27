@@ -824,6 +824,26 @@
         }
       ],
       "limits": "The milestone definition is written material; the part measured here is the read-only guard, which is host-tested. M1 itself is unmet and every milestone's evidence column names the handset as the judge."
+    },
+    {
+      "id": "skip-switch-regression",
+      "what": "Two additional skip switches (wfe_timeout_* and kernel_startup_bootstrap) were measured to break the emulated boot even with both switched off: four configurations stop at _sleh_synchronous_sp1 while the same tree without them reaches root-wait, so they were withdrawn and the bisect stays at the five verified calls",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/switch-regression/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/bisect-switch-combinations.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/boot-progress.py"
+        }
+      ],
+      "limits": "Emulator only. It is a negative result about an instrument, not about the handset: nothing here says anything about how far the kernel gets on the phone."
     }
   ]
 }

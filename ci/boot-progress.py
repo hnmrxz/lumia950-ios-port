@@ -87,11 +87,10 @@ SWITCHED_CALLS = {
     "lumia-skip-timercall": "\ttimer_call_init();\n",
     "lumia-skip-cpuinit": "\tcpu_init();\n",
     "lumia-skip-processor": "\tprocessor_bootstrap();\n",
-    # The handset still shows nothing with the five above skipped, so the stop is earlier. These cover what is left between the
-    # platform expert and the VM work: the WFE timeout configuration and the bootstrap startup routines. They are the two remaining
-    # candidates that talk to hardware the emulator does not model.
-    "lumia-skip-wfe": "\twfe_timeout_configure();\n\twfe_timeout_init();\n",
-    "lumia-skip-startup": "\tkernel_startup_bootstrap();\n",
+    # Measured and withdrawn: wrapping wfe_timeout_configure()/wfe_timeout_init() or kernel_startup_bootstrap() this way makes the
+    # kernel fault at _sleh_synchronous_sp1 before the VM work even with both switches off (four configurations tested in QEMU, all
+    # stopped at el1_sp0_synchronous_vector_long+0x34 while the same kernel without these two guards reached root-wait). Until that is
+    # understood, the bisect stops at the five calls above; going earlier needs an observable, not more switches.
 }
 
 AFTER_VM_INIT_MARKER = (

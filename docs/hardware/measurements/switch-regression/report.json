@@ -1,0 +1,48 @@
+{
+  "what": "The two additional skip switches (wfe_timeout_configure/init and kernel_startup_bootstrap) were found to break the emulated boot even when switched off, so they were withdrawn",
+  "kernel": "build 45943521202 (head 7079f59), which carries the two extra guards",
+  "reference": "build 45927960099, the same tree without the two guards, which reaches root-wait and prints the post-VM marker",
+  "configurations": {
+    "five switches": {
+      "outcome": "stopped",
+      "stop": [
+        "_sleh_synchronous_sp1"
+      ]
+    },
+    "five + lumia-skip-wfe": {
+      "outcome": "stopped",
+      "stop": [
+        "_sleh_synchronous_sp1"
+      ]
+    },
+    "five + lumia-skip-startup": {
+      "outcome": "stopped",
+      "stop": [
+        "_sleh_synchronous_sp1"
+      ]
+    },
+    "all seven": {
+      "outcome": "stopped",
+      "stop": [
+        "_sleh_synchronous_sp1"
+      ]
+    }
+  },
+  "reference_result": {
+    "outcome": "root-wait",
+    "marker": true,
+    "note": "the same staged tree, the same fixture arguments, only the kernel differs"
+  },
+  "fault": {
+    "stop_symbols": [
+      "_sleh_synchronous_sp1"
+    ],
+    "fault_elr_symbol": "el1_sp0_synchronous_vector_long+0x34"
+  },
+  "reading": [
+    "The guards are structurally correct: the call still runs when its switch is absent, and the injector's diff shows only the expected wrappers.",
+    "Nevertheless the presence of the two extra guards breaks the boot in four configurations, including the one whose switches are all off. The change that does it is therefore in the added code path itself -- most plausibly the PE_parse_boot_argn call at that point in arm_init -- not in the skipping.",
+    "Since a configuration that already fails in the emulator cannot say anything about the handset, the two switches are withdrawn and the bisect stays at the five calls that are verified to reach root-wait.",
+    "Going earlier than those five now needs an observable rather than more switches: the milestone document's route A (map the framebuffer from the kernel's own bootstrap page tables) or route B (a RAM mailbox with a warm reset)."
+  ]
+}

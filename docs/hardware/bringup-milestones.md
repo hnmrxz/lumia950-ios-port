@@ -55,3 +55,18 @@ microSD 可作为独立辅助平台，但**不能用它的成功替代 eMMC 真�
 2. eMMC 初期只读：驱动层不发写命令；不允许分区表写入、文件系统修复或自动挂载写入。
 3. 没有真实 APFS root 启动证据前，**不格式化 MainOS**。
 4. 不为内核调试更换 `BootShim.efi`、`UEFI.elf`、BCD 或已验证的 UniXNU 启动文件；任何受保护对象改动必须走 `scripts/boot-chain-io.py` 的四项证据。
+
+## M1 进展（2026-11-27 晚）：五个开关已验证、两个新开关撤回
+
+| 事实 | 证据 |
+|---|---|
+| 五个开关（rtclock/topology/timercall/cpuinit/processor）全开时，内核在 QEMU **仍到 root-wait** 并打出 post-VM 标记 | `scripts/check-staged-tree.py` 用同一棵树换了参考内核后 `past_bsd=root-wait`、`marker=True` |
+| 真机把五个全开后**仍无任何输出** | 机主两次开机照片（`docs/hardware/measurements/menu-after-handoff/`） |
+| 新增的 `lumia-skip-wfe` / `lumia-skip-startup` **在 QEMU 里即使开关关闭也会让内核早期 fault** | 四种配置全停 `_sleh_synchronous_sp1`；同一棵树换回参考内核即到 root-wait（`docs/hardware/measurements/switch-regression/`） |
+
+**结论**：
+1. 五个开关的二分已经做到头——卡点在它们**之前**，且**不能靠"再加跳过"继续逼近**；
+2. 新开关本身会破坏启动，**已撤回**，不再写进启动参数；
+3. 要到 `arm_vm_init` 之前观测，只能走文档里那两条路线（A：bootstrap 页表映射帧缓冲；B：RAM mailbox + 热复位）。
+
+下一步按决策规则执行：**先做 A 的 QEMU 原型**（不改真机），并用现有门禁（`past_bsd=root-wait`、底部分段色块、`check-evidence`）验证它没有破坏已验证路径。
