@@ -58,3 +58,11 @@ QEMU 里已经证明：内核能在 `arm_vm_init` **之前**建立帧缓冲映�
 - 为这次验证格式化 MainOS、重排分区、写 eMMC；
 - 更换 `BootShim.efi`、`UEFI.elf`、`BCD`、`BOOTAA64.EFI`；
 - 在没有照片的情况下把任何一步写成"已验证"。
+
+## 7. 自我测试已覆盖真机分支（2026-11-27）
+
+`lumia-early-map-selftest` 在 QEMU 上跑过真机将要走的那条分支（帧缓冲所在 GB 的 identity 表项**已经是表**），
+结果状态 **30**：走的是"已有表"分支、哨兵完好、内核仍到 root-wait。
+
+因此真机验证时，**分支风险已降低**，剩下的风险是数值（真机 stride/行范围，已由 `scripts/test-early-map-arithmetic.py` 对两种面板验算）
+与真机硬件本身。

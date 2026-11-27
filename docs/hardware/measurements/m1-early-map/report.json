@@ -360,5 +360,74 @@
       "note": "state 0 means the marker installed the mapping and finished its rows; the panel itself is painted over later by PE_create_console, which is why the state code, not the final framebuffer dump, is the evidence"
     },
     "limits": "QEMU only. The handset has not run this kernel; the drawing position was chosen for the emulator's block layout and the same arithmetic applies on hardware, where the video base is 0x400000 and the identity map starts at physBase."
+  },
+  "round_175": {
+    "what": "The self-test now has its own buffer, geometry and sentinels, and all six forms pass on one artifact",
+    "artifact": {
+      "kernel_sha256": "74c8be7b78dacb4425dcd05535ae90dbee0f9d6828d3466f28800770b2c6431d",
+      "commit": "bd77411",
+      "build": "46009846837",
+      "previous": {
+        "kernel_sha256": "404140cb4d8b1e52cd9b7dac7634d22b9c1f5c10bac245b306030880df743681",
+        "note": "the artifact that first drew before arm_vm_init; its draw result is reproduced here"
+      }
+    },
+    "bug_fixed": [
+      "The first self-test pointed the drawing loop at lumia_l2, a 4 KB page, while keeping the panel's stride and width, so its rows ran past the end of that page. It reported state 7 and never reached the stores -- luck, not safety.",
+      "The leaf comparison used '(entry & (block - 1))', which compares flag bits rather than the block address, so a block that already mapped the target read as a different one. It now uses ARM_TTE_BLOCK_L2_MASK."
+    ],
+    "self_test_design": {
+      "buffer": "lumia_test_pixels[4096] words (16 KB), page aligned, its own storage",
+      "geometry": "stride 256 bytes, width 64, height 16 -- not the panel's",
+      "drawn_region": "starts at word 16, eight rows of 64 words -> ends at word 528",
+      "sentinels": "words 0..15 (0x5AA5C33C) and 4080..4095 (0xC33C5AA5) in the same buffer",
+      "outcomes": {
+        "30": "existing-table branch taken, sentinels intact",
+        "31": "a table had to be created",
+        "32": "a sentinel broke"
+      }
+    },
+    "six_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "noclean": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "notlbi": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "selftest": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 30
+      }
+    },
+    "comparison_with_previous": {
+      "draw": "state 0 on both artifacts (404140cb and 74c8be7b), so the self-test change did not disturb the panel path",
+      "new": "selftest state 30, which is the branch the handset takes and QEMU had never executed"
+    },
+    "evidence_levels": {
+      "qemu_empty_l1_branch": true,
+      "qemu_existing_l1_branch": true,
+      "qemu_bsd_init": true,
+      "handset_bsd_init": false
+    }
   }
 }

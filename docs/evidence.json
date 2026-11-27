@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The early marker installs an identity-map entry for the framebuffer block, draws rows 8..15 before arm_vm_init and the kernel still reaches root-wait: state 0, ESR 0x0, while the untouched configuration reports 4",
+      "what": "Six forms on one artifact: the plain marker draws before arm_vm_init (state 0), the dry form installs the mapping without drawing (1), and the self-test runs the handset's existing-table branch on its own sentinelled buffer (30) -- all reaching root-wait with ESR 0x0, next to the untouched configuration's 4",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -860,10 +860,14 @@
         },
         {
           "label": "host-tested",
-          "path": "scripts/verify-probe-word.py"
+          "path": "scripts/test-early-marker.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-early-map-arithmetic.py"
         }
       ],
-      "limits": "QEMU only. The handset has not run this kernel, so M1's handset evidence is still missing; nothing was flashed."
+      "limits": "QEMU only. The handset has not run this kernel; the self-test executes its branch, not its panel."
     },
     {
       "id": "m1-early-map-handset-math",
