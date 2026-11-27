@@ -133,7 +133,8 @@ CNTFRQ  MIDR  MPIDR  CURRL  SCTLR  TCR  TTBR0  TTBR1     （逐个以 16 进制�
 lld 的 `--subsystem,efi_application`）。本轮实跑：
 
 ```
-build\local\probeegprobe.efi: 4096 bytes
+build\local\probe
+egprobe.efi: 4096 bytes
 QEMU 验证：面板绘出（640x480，文字像素 60760 + 116063）
 ```
 
@@ -141,3 +142,52 @@ QEMU 验证：面板绘出（640x480，文字像素 60760 + 116063）
 
 **只在"没有 `arm_vm_init returned` 那行"时才值得换**：把 `regprobe.efi` 装成 `R:\EFI\BOOT\BOOTAA64.EFI`，开机拍照，
 再把真加载器换回来（`BOOTAA64.EFI.before-control-mark` 一直都在）。这样一次拍照就能拿到真机的定时器频率与 MMU 配置。
+
+
+## 实测结论：`PE_init_platform()` 返回时 `vinfo` **全零**——VM 之前不存在可用的帧缓冲地址
+
+按你的要求先核实语义再上机。方法是**在 QEMU 里把内核停在 `PE_init_platform()` 之后的第一个语句**并读出结构体：
+
+```
+断点：_wfe_timeout_configure = 0xfffffff00740a2c0     （arm_init 中紧接着 PE_init_platform 的调用）
+读取：struct vinfo @ 0xfffffff007af17e8，128 字节
+结果：v_height=0  v_width=0  v_depth=0  v_rowbytes=0  v_baseaddr=0x0   （前 32 字节全 0）
+```
+
+### 源码给出的原因（不是巧合）
+
+| 位置 | 事实 |
+|---|---|
+| `pexpert/arm/pe_init.c` | 控制台由 **`PE_create_console()`** 创建；它才调用 `PE_initialize_console()` |
+| `osfmk/console/video_console.c` `initialize_screen()` | 当 `kernel_map == VM_MAP_NULL` 时走 `ml_io_map_unmappable()` 建映射；VM 未起时该映射不存在，`v_baseaddr` 只能来自它的返回值 |
+| `osfmk/arm/arm_init.c` | `PE_create_console()` 在 **第 571 行**，即 `arm_vm_init()`（第 516 行）**之后** |
+
+**结论：在 `arm_vm_init` 之前，帧缓冲根本还没有被内核映射。** 这不是我们写错了地址，而是这条链的构造如此。
+
+## `lumia-early-bar` 的正反对照（QEMU）
+
+| 运行 | 参数 | rows 120–135 的色块像素 | 内核最终 |
+|---|---|---|---|
+| 正对照 | `… lumia-early-bar` | **0** | 仍到 `root-wait`（**未 fault**） |
+| 负对照 | 无 | 0 | 仍到 `root-wait` |
+
+- **正对照失败**：因为 `vinfo.v_baseaddr == 0`，守卫 `if (vinfo.v_baseaddr != 0 …)` 直接跳过绘制；
+- **安全验证通过**：带参数时内核**没有**在仪器处 fault，与不带参数走完全一样的路径（都到 `root-wait`）；
+- 因此这个仪器**无法**用来判断"真机是否到达 `PE_init_platform()`"——没有色块不代表没到。
+
+## 三类结果的严格区分（回答你要求的判读标准）
+
+| 结果 | 判定依据 | 能否用 `lumia-early-bar` 判定 |
+|---|---|---|
+| **执行未到达** | 无任何后续信号 | ❌ 与下一条不可区分 |
+| **映射不可用** | `vinfo.v_baseaddr == 0`（VM 之前**恒为真**，已实测） | ❌ 恒发生，故无信息量 |
+| **绘制失败** | `vinfo` 有效但 `drawable()` 拒绝或存储 fault | 只在 VM 之后才可能出现 |
+
+**所以：`lumia-early-bar` 不作为真机判据，不为此再消耗一次开机。**
+
+## 要在 `arm_vm_init` 之前获得观测，只剩两条路
+
+1. **在内核 bootstrap 页表里为帧缓冲建一条映射**（改 `start.s` 的 L1/L2 填充），之后任何早期代码都能写屏；
+2. **非视频通道**：把阶段标记写进一段内核镜像内（已映射）的变量，配合**热复位**（DRAM 保持）+ 加载器在下次启动时读出并显示。
+
+第 1 条是纯内核改动、可在 QEMU 验证；第 2 条要加载器配合。两者都比继续"在错误的位置画色块"更接近你要求的 P1.1。

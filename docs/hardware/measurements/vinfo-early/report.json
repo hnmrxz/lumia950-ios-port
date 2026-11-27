@@ -1,0 +1,32 @@
+{
+  "what": "Measurement of struct vinfo at the moment PE_init_platform() has returned in arm_init, in QEMU, and the controls for the 'lumia-early-bar' instrument that was built on the assumption that vinfo is usable there",
+  "method": {
+    "kernel": "the build from run 45927960099, which carries the lumia-early-bar instrument",
+    "breakpoint": "_wfe_timeout_configure (0xfffffff00740a2c0), the first statement after PE_init_platform(FALSE, args)",
+    "read": "struct vinfo at 0xfffffff007af17e8, 128 bytes, via the fixture's --read-at"
+  },
+  "measured": {
+    "v_height": 0,
+    "v_width": 0,
+    "v_depth": 0,
+    "v_rowbytes": 0,
+    "v_baseaddr": "0x0",
+    "raw_prefix": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "controls": {
+    "positive": "boot with 'lumia-early-bar': 0 pixels of the bar colour in rows 120-135; the kernel still reached root-wait",
+    "negative": "boot without it: 0 pixels in those rows (as expected), kernel reached root-wait",
+    "safety": "with the argument present the kernel did not fault at the instrument: the guard (v_baseaddr != 0) skipped the store and the boot continued to the same place as without it"
+  },
+  "source": [
+    "pexpert/arm/pe_init.c: the console is created by PE_create_console(), which calls PE_initialize_console() only when PE_state.video.v_display is set",
+    "osfmk/console/video_console.c initialize_screen(): with kernel_map == VM_MAP_NULL it calls ml_io_map_unmappable() and sets new_vinfo.v_baseaddr from the result; before arm_vm_init that map does not exist",
+    "osfmk/arm/arm_init.c: PE_create_console() is called at line 571, i.e. after arm_vm_init() at line 516 -- the framebuffer becomes writable only there"
+  ],
+  "conclusion": [
+    "vinfo is entirely zero when PE_init_platform() returns: there is no address to draw through at that point, and never was.",
+    "The console, and with it the framebuffer mapping, is created later in arm_init, after the VM work. So no framebuffer output is possible before arm_vm_init by construction rather than by accident.",
+    "The early bar is therefore not a valid instrument for the handset: a missing bar would say nothing about whether the kernel reached that point. It stays in the tree behind its boot argument because it is harmless and documents the attempt.",
+    "An observable before arm_vm_init needs either a mapping made from the kernel's own bootstrap page tables (start.s) or a non-video channel such as a RAM mailbox that survives a warm reset."
+  ]
+}

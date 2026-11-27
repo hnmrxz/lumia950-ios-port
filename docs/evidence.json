@@ -720,6 +720,30 @@
         }
       ],
       "limits": "One photograph of one probe run. It records the EL1 environment at the moment the probe ran, which is before the loader installs its own mapping; it does not show the state at the kernel's entry."
+    },
+    {
+      "id": "vinfo-zero-before-vm",
+      "what": "struct vinfo is all zeros when PE_init_platform() returns in arm_init (measured in QEMU at _wfe_timeout_configure), and the console that maps the framebuffer is created by PE_create_console() after arm_vm_init -- so no framebuffer output is possible before the VM work",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/vinfo-early/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/read-vinfo-early.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/verify-early-bar.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "ci/boot-progress.py"
+        }
+      ],
+      "limits": "Emulator only, but it is a measurement of the kernel's own structure at a named instruction, so it carries to any platform that runs this kernel: the ordering is in the source, not in the emulator."
     }
   ]
 }
