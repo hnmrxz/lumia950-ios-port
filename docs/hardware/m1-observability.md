@@ -487,3 +487,34 @@ fixture 自己的 PASS 行同时报告：时钟/WFE/拓扑初始化、`arm_vm_in
 | QEMU 到 BSD 初始化 | 是（fixture PASS 行） |
 | 真机 hand-off | 是（此前建立） |
 | **Lumia 950 真机 BSD 初始化** | **否** |
+
+## 22. self-test 改用真机几何（2026-11-27）
+
+上一版 self-test 证明的是“已有表”分支，但用的是**合成几何**（stride 256、width 64）——真机的数字只被**计算**过，没被**执行**过。
+现在它执行真机的数字：
+
+| 项 | 值 |
+|---|---|
+| 几何 | stride **4320**、width **1080**、height **1920** |
+| 行 | **8–15**（与面板路径同一批行） |
+| 缓冲区 | `lumia_test_pixels[18432]`（72 KB） |
+| 哨兵 | 字 0–15 与 18400–18415 |
+| 绘制区 | 字 16 + row×1080，止于字 17,296（距尾部哨兵还有一千多字） |
+
+### 22.1 六模式（artifact `717752f7…`，build 46013849761，commit `bb90eac`）
+
+| 模式 | 结果 | ESR | 状态 |
+|---|---|---|---|
+| off | root-wait | `0x0` | 4 |
+| dry | root-wait | `0x0` | 1 |
+| draw | root-wait | `0x0` | 0 |
+| noclean | root-wait | `0x0` | 0 |
+| notlbi | root-wait | `0x0` | 0 |
+| **selftest** | root-wait | `0x0` | **30** |
+
+与 `74c8be7b…` 对比：draw 与 selftest 结果**完全一致** ⇒ 换几何没有扰动任何路径。
+
+### 22.2 现在的边界
+
+- **QEMU**：真机分支 + 真机几何都已执行；内核到 BSD 初始化与 root-wait；
+- **真机**：仍未运行。剩余风险是真机硬件本身，以及 identity 表在真机上的实际布局（`physBase` 不同，掩码/索引由同一段代码计算）。

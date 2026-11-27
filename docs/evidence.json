@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "Six forms on one artifact: the plain marker draws before arm_vm_init (state 0), the dry form installs the mapping without drawing (1), and the self-test runs the handset's existing-table branch on its own sentinelled buffer (30) -- all reaching root-wait with ESR 0x0, next to the untouched configuration's 4",
+      "what": "Six forms on one artifact with the self-test running the handset's own geometry (stride 4320, width 1080, rows 8..15): the plain marker draws (state 0), the dry form maps without drawing (1), the self-test takes the handset's existing-table branch with its sentinels intact (30), and the untouched configuration reports 4 -- all reaching root-wait with ESR 0x0",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -861,13 +861,9 @@
         {
           "label": "host-tested",
           "path": "scripts/test-early-marker.py"
-        },
-        {
-          "label": "host-tested",
-          "path": "scripts/test-early-map-arithmetic.py"
         }
       ],
-      "limits": "QEMU only. The handset has not run this kernel; the self-test executes its branch, not its panel."
+      "limits": "QEMU only. The handset has not run this kernel: its branch and its numbers are exercised, its hardware is not."
     },
     {
       "id": "m1-early-map-handset-math",

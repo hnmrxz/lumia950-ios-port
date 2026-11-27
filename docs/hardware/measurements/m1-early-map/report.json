@@ -429,5 +429,61 @@
       "qemu_bsd_init": true,
       "handset_bsd_init": false
     }
+  },
+  "round_176": {
+    "what": "The self-test now draws with the handset's geometry, and six forms pass again on one artifact",
+    "artifact": {
+      "kernel_sha256": "717752f741d8597fcf1f497b964ba3a0d27da55978cf197a261d9e617da1e8f0",
+      "commit": "bb90eac",
+      "build": "46013849761"
+    },
+    "self_test_geometry": {
+      "before": "stride 256, width 64, rows 0..7 -- synthetic numbers, so the handset's were only ever calculated",
+      "now": "stride 4320, width 1080, height 1920, rows 8..15 -- the handset's own numbers, executed against a 72 KB buffer",
+      "buffer": "lumia_test_pixels[18432] words with sentinels at 0..15 and 18,400..18,415",
+      "drawn_region": "word 16 + row * 1080 for rows 8..15, ending at word 17,296, more than a thousand words short of the trailing sentinel"
+    },
+    "six_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "noclean": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "notlbi": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "selftest": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 30
+      }
+    },
+    "comparison": {
+      "74c8be7b": "draw 0, selftest 30 with the synthetic geometry",
+      "717752f7": "draw 0, selftest 30 with the handset geometry -- so the geometry change did not disturb either path"
+    },
+    "evidence_levels": {
+      "qemu_empty_l1_branch": true,
+      "qemu_existing_l1_branch_with_handset_geometry": true,
+      "qemu_bsd_init": true,
+      "handset_bsd_init": false
+    }
   }
 }
