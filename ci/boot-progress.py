@@ -32,6 +32,23 @@ DECLARATION = ("\textern void native_boot_progress_remember(void *base, unsigned
                "\textern void native_boot_progress_stage(void *base, unsigned long stride, "
                "unsigned long height, const char *command_line, int stage);\n")
 
+AFTER_CONSOLE = (
+    "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
+)
+
+# PE_init_platform() is what initialises the graphics console with the video parameters from boot_args, so this is the first
+# point in the kernel where a line of text can reach the panel. On the handset that matters: the photograph of the hand-off page
+# proves the loader ran, and a line printed here is what distinguishes "the kernel started" from "the kernel never ran". The
+# marker is deliberately a plain kprintf, not a framebuffer store -- it goes through the console the platform expert set up,
+# which is exactly what we want to test.
+CONSOLE_MARKER = (
+    "\n\t/* Bring-up instrument: the console exists from here on. It reports boot_args.Video rather than PE_state, so\n"
+    "\t * the line uses the same fields as the bar calls above and nothing that needs a private header. */\n"
+    "\tkprintf(\"LUMIA: arm_init past PE_init_platform, bootargs video base=%lx row=%lu height=%lu\\n\",\n"
+    "\t       (unsigned long)args->Video.v_baseAddr, (unsigned long)args->Video.v_rowBytes,\n"
+    "\t       (unsigned long)args->Video.v_height);\n"
+)
+
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 # The third bar is drawn after the platform expert has installed the video console, through the same mapping the
@@ -62,7 +79,8 @@ STAGE_0 = (
     + "\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
     + "args->Video.v_height, args->CommandLine, 0);\n"
 )
-STAGE_2 = ("\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
+STAGE_2 = ("\tkprintf(\"LUMIA: arm_init reached arm_vm_init, drawing stage 1\\n\");\n"
+           "\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
            "args->Video.v_height, args->CommandLine, 1);\n")
 
 def find(root: Path) -> list[Path]:
@@ -137,7 +155,7 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # Stage 0 goes immediately before the first statement of arm_init, not at the top of the body: the body
     # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
     # declaration a declaration-after-statement.
-    text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
+    text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL + CONSOLE_MARKER, 1)
     text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
