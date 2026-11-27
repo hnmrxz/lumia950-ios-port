@@ -54,6 +54,19 @@ BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
 # setup (run 45918861169), because the console exists then but its framebuffer mapping does not. The first line that can safely be
 # printed is therefore this one, immediately after arm_vm_init() returns -- and it is the line that answers the handset
 # question, because a kernel that reaches it has run through the whole early boot path.
+# The handset stops before arm_vm_init can print, so nothing on the panel says where. The way out is to remove one candidate at a
+# time and watch for the post-VM marker to appear: a candidate that is skipped and lets the marker print is the one that hangs.
+# Each switch is a boot argument, so one kernel can test all of them without rebuilding, and nothing changes without the argument.
+#
+# The candidates are the calls between the platform expert and the VM work that touch hardware the emulator does not model.
+SWITCHED_CALLS = {
+    "lumia-skip-rtclock": "\trtclock_early_init();\n",
+    "lumia-skip-topology": "\tml_parse_cpu_topology();\n",
+    "lumia-skip-timercall": "\ttimer_call_init();\n",
+    "lumia-skip-cpuinit": "\tcpu_init();\n",
+    "lumia-skip-processor": "\tprocessor_bootstrap();\n",
+}
+
 AFTER_VM_INIT_MARKER = (
     "\n\t/* Bring-up instrument: the VM work is done, so the console can be written. */\n"
     "\tkprintf(\"LUMIA: arm_vm_init returned, entering the rest of arm_init\\n\");\n"
@@ -164,6 +177,16 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # declaration a declaration-after-statement.
     text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
     text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT + AFTER_VM_INIT_MARKER, 1)
+    for switch, call in SWITCHED_CALLS.items():
+        if call not in text:
+            continue
+        guard = (
+            "\t/* Bring-up bisect: this call is skipped when '%s' is in the boot arguments. */\n"
+            "\tif (!PE_parse_boot_argn(\"%s\", NULL, 0)) {\n"
+            "%s"
+            "\t}\n" % (switch, switch, call)
+        )
+        text = text.replace(call, guard, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
 
