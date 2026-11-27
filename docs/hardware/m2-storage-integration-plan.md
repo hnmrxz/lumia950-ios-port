@@ -67,3 +67,20 @@ ok   .../org.unixnu.NativeSdhci/Contents/MacOS/NativeSdhci: arm64 kext bundle, 6
 同一份构建里 `archive` 步骤的失败数为 **0**（此前 `mkext_blob.cpp is missing` 被作业吞掉）。
 
 **因此 S1 通过、S2 未尝试**：bundle 与 container 都已生成并通过格式检查，但把它放进 prelinked 镜像仍被拒（已知的段冲突）。
+
+## 8. S6 的计数器已就位（2026-11-28）
+
+S6 要求"整个过程中**没有**发出 CMD24/25/38"，而且要是**运行时**的证据。为此在 `PollingHost::issue()` 里加了两件事：
+
+| 计数器 | 含义 |
+|---|---|
+| `native_sdhci_commands_issued` | 每一条离开 `issue()` 的命令 |
+| `native_sdhci_write_commands` | 其中写/擦除的那几条（24/25/38） |
+
+写入/擦除**在触碰命令寄存器之前**就被计数并直接拒绝（返回 `InvalidArgument`），所以计数一定先于任何设备动作。
+两个计数器都是非 `static`，等驱动真正跑起来时可以被内核打印。
+
+写入相关的 opcode 用**数字**引用（`24u`/`25u`/`38u`），因为 `scripts/test-storage-read-only.py` 断言这个驱动**不得出现**写命令的名字，
+而 `SdhciRegs.h` 也不声明 CMD38——"没声明"不等于"不会到达"，所以计数器三种都覆盖。
+
+**仍未成立的是运行时读数**：驱动还没有在 QEMU/真机里跑过，S6 的判据（计数为 0）要等 S4 之后才能读。

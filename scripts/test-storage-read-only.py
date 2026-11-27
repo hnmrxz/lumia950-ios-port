@@ -64,6 +64,22 @@ class StorageReadOnlyTests(unittest.TestCase):
         for command in WRITE_COMMANDS:
             self.assertNotIn(command, text, f"the polling host must not know {command}")
 
+    def test_the_driver_counts_commands_and_flags_writes(self):
+        """M2's S6 asks for a runtime proof, not a source review: the counters make that possible once the driver runs."""
+        text = self.sources["PollingHost.cpp"]
+        self.assertIn("native_sdhci_commands_issued += 1", text, "every command that leaves issue() is counted")
+        self.assertIn("native_sdhci_write_commands += 1", text, "and the write/erase ones are counted separately")
+        for opcode in ("index == 24u", "index == 25u", "index == 38u"):
+            self.assertIn(opcode, text, "the counter covers write and erase without naming them")
+        # the counter must sit before the controller is touched, otherwise a write could reach the device before being counted
+        self.assertLess(text.index("native_sdhci_write_commands += 1"), text.index("io.write16(io.context, kRegCommand"),
+                        "the count has to happen before the command register is written")
+
+    def test_the_counters_are_visible_outside_the_driver(self):
+        text = self.sources["PollingHost.cpp"]
+        self.assertIn("volatile unsigned long native_sdhci_write_commands", text,
+                      "a non-static counter can be printed by the kernel once the driver runs")
+
 
 if __name__ == "__main__":
     unittest.main()

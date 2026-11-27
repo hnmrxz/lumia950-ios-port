@@ -1012,6 +1012,22 @@
         }
       ],
       "limits": "The bundle and container are built and validated, not delivered: M2's S2 (putting it into the prelinked image) is still refused, and nothing has run against the device"
+    },
+    {
+      "id": "sdhci-write-counter",
+      "what": "The storage driver counts every command it issues, counts write and erase opcodes separately, and refuses a write before the command register is touched, so M2's read-only guarantee (S6) can be measured at run time instead of read off the source",
+      "label": "ABI-compiled",
+      "evidence": [
+        {
+          "label": "ABI-compiled",
+          "path": "drivers/NativeSdhci/PollingHost.cpp"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-storage-read-only.py"
+        }
+      ],
+      "limits": "Instrumentation only: the counters are compiled for arm64 and checked by source tests, but the driver does not run yet, so no counter has ever been read at run time"
     }
   ]
 }

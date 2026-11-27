@@ -1,4 +1,8 @@
 #include "PollingHost.h"
+
+// Exposed so a later stage can prove the read-only guarantee at run time instead of reading the source (M2 plan, step S6).
+volatile unsigned long native_sdhci_commands_issued = 0;
+volatile unsigned long native_sdhci_write_commands = 0;
 #include "SdhciRegs.h"
 
 namespace sdhci {
@@ -99,6 +103,16 @@ bool PollingHost::issue(u8 index, u32 argument, ResponseType type, bool data, u3
 {
     last = {};
     last.command = index;
+    // S6 of the M2 plan asks for a runtime proof that no write command is ever issued, not a source review: count every command that
+    // leaves this function, and count the ones that would write or erase separately. A non-zero write count is the alarm, and the kernel can
+    // print both numbers once the driver runs.
+    native_sdhci_commands_issued += 1;
+    // The write and erase opcodes are numeric on purpose: this driver must not name a write command anywhere, and the read-only test
+    // enforces that. A command that is not declared can still arrive, so the counter covers all three.
+    if (index == 24u || index == 25u || index == 38u) {
+        native_sdhci_write_commands += 1;
+        return fail(HostError::InvalidArgument, HostPhase::Idle);
+    }
     if (!running) return fail(HostError::NotReady, HostPhase::Idle);
     if (index > 63 || static_cast<u8>(type) > static_cast<u8>(ResponseType::R2) ||
         (data && type != ResponseType::R1) || (type != ResponseType::None && !response)) {
