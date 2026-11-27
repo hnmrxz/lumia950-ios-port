@@ -87,3 +87,23 @@ ID_AA64PFR0_EL1  0x2222
 若打不出，说明停在 VM 之前。
 
 这行还没有上机（构建中）。它是目前能拿到的最强早期信号。
+
+
+## 现在手机上装的是"带 post-VM 标记"的内核
+
+本机验证（`scripts/verify-after-vm-marker.py`）：这行**确实会打出来**，而且内核照常走到 `root-wait`：
+
+```
+[    7.204918]: LUMIA: arm_vm_init returned, entering the rest of arm_init
+past_bsd: root-wait    milestones: … arm_vm_init_return … bsd_init_entry
+```
+
+已装到手机（`H:\EFI\UniXNU\Payloads\kernel.macho`，sha256 `f8ea5f23…`，旧内核留在 `kernel.macho.prev`）。
+
+### 下一次开机怎么判读
+
+| 屏幕底部 / 屏幕上出现 | 结论 | 下一步 |
+|---|---|---|
+| `LUMIA: arm_vm_init returned…` | VM 工作**完成**，停在这行之后 | 往 `PE_init_iokit` / `bsd_init` 之间找（可在更后面再加标记） |
+| 只有 DARWINBOOT 那页，**没有**这行 | 停在 `arm_vm_init` **之前或之中** | 查 early boot：EL1 环境、缓存、`wfe_timeout_*`、ADT 解析 |
+| 出现这行后又出现别的字样 | 打印的内容告诉我停在哪 | 按打印内容继续 |
