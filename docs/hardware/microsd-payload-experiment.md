@@ -71,3 +71,43 @@ microSD 是唯一"零分区改动"的候选。
 1. 为这个实验格式化或重排 MainOS；
 2. 替换 `bootarm.efi` / `UEFI.elf` / `BCD` / `BOOTAA64.EFI`；
 3. 在没有拍照取证前，把上述任何一步写成"已验证"。
+
+
+## 8. 修正：这不是"零写入实验"，必须分两阶段
+
+`unixnu.toml` 位于 `EFI\UniXNU\`，属于第六类受保护对象。因此"新增 `xnu-sd` 条目"**不是**只读操作，也不能只靠拔卡回滚。
+
+### 阶段 A：纯只读探测（不改任何文件）
+
+| 动作 | 观察到什么 | 是否写入手机 |
+|---|---|---|
+| 插入 microSD（FAT32，内容见第 3 节），开机停在菜单 | 菜单是否出现新卷/新条目；UEFI 是否枚举到设备 | **否** |
+| 不选择任何新条目，直接让原 `xnu` 条目启动 | 原有 NTFS 路径是否仍 hand-off（回归确认） | 否 |
+
+阶段 A 的结论只有两种：**UEFI 能看到该卡**，或**看不到**。看不到就停止，不必进入阶段 B。
+
+### 阶段 B：受控的菜单配置实验（需要一次受保护的 EFIESP 写入）
+
+前置条件（缺一不可）：
+
+1. 阶段 A 已确认 UEFI 能枚举该卡；
+2. 先做**文件级快照**：`python scripts/phone-snapshot.py save --efiesp R: --out out/phone-backups`；
+3. 记下当前 `unixnu.toml` 的 SHA-256，并在改完后与 `scripts/boot-chain-guard.py inventory` 对照；
+4. 修改必须通过守卫：`--replace-protected --backup <快照里的 unixnu.toml> --reason ... --verify ...`；
+5. **保留原 `xnu` 条目**，只新增 `xnu-sd`；这样即使新条目完全失败，菜单仍能用原条目启动；
+6. 改完立刻用原 `xnu` 条目启动一次，确认回归通过，再试 `xnu-sd`。
+
+回滚：用第 2 步的快照，经守卫（同样带 `--replace-protected` 与证据）恢复 `unixnu.toml`。
+
+## 9. 通过判据必须分层（原来把五件事混在一起了）
+
+| 层 | 要证明的事 | 判据 | 失败说明什么 |
+|---|---|---|---|
+| L1 设备枚举 | UEFI 发现了存储设备 | 菜单/固件能看到新卷 | UEFI 无 SD 驱动或卡未被供电 |
+| L2 文件系统协议 | UEFI 能读 FAT32 | 菜单能列出 `xnu-sd` 指向的目录/文件 | FAT 驱动或分区表问题 |
+| L3 卷标识 | UniXNU 能唯一定位该卷 | 条目解析出的卷句柄/路径非空 | 卷标识解析问题 |
+| L4 文件读取 | DarwinBoot 读到 `kernel.macho` 与 `.adt` | 日志出现读取成功，长度与 `DEPLOYED.txt` 的 SHA-256 一致 | 路径/权限/长度问题 |
+| L5 内核一致性 | 读到的内核与手机现有的一致 | SHA-256 相等 | 拷贝错误或版本不匹配 |
+| L6 hand-off | 真机完成交接 | `DARWINBOOT: hand-off to the kernel` + 页内 `entry words 140006F5` | 前五层都过了才会到这层 |
+
+**只有 L6 通过并且有照片，才可以把"microSD 载荷路径"记为已验证。** L1–L5 各自单独记录，失败时按层定位。

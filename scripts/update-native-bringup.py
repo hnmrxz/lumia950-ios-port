@@ -22,6 +22,24 @@ MANIFEST = "EFI/UniXNU/native-bringup.json"
 UPDATABLE = {KERNEL, KERNEL + ".adt", "EFI/UniXNU/Drivers/LumiaGpuPower.efi", MANIFEST}
 METADATA_DIRECTORIES = {".fseventsd", ".Spotlight-V100", ".Trashes", ".TemporaryItems"}
 
+# The payload this script updates lives inside EFI/UniXNU, which is a protected class. Its delete-and-rewrite therefore goes through
+# the same gate as any other writer: the release-kernel path needs --delete-protected plus --backup, --reason and --verify, so a
+# delete cannot be used to sidestep the rule.
+GATE_SPEC = importlib.util.spec_from_file_location("boot_chain_io", Path(__file__).with_name("boot-chain-io.py"))
+GATE = importlib.util.module_from_spec(GATE_SPEC)
+GATE_SPEC.loader.exec_module(GATE)
+
+
+def gate_delete(destination: Path, args) -> None:
+    if not getattr(args, "delete_protected", False):
+        raise SystemExit(f"refused: {destination} is a protected boot-chain object; the release-kernel delete needs "
+                         f"--delete-protected with --backup, --reason and --verify")
+    decision = GATE.authorise(destination, delete=True, backup=getattr(args, "backup", None),
+                              reason=getattr(args, "reason", None), verify=getattr(args, "verify", None))
+    if not decision.allowed:
+        raise SystemExit(decision.message)
+    print(decision.message)
+
 
 def metadata(name):
     return name.startswith("._") or name == ".DS_Store" or name in METADATA_DIRECTORIES
@@ -137,7 +155,9 @@ def update(args):
         if INSTALL.phone_file(name).read_bytes() != data:
             raise ValueError(f"phone file changed during backup: {name}; phone remains untouched")
     if release_kernel:
-        INSTALL.phone_file(KERNEL).unlink()
+        destination = INSTALL.phone_file(KERNEL)
+        gate_delete(destination, args)
+        destination.unlink()
     for name in sorted(changed, key=lambda name: (name == MANIFEST, name != KERNEL, name)):
         INSTALL.write_verified(INSTALL.phone_file(name), changed[name])
     os.sync()
@@ -165,6 +185,12 @@ def main():
     parser.add_argument("--volume-uuid", required=True)
     parser.add_argument("--partition-uuid", required=True)
     parser.add_argument("--backup-root", type=Path, default=Path("/Volumes/bludssd/Lumia950-backups"))
+    parser.add_argument("--delete-protected", action="store_true",
+                        help="allow the release-kernel delete of EFI/UniXNU/Payloads/kernel.macho")
+    parser.add_argument("--backup", type=Path, default=None,
+                        help="a file that can restore the object being deleted; required with --delete-protected")
+    parser.add_argument("--reason", default=None, help="why the object is being deleted; required with --delete-protected")
+    parser.add_argument("--verify", default=None, help="how the result will be proven; required with --delete-protected")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     try:

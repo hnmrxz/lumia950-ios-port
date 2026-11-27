@@ -26,39 +26,31 @@ ROOT = Path(__file__).resolve().parent.parent
 STAGING = ROOT.parent / "out"
 
 
-def protected_object(destination: Path) -> str | None:
-    """Which protected boot-chain object this destination is, if any.
-
-    The list and the reasons live in scripts/boot-chain-guard.py so that every installer asks the same question. This wrapper keeps
-    the installer's default behaviour: writing a protected object is refused unless the caller asked for it explicitly.
-    """
+def _shared_gate():
     import importlib.util
 
-    module_path = Path(__file__).with_name("boot-chain-guard.py")
-    spec = importlib.util.spec_from_file_location("boot_chain_guard", module_path)
+    module_path = Path(__file__).with_name("boot-chain-io.py")
+    spec = importlib.util.spec_from_file_location("boot_chain_io", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    # compare on the tail of the path: callers pass \volume-relative destinations such as efiesp / "UEFI.elf"
-    parts = destination.as_posix().replace("\\", "/")
-    for protected in list(module.PROTECTED) + ["efi/unixnu"]:
-        if parts.casefold().endswith(protected) or ("/" + protected + "/") in parts.casefold():
-            return protected
-    return None
+    return module
 
 
-def refuse_protected(destination: Path, replace: bool) -> bool:
-    protected = protected_object(destination)
-    if protected is None:
+def refuse_protected(destination: Path, args) -> bool:
+    """Ask the one shared gate, with the full evidence the rules require.
+
+    This used to be a weaker local copy that accepted --replace-protected on its own. It now delegates to scripts/boot-chain-io.py,
+    so an existing protected object needs --replace-protected *and* --backup *and* --reason *and* --verify, exactly like every other
+    writer in the repository.
+    """
+    gate = _shared_gate()
+    decision = gate.authorise(destination, replace=getattr(args, "replace_protected", False),
+                              backup=getattr(args, "backup", None), reason=getattr(args, "reason", None),
+                              verify=getattr(args, "verify", None))
+    if decision.allowed:
+        print(f"  {decision.message}")
         return True
-    if not destination.exists():
-        # creating the object on a blank volume destroys nothing; only a replacement needs the acknowledgement
-        print(f"allowed: {destination} is the protected object {protected}, and it does not exist yet")
-        return True
-    if replace:
-        print(f"allowed: {destination} is the protected object {protected}, and --replace-protected was given")
-        return True
-    print(f"refused: {destination} is the protected object {protected}", file=sys.stderr)
-    print("         pass --replace-protected together with a verified backup, or leave it alone", file=sys.stderr)
+    print(f"  {decision.message}", file=sys.stderr)
     return False
 
 
@@ -119,7 +111,7 @@ def pe_subsystem(path: Path) -> int | None:
 
 
 def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = None,
-            replace_protected: bool = False) -> bool:
+            args = None) -> bool:
     subsystem = pe_subsystem(src)
     note = "" if subsystem is None else f" subsystem 0x{subsystem:02X}"
     print(f"  {src.name:32} {src.stat().st_size:>10} B  sha256 {digest(src)[:16]}{note}")
@@ -128,12 +120,8 @@ def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = N
             print(f"error: {src.name} has subsystem {subsystem}, which is not the required "
                   f"0x{require_subsystem:02X}; the boot manager would not start it", file=sys.stderr)
             return False
-    if apply:
-        if not refuse_protected(dst, replace_protected):
-            return False
-    elif protected_object(dst) is not None and not replace_protected:
-        # a dry run reports the refusal instead of performing it, so it keeps its exit code while still showing the requirement
-        print(f"  note: {dst} is a protected boot-chain object; --replace-protected will be required to write it")
+    if args is not None and not refuse_protected(dst, args) and apply:
+        return False
     if not apply:
         return True
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -246,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
                              "custom UEFI looks when no boot entry is configured. Measured on the handset, "
                              "2026-11-26: the UEFI reported 'Failed to boot OS. No usable boot entry found' "
                              "with the loader only at EFI\\UniXNU\\UniXNU.efi")
+    parser.add_argument("--backup", type=Path, default=None,
+                        help="a file that can restore a protected object; required together with --replace-protected")
+    parser.add_argument("--reason", default=None,
+                        help="what is being replaced and why; required together with --replace-protected")
+    parser.add_argument("--verify", default=None,
+                        help="how the result will be proven; required together with --replace-protected")
     parser.add_argument("--replace-protected", action="store_true",
                         help="acknowledge that a protected boot-chain object is being written (UEFI.elf, BootShim.efi, "
                              "BOOTAA64.EFI, BCD, bootarm.efi, EFI/UniXNU/**); refused without it")
@@ -288,24 +282,24 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shim = resolve_bootshim(args.bootshim)
         print(f"shim source: {shim}")
-        ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A, replace_protected=args.replace_protected)
+        ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A, args=args)
 
     if args.keep_uefi_elf:
         ok &= verify_kept_uefi_elf(efiesp / "UEFI.elf")
     else:
         print("UEFI.elf -> EFIESP root")
-        ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply, replace_protected=args.replace_protected)
+        ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply, args=args)
 
     print("UniXNU payload -> EFIESP")
     for name in ("UniXNU.efi", "unixnu.toml"):
         source = args.stage / "EFI" / "UniXNU" / name
         if source.is_file():
-            ok &= install(source, efiesp / "EFI" / "UniXNU" / name, args.apply, replace_protected=args.replace_protected)
+            ok &= install(source, efiesp / "EFI" / "UniXNU" / name, args.apply, args=args)
     drivers = args.stage / "EFI" / "UniXNU" / "Drivers"
     if drivers.is_dir():
         for source in sorted(drivers.iterdir()):
             if source.is_file():
-                ok &= install(source, efiesp / "EFI" / "UniXNU" / "Drivers" / source.name, args.apply, replace_protected=args.replace_protected)
+                ok &= install(source, efiesp / "EFI" / "UniXNU" / "Drivers" / source.name, args.apply, args=args)
 
     if args.loader_alias:
         loader = args.stage / "EFI" / "UniXNU" / "UniXNU.efi"
@@ -322,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     if payloads.is_dir():
         for source in sorted(payloads.iterdir()):
             if source.is_file():
-                ok &= install(source, mainos / "EFI" / "UniXNU" / "Payloads" / source.name, args.apply, replace_protected=args.replace_protected)
+                ok &= install(source, mainos / "EFI" / "UniXNU" / "Payloads" / source.name, args.apply, args=args)
     else:
         print("  (no staged kernel; run scripts/stage-kernel.py --payload-out first)")
 
@@ -335,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
             for source in sorted(args.refind.rglob("*")):
                 if source.is_file():
                     relative = source.relative_to(args.refind)
-                    ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply, replace_protected=args.replace_protected)
+                    ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply, args=args)
 
     if args.verify_bcd is not None:
         ok &= verify_bcd(args.verify_bcd, args.layout)

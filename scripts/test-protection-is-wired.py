@@ -34,12 +34,16 @@ class ProtectionIsWiredTests(unittest.TestCase):
     def setUpClass(cls):
         cls.guard = load_guard()
 
-    def test_every_installer_asks_the_guard(self):
+    def test_every_installer_asks_the_shared_gate(self):
         installer = (SCRIPTS / "phone-install.py").read_text(encoding="utf-8")
-        self.assertIn("refuse_protected", installer, "phone-install.py must consult the guard")
-        self.assertIn("--replace-protected", installer, "and offer the acknowledgement flag")
-        self.assertIn("replace_protected=args.replace_protected", installer,
-                      "every install() call has to carry the acknowledgement")
+        self.assertIn("boot-chain-io.py", installer, "phone-install.py must delegate to the shared gate")
+        self.assertIn("gate.authorise", installer,
+                      "and ask it with the full evidence, not a weakened local copy")
+        for flag in ("--backup", "--reason", "--verify", "--replace-protected"):
+            self.assertIn(flag, installer, f"the command line has to offer {flag}")
+        self.assertIn("args=args", installer, "every install() call has to carry the evidence object")
+        self.assertNotIn("protected_object(dst)", installer,
+                         "the local duplicate of the classification was removed")
 
     def test_the_handoff_installer_keeps_its_own_refusal(self):
         installer = (SCRIPTS / "install-native-bringup.py").read_text(encoding="utf-8")
@@ -85,6 +89,32 @@ class ProtectionIsWiredTests(unittest.TestCase):
         snapshot = (SCRIPTS / "phone-snapshot.py").read_text(encoding="utf-8")
         self.assertIn("manifest", snapshot, "a restore must be driven by a manifest")
         self.assertIn("--name", snapshot, "and by an explicit snapshot name, never by 'the newest'")
+
+    def test_the_installer_refuses_an_existing_protected_file_without_a_backup(self):
+        """The behavioural half of the rule: --replace-protected alone must not be enough."""
+        import argparse
+
+        spec = importlib.util.spec_from_file_location("phone_install", SCRIPTS / "phone-install.py")
+        installer = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = installer
+        spec.loader.exec_module(installer)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source = base / "UniXNU.efi"
+            source.write_bytes(b"new")
+            destination = base / "EFI" / "UniXNU" / "UniXNU.efi"
+            destination.parent.mkdir(parents=True)
+            destination.write_bytes(b"old")
+
+            only_flag = argparse.Namespace(replace_protected=True, backup=None, reason=None, verify=None)
+            self.assertFalse(installer.install(source, destination, True, args=only_flag),
+                             "a replacement without a backup must be refused")
+
+            complete = argparse.Namespace(replace_protected=True, backup=source, reason="test", verify="readback")
+            self.assertTrue(installer.install(source, destination, True, args=complete),
+                            "with the full evidence the write is allowed")
+            self.assertEqual(destination.read_bytes(), b"new")
 
 
 if __name__ == "__main__":

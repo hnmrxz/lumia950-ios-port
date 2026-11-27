@@ -784,6 +784,26 @@
         }
       ],
       "limits": "Host tests only: they exercise the guard and the scripts against temporary volumes. Nothing here was run against the phone, and no protected object was written."
+    },
+    {
+      "id": "boot-chain-gate-complete",
+      "what": "One shared decision point (scripts/boot-chain-io.py) now governs replacing and deleting the six protected boot-chain classes, with --replace-protected/--delete-protected plus an existing backup, a reason and a verification plan; the installer, the updater and the snapshot restore all go through it, and tests cover the incomplete-request refusals",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-boot-chain-io.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-protection-is-wired.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/boot-chain-preservation.md"
+        }
+      ],
+      "limits": "Host tests against temporary volumes. No phone was connected and no protected object was written; the microSD experiment is still a design with unverified capabilities."
     }
   ]
 }

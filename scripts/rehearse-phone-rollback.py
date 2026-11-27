@@ -46,13 +46,20 @@ def main() -> int:
 
         bcd.write_text("damaged", encoding="utf-8")
 
-        dry = run("restore", "--efiesp", str(efiesp), "--out", str(backups), "--name", name)
+            # A snapshot restore replaces the BCD store, which is a protected object, so the rehearsal supplies the evidence a real restore
+        # would have to supply: the snapshot's own BCD copy stands in for "a file that can restore the current state", and the reason and
+        # verification strings are the ones the runbook asks for.
+        recovered = backups / name / "efiesp" / "EFI" / "Microsoft" / "BOOT" / "BCD"
+        evidence = ["--replace-protected", "--backup", str(recovered),
+                    "--reason", "rollback rehearsal restores the damaged store",
+                    "--verify", "the bytes are compared with the snapshot manifest after the write"]
+        dry = run("restore", "--efiesp", str(efiesp), "--out", str(backups), "--name", name, *evidence)
         print("== restore dry exit:", dry.returncode)
         print(dry.stdout.rstrip())
         untouched = bcd.read_text(encoding="utf-8") == "damaged"
         print("== dry run left the store damaged:", untouched)
 
-        apply = run("restore", "--efiesp", str(efiesp), "--out", str(backups), "--name", name, "--apply")
+        apply = run("restore", "--efiesp", str(efiesp), "--out", str(backups), "--name", name, *evidence, "--apply")
         print("== restore apply exit:", apply.returncode)
         print(apply.stdout.rstrip())
         repaired = bcd.read_text(encoding="utf-8") == "synthetic-bcd"

@@ -70,8 +70,13 @@ class NativeInstallTests(unittest.TestCase):
             patch.object(UPDATE, "INSTALL", INSTALL)]:
             replacement.start()
             self.addCleanup(replacement.stop)
+        # the release-kernel path now goes through the boot-chain gate, so the test states the evidence a real run has to give
+        backup_file = self.ssd / "evidence" / "before-kernel.macho"
+        backup_file.parent.mkdir(parents=True, exist_ok=True)
+        backup_file.write_bytes(b"the kernel that was on the phone")
         self.args = argparse.Namespace(stage=self.stage, volume_uuid="expected-volume", partition_uuid="expected-partition",
-            backup_root=self.ssd / "backups", apply=True)
+            backup_root=self.ssd / "backups", apply=True, delete_protected=True,
+            backup=backup_file, reason="free space for the update", verify="readback after the write")
 
     def set_file(self, name, data):
         destination = self.stage / name

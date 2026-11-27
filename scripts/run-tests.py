@@ -25,6 +25,7 @@ SELF_CONTAINED = (
     "test-build-manifest.py",
     "test-check-phase.py",
     "test-boot-chain-guard.py",
+    "test-boot-chain-io.py",
     "test-protection-is-wired.py",
     "test-prelinked-guard.py",
     "test-checkpoints.py",

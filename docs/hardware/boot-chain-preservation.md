@@ -128,3 +128,27 @@ Get-Partition | Where-Object DiskNumber -eq <Number> |
 ```
 
 这两个文件记录的是 D 类基线；它们**不写手机**，也不含密钥。
+
+## 9. 删除也走同一道门（P1 修复）
+
+`boot-chain-guard.py` 只看“目标是否存在”，因此“先删再建”曾经能绕过替换规则。现在删除与替换共用
+`scripts/boot-chain-io.py` 的判定：
+
+| 操作 | 需要的证据 |
+|---|---|
+| 替换已存在的受保护对象 | `--replace-protected` + `--backup`（存在的文件）+ `--reason` + `--verify` |
+| 删除已存在的受保护对象 | `--delete-protected` + `--backup` + `--reason` + `--verify` |
+| 在空卷上创建 | 无需（没有可破坏的东西） |
+
+`--replace-protected` 本身**不是**授权：缺任何一项都会被拒。
+
+### 已接线的写入/删除入口
+
+| 脚本 | 现状 |
+|---|---|
+| `phone-install.py` | 直接调用 `scripts/boot-chain-io.py`；本地弱化版判定已删除；命令行提供 `--backup/--reason/--verify` |
+| `update-native-bringup.py` | 释放内核空间的那次 `unlink()` 现在必须 `--delete-protected` + 三项证据 |
+| `phone-snapshot.py restore` | 恢复前列出会被覆盖的受保护文件，逐个过守卫；快照自身 manifest **不**被视为当前状态的备份 |
+| `swap-loader.py` | 仍然只替换 `BOOTAA64.EFI`，且自带备份与 `--restore` |
+
+`install-native-bringup.py` 的两处删除（临时文件、临时目录）发生在**本机临时树**上，不涉及手机路径。

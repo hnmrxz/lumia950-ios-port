@@ -25,6 +25,11 @@ import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import importlib.util as _importlib_util
+
+_GATE_SPEC = _importlib_util.spec_from_file_location("boot_chain_io", Path(__file__).with_name("boot-chain-io.py"))
+GATE = _importlib_util.module_from_spec(_GATE_SPEC)
+_GATE_SPEC.loader.exec_module(GATE)
 
 SKIP = {"System Volume Information"}
 
@@ -109,6 +114,34 @@ def restore(args) -> int:
         print(f"error: the backup is incomplete ({len(missing)} files missing)", file=sys.stderr)
         return 2
 
+    # A snapshot restore writes files that may be protected objects (the BCD store, bootarm.efi, the whole UniXNU tree). The snapshot's
+    # own manifest is not a rollback for the *current* state, so every differing protected file is listed and gated individually.
+    protected_changes = []
+    for name, record in data["files"].items():
+        target = root / name
+        if GATE.protected_object(target) is None:
+            continue
+        if target.is_file() and digest(target) == record["sha256"]:
+            continue
+        protected_changes.append(name)
+    if protected_changes:
+        print(f"this snapshot would replace {len(protected_changes)} protected object(s):")
+        for name in sorted(protected_changes):
+            print(f"  {name}")
+        decisions = [GATE.authorise(root / name, replace=True, backup=args.backup,
+                                    reason=args.reason, verify=args.verify) for name in sorted(protected_changes)]
+        denied = [decision for decision in decisions if not decision.allowed]
+        if denied:
+            for decision in denied[:3]:
+                print(decision.message, file=sys.stderr)
+            print("refused: a snapshot restore that overwrites protected objects needs --replace-protected with "
+                  "--backup, --reason and --verify", file=sys.stderr)
+            return 1
+        for decision in decisions:
+            print(decision.message)
+    else:
+        print("no protected object would change")
+
     print(f"restoring {len(data['files'])} files from {args.name} onto {args.efiesp}")
     if not args.apply:
         print("dry run only; pass --apply to write")
@@ -146,6 +179,12 @@ def main(argv: list[str] | None = None) -> int:
     p_restore.add_argument("--out", default="out/phone-backups")
     p_restore.add_argument("--name", required=True)
     p_restore.add_argument("--apply", action="store_true")
+    p_restore.add_argument("--replace-protected", action="store_true",
+                           help="allow this restore to overwrite protected boot-chain objects")
+    p_restore.add_argument("--backup", type=Path, default=None,
+                           help="a file that can restore the current state; required with --replace-protected")
+    p_restore.add_argument("--reason", default=None, help="why the restore is needed; required with --replace-protected")
+    p_restore.add_argument("--verify", default=None, help="how the result will be proven; required with --replace-protected")
     p_restore.set_defaults(func=restore)
 
     args = parser.parse_args(argv)
