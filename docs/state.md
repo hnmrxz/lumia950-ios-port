@@ -95,6 +95,14 @@ One engineering requirement from the same review is now enforced by a test: read
 mount option. `scripts/test-storage-read-only.py` refuses any change that would add a write or erase command to `NativeSdhci`, that
 would forward an outbound transfer, or that would stop reporting write protection.
 
+## M1 observation: where it stands
+
+The early-marker work is code-complete on the repository side and converging in QEMU, but the mapping is not installed yet. Both
+configurations reach root-wait; with `lumia-early-map` the post-VM console reports a specific refusal code from `lumia_early_map_state`
+(2 meant the chosen address had no root entry, 7 means the L1 slot was occupied) rather than a fault. The empty-slot build that would
+answer whether it installs is blocked by the framework's `drivers/NativeMetal` submodule, whose pinned commit is no longer served by its
+remote, so every kernel build fails before compiling. Details in `docs/hardware/m1-observability.md` section 11.
+
 ## Checks
 
 `scripts/run-tests.py` 34/34 (7 need inputs), `scripts/check-evidence.py` 16 subjects,

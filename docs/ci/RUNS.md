@@ -16,6 +16,8 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [43992258242](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43992258242) | `107a506` | push | validate, efi-preflight, gicv2-emulation, installer-windows, kernel | success | 9m20s |
 | [43993637318](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/43993637318) | `107a506` | dispatch `target=both` | all seven jobs, including the installer-precondition step in `stage` | success | 7m10s |
 | [44003233713](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/44003233713) | `44930b9` | dispatch `target=both` | all eight jobs, including `xnu-entry-qemu` | success | 10m30s |
+| [45960618255](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45960618255) | `c2796d9` | manual | validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel | success | the artifact both QEMU acceptance runs used (state 4 off, 7 on) |
+| [45962941472](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45962941472) | `926e1f0` | manual | validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel | failure | kernel job cannot init the framework's NativeMetal submodule (pinned commit no longer served); rerun failed the same way |
 
 The last row is the definitive one. In addition to the three artifacts it is the first run in which
 **the linked kernel was executed**: `xnu-entry-qemu` boots the same run's kernel through the

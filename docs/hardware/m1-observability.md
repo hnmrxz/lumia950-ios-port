@@ -160,3 +160,66 @@ BSS 页的物理地址用 `args->virtBase/physBase` 换算，与 start.s 建立 
    再从根表按真实层级走到 L1，而不是假定 `bootstrap_pagetables + ARM_PGBYTES`。
 3. 同时修 `STAGE_0`：把"记录参数"和"写屏"彻底分开，任何物理地址都不得在建立映射前被解引用。
 4. 在此之前，M1 的观测仍只有 `docs/hardware/measurements/vinfo-early` 的零值结论与真机"无输出"的事实。
+
+## 11. 现状（2026-11-27 收尾）：两条 QEMU 路径都到 root-wait，映射仍未装上
+
+### 11.1 已完成的代码
+
+| 项 | 状态 |
+|---|---|
+| bootstrap 页表映射 | **已实现**，在 `arm_init` 里从 `TTBR1_EL1` 读根表、按真实层级取 L1，不再假定 `bootstrap_pagetables + PGBYTES` |
+| `STAGE_0` / `STAGE_2` 用物理地址写屏 | **已移除**（审计确认的 P0 缺陷），现在只记录参数 |
+| `apply_bsd()` 重复定义 | **已合并为 1 个** |
+| 映射结果自报 | **已实现**：`lumia_early_map_state` 经 post-VM `kprintf` 打印 |
+| 面板参数校验 | 已实现：地址/stride/宽/高非零、`height > 136`、`width <= 16384`、`stride <= 65536` |
+
+### 11.2 状态码（每一次 QEMU 都是可解释的数字）
+
+| 码 | 含义 |
+|---|---|
+| 0 | 映射装入且标记已画 |
+| 1 | 映射装入但未画（面板太矮等） |
+| 2 | 守卫拒绝（默认值） |
+| 3 | 面板参数无效 |
+| 4 | 启动参数里没有 `lumia-early-map` |
+| 5 | 该虚拟地址没有根表项 |
+| 6 | 索引越界 |
+| 7 | 选中的 L1 槽已被占用 |
+| 8 | L1 表没有空槽 |
+
+### 11.3 QEMU 实测序列（同一 fixture，逐步收敛）
+
+| 构建 | 结果 | 由此做的修改 |
+|---|---|---|
+| 45952024166 | 停在异常向量（FAR `0x158`） | 改为从 `TTBR1_EL1` 取 L1 |
+| 45954313018 | root-wait，但面板被 console 清屏 | 改用 post-VM `kprintf` 自报状态 |
+| 45958314960 | root-wait，状态 **2** | 地址 `0xFFFFFFF0E0000000` 无根表项 → 改共享内核根表项 |
+| 45960618255 | root-wait，状态 **7** | 固定槽位被占用 → 改为扫描最高空槽（已提交） |
+| 45962941472 | **构建失败（基础设施）** | 见 11.4 |
+
+### 11.4 当前阻塞（不是代码问题）
+
+```
+fatal: remote error: upload-pack: not our ref c6d29caad6d880cc8204ebe3bc34d77479a3255d
+fatal: Fetched in submodule path 'drivers/NativeMetal', but it did not contain c6d29caa...
+```
+
+框架的 `drivers/NativeMetal` 子模块指向的提交在远端已不存在，**任何** kernel 构建都会在此失败；重跑同样失败。
+所以"扫描空槽"那次构建**没有产出**，状态 8 / 0 的 QEMU 结果**尚未取得**。
+
+### 11.5 证据等级（不得互相替代）
+
+| 等级 | 当前 |
+|---|---|
+| QEMU 到 root-wait | **是**（off 与 on 都到） |
+| QEMU 映射装入 | **否**（状态 7，槽位被占用） |
+| QEMU 到 BSD init | 否 |
+| 真机 hand-off | 是（此前建立） |
+| 真机 XNU entry | 否 |
+| 真机 BSD init | 否 |
+
+### 11.6 下一步
+
+1. 先解除 11.4 的阻塞（要么等远端恢复，要么在框架里改钉一个远端仍提供的 `NativeMetal` 提交——这属于框架改动，需要单独评审）；
+2. 构建成功后跑 `scripts/verify-early-mapping.py`，看状态是 0（成功）还是 8（无空槽）；
+3. 只有状态 0 且仍到 root-wait，才算"早期映射在 QEMU 成立"，届时再讨论真机。
