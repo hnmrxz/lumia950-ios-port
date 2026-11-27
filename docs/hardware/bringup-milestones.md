@@ -110,3 +110,21 @@ M3 要求"只读读取 GPT 并用独立基准核对"。在真机可用之前，�
 **边界**：这是一份**合成 fixture**（分区名与 LBA 都是声明为合成的，不来自任何设备）。
 它的用途是给内核侧的读取器一个**可核对的基准**，以及把"拒绝条件"写死；它**不是**真机 GPT 的证据。
 真机 M3 仍需要一次只读 dump 与它的 GP 对照（`docs/hardware/mainos-replacement-readiness.md` 的 GPT 采集步骤）。
+
+## M3 的 C 侧解析器与参考读者一致（2026-11-27）
+
+`drivers/Common/GptRead.c` 是内核侧要用的只读 GPT 解析器：不依赖 IOKit，通过调用者提供的扇区回调读取，
+校验保护性 MBR、header CRC、entry-array CRC、分区重叠与主/备头一致性，任何一项不过就返回对应状态码而非猜测。
+
+`tools/gpt-harness/main.c` 把它编成主机程序，`scripts/test-gpt-parser-parity.py`（5 条）在同一份合成镜像上
+**逐字段对比** C 解析器与 Python 参考读者：
+
+| 项 | 结果 |
+|---|---|
+| 编译 | `zig cc -std=c11 -Wall -Wextra -Werror` 干净通过 |
+| header CRC / entries CRC / 分区号、类型、起止 LBA、名称 | 两者**完全一致** |
+| 主/备头一致性 | 两者都报 `agrees` |
+| 四种损坏（`mbr` / `header` / `entries` / `overlap`） | 两者都拒绝，且**原因类别相同** |
+
+边界不变：镜像仍是**合成 fixture**。这一步证明的是"内核解析器与独立参考读者口径一致"，
+**不是**真机 GPT 的证据；真机 M3 仍需一次只读 dump。

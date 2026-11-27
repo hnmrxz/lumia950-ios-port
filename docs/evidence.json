@@ -928,6 +928,26 @@
         }
       ],
       "limits": "The fixture is synthetic -- names and LBAs are declared, not read from any device. This is the reference the kernel side of M3 has to match, not evidence about the handset GPT."
+    },
+    {
+      "id": "gpt-parser-parity",
+      "what": "The kernel-side read-only GPT parser (drivers/Common/GptRead.c) compiles clean with -Wall -Wextra -Werror and agrees field by field with the Python reference reader on the same synthetic image, including refusing the same four corruptions for the same reasons",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-gpt-parser-parity.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "drivers/Common/GptRead.c"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "tools/gpt-harness/main.c"
+        }
+      ],
+      "limits": "Host compilation and the synthetic fixture only. The parser has not run inside XNU, and no real disk has been read."
     }
   ]
 }
