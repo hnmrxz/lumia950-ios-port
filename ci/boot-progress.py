@@ -32,6 +32,28 @@ DECLARATION = ("\textern void native_boot_progress_remember(void *base, unsigned
                "\textern void native_boot_progress_stage(void *base, unsigned long stride, "
                "unsigned long height, const char *command_line, int stage);\n")
 
+# A bar drawn from vinfo, not from boot_args, and placed right after the platform expert has run.
+#
+# The stage-0 and stage-1 bars take their address from `args->Video.v_baseAddr`, which is the *physical* address the loader
+# reported; storing there before the VM work faults. The console, however, is set up by PE_init_platform() through
+# video_console.c, which maps the framebuffer and publishes the mapped address in `vinfo.v_baseaddr`. That is the address the
+# bsd_init bar already uses successfully, so a store through it may work far earlier -- which would give the handset an
+# observable point before the five bisect candidates instead of after them.
+#
+# It is behind its own boot argument so an ordinary boot is unchanged.
+EARLY_BAR = (
+    "\n\t/* Bring-up instrument: draw through the console's own mapping, before the rest of arm_init. */\n"
+    "\tif (PE_parse_boot_argn(\"lumia-early-bar\", NULL, 0)) {\n"
+    "\t\textern struct vc_info vinfo;\n"
+    "\t\textern void native_boot_progress_stage(void *base, unsigned long stride, unsigned long height,\n"
+    "\t\t        const char *command_line, int stage);\n"
+    "\t\tif (vinfo.v_baseaddr != 0 && vinfo.v_rowbytes != 0 && vinfo.v_height != 0) {\n"
+    "\t\t\tnative_boot_progress_stage((void *)vinfo.v_baseaddr, vinfo.v_rowbytes, vinfo.v_height,\n"
+    "\t\t\t                           \"lumia-bars\", 0);\n"
+    "\t\t}\n"
+    "\t}\n"
+)
+
 AFTER_CONSOLE = (
     "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 )
@@ -176,6 +198,14 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
     # declaration a declaration-after-statement.
     text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
+    text = text.replace(PLATFORM_CALL + EARLY_BAR, PLATFORM_CALL + EARLY_BAR, 1)
+    if EARLY_BAR not in text:
+        insertion = text.find(PLATFORM_CALL) + len(PLATFORM_CALL)
+        text = text[:insertion] + EARLY_BAR + text[insertion:]
+        # struct vc_info comes from console/video_console.h; arm_init.c does not include it
+        if BSD_INCLUDE not in text:
+            anchor = "#include <arm/pmap.h>\n"
+            text = text.replace(anchor, anchor + BSD_INCLUDE, 1)
     text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT + AFTER_VM_INIT_MARKER, 1)
     for switch, call in SWITCHED_CALLS.items():
         if call not in text:
