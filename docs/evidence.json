@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "Three shapes of the pre-VM mapping were measured in QEMU: writing the kernel-VA tables, and adding an identity-map level twice (the second with a page per level) all end in a nested fault at VA 0x158, while the refusing marker keeps the kernel at root-wait with ESR 0x0 (state 4 off, 5 on)",
+      "what": "At arm_vm_init, TTBR0_EL1 and TTBR1_EL1 are two adjacent pages of bootstrap_pagetables, and a marker that never replaces a block entry keeps QEMU at root-wait with ESR 0x0 (state 4 without the boot argument, 5 with it)",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -856,14 +856,14 @@
         },
         {
           "label": "host-tested",
-          "path": "scripts/verify-early-mapping.py"
+          "path": "scripts/trace-page-tables.py"
         },
         {
           "label": "host-tested",
           "path": "scripts/test-early-marker.py"
         }
       ],
-      "limits": "QEMU only, and the mapping is not installed: nothing here says where the handset stops. The handset was not touched."
+      "limits": "QEMU only. The marker does not draw yet, so nothing is proven about the handset's pre-VM stop; the handset was not touched."
     }
   ]
 }

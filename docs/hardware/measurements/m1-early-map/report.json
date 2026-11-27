@@ -72,5 +72,45 @@
     ],
     "decision": "Restored the refusing identity-map version (state 5, root-wait, ESR 0). Both installation attempts stay in the record.",
     "next_step": "This is now a debugger question: break after the marker, read TTBR0_EL1 and the written entries, and single-step the next few instructions to see which access reaches 0x158. Another table shape would be a fourth guess."
+  },
+  "round_169": {
+    "what": "The page-table layout measured at a breakpoint, and a non-destructive marker that no longer splits block entries",
+    "measurement": {
+      "breakpoint": "_arm_vm_init (0xfffffff0073fca68)",
+      "ttbr0_el1": "0x4818d000",
+      "ttbr1_el1": "0x4818e000",
+      "tcr_el1": "0x22a51a251a",
+      "reading": "TTBR0 and TTBR1 point at two adjacent pages of bootstrap_pagetables: page 0 is the identity root, page 1 the kernel-VA root. The earlier code assumed that relation; this run shows it."
+    },
+    "artifact": {
+      "kernel_sha256": "4b92701cd4ea29e27489fe6d936100bfab31abfb7b16c83c54694e69009521c2",
+      "commit": "d13f651",
+      "build": "45984406868"
+    },
+    "results": {
+      "off": {
+        "past_bsd_outcome": "root-wait",
+        "esr_el1": "0x0",
+        "state": 4,
+        "ttbr0_el1": "0x492e8000"
+      },
+      "on": {
+        "past_bsd_outcome": "root-wait",
+        "esr_el1": "0x0",
+        "state": 5,
+        "ttbr0_el1": "0x492e8000"
+      }
+    },
+    "reading": [
+      "The non-destructive marker is safe: both configurations reach root-wait with ESR 0x0, and the boot argument only changes the state",
+      " code from 4 to 5 -- no fault, which confirms that the previous faults came from replacing block entries.",
+      "State 5 (root entry is not a table) is now the open question, not a crash: the table TTBR0 points at is indexed with",
+      " ARM_TT_ROOT_* here, and the entry read back is neither a table nor a block. With TCR_EL1 = 0x22a51a251a the T0SZ field suggests",
+      " translation starts at the level XNU calls L1, so the index arithmetic and the level the CPU starts at have to be compared against",
+      " the actual table contents rather than argued from the macro names.",
+      "Next: at the same breakpoint, read the first four entries of the table TTBR0 points at (address = ttbr0 + virtBase - physBase) and",
+      " see which slot start.s filled for the framebuffer's range. That is a read, not another build."
+    ],
+    "decision": "The non-destructive marker stays: it reaches root-wait in both configurations and refuses with a code instead of touching a block entry."
   }
 }
