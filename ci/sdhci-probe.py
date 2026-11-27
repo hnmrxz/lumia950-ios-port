@@ -25,13 +25,13 @@ HC_SIZE = 0x1A0
 
 PROBE = f"""
 /* {MARKER}: read the SDHCI identification registers. No command is issued and no register is written. */
+#include <machine/machine_routines.h>
 static int lumia_sdhci_probe_state = -1;
 static unsigned int lumia_sdhci_version;
 static unsigned int lumia_sdhci_capabilities;
 static unsigned int lumia_sdhci_present;
 static int lumia_sdhci_probe(void)
 {{
-	extern void *ml_io_map(vm_offset_t phys_addr, vm_size_t size);
 	volatile unsigned char *hc;
 	volatile unsigned int *word;
 
