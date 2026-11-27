@@ -106,6 +106,62 @@ UefiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
         ProbeDrawText(&framebuffer, 24, 344, 3, line, text_color);
     }
 
+    // The registers the kernel's early boot depends on, read here at EL1 where they are readable. A hang before the kernel can
+    // print is otherwise invisible: this panel is the only place these values can be seen. CNTFRQ_EL0 matters most -- a firmware
+    // that leaves it zero would give the kernel a zero timebase, and the handset's own value has never been recorded here.
+    {
+        UINT64 cntfrq = 0, midr = 0, mpidr = 0, currentel = 0, sctlr = 0, tcr = 0, ttbr0 = 0, ttbr1 = 0;
+        __asm__ volatile("mrs %0, CNTFRQ_EL0" : "=r"(cntfrq));
+        __asm__ volatile("mrs %0, MIDR_EL1" : "=r"(midr));
+        __asm__ volatile("mrs %0, MPIDR_EL1" : "=r"(mpidr));
+        __asm__ volatile("mrs %0, CurrentEL" : "=r"(currentel));
+        __asm__ volatile("mrs %0, SCTLR_EL1" : "=r"(sctlr));
+        __asm__ volatile("mrs %0, TCR_EL1" : "=r"(tcr));
+        __asm__ volatile("mrs %0, TTBR0_EL1" : "=r"(ttbr0));
+        __asm__ volatile("mrs %0, TTBR1_EL1" : "=r"(ttbr1));
+
+        UINT32 y = 380;
+        ProbeDrawText(&framebuffer, 24, y, 2, "CNTFRQ", text_color);
+        if (ProbeFormatUnsigned(cntfrq, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "MIDR", text_color);
+        if (ProbeFormatUnsigned(midr, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "MPIDR", text_color);
+        if (ProbeFormatUnsigned(mpidr, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "CURRL", text_color);
+        if (ProbeFormatUnsigned(currentel, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "SCTLR", text_color);
+        if (ProbeFormatUnsigned(sctlr, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "TCR", text_color);
+        if (ProbeFormatUnsigned(tcr, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "TTBR0", text_color);
+        if (ProbeFormatUnsigned(ttbr0, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+        y += 32;
+        ProbeDrawText(&framebuffer, 24, y, 2, "TTBR1", text_color);
+        if (ProbeFormatUnsigned(ttbr1, 16, 1, line, sizeof(line))) {
+            ProbeDrawText(&framebuffer, 24 + 7 * 24, y, 2, line, text_color);
+        }
+    }
+
     FlushPanel(&framebuffer);
     system_table->ConOut->OutputString(system_table->ConOut,
                                        L"control mark drawn\r\n");

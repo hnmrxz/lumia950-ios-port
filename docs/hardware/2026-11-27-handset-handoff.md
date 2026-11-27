@@ -107,3 +107,37 @@ past_bsd: root-wait    milestones: … arm_vm_init_return … bsd_init_entry
 | `LUMIA: arm_vm_init returned…` | VM 工作**完成**，停在这行之后 | 往 `PE_init_iokit` / `bsd_init` 之间找（可在更后面再加标记） |
 | 只有 DARWINBOOT 那页，**没有**这行 | 停在 `arm_vm_init` **之前或之中** | 查 early boot：EL1 环境、缓存、`wfe_timeout_*`、ADT 解析 |
 | 出现这行后又出现别的字样 | 打印的内容告诉我停在哪 | 按打印内容继续 |
+
+
+## 备用仪器已就绪：`regprobe.efi`（读真机的 CNTFRQ / MIDR / SCTLR / TCR / TTBR）
+
+如果下次开机屏幕上**没有** `arm_vm_init returned`，说明停在 VM 之前，而内核那时**无法输出**。这时唯一的办法是从 EL1
+读真机的关键寄存器——那是 EFI 应用能做的事，我们的 `LumiaControlMark` 就是现成的载体，本轮给它加了一段：
+
+```
+CNTFRQ  MIDR  MPIDR  CURRL  SCTLR  TCR  TTBR0  TTBR1     （逐个以 16 进制画在面板上）
+```
+
+为什么要看这几个：
+
+| 寄存器 | 为什么重要 |
+|---|---|
+| `CNTFRQ_EL0` | 若固件留成 0 或不对，内核早期定时器/超时会挂；这个值在本项目里**从未在真机上记录过** |
+| `MIDR_EL1` | 决定 XNU 走哪条 CPU 特性分支（真机 vs QEMU 的 cortex-a53 可能不同） |
+| `SCTLR_EL1` / `TCR_EL1` | 交接时的 MMU/缓存/页表配置；真机与 QEMU 已知不同 |
+| `TTBR0/TTBR1_EL1` | 固件留下的页表基址，内核切换时要覆盖 |
+
+### 本地构建链（新增）
+
+`scripts/build-control-mark.py`：用工作区自带的 Zig 直接编出 EFI 应用（`aarch64-windows-msvc` + `-nostdlib` + EDK2 头 +
+lld 的 `--subsystem,efi_application`）。本轮实跑：
+
+```
+build\local\probeegprobe.efi: 4096 bytes
+QEMU 验证：面板绘出（640x480，文字像素 60760 + 116063）
+```
+
+### 什么时候用它
+
+**只在"没有 `arm_vm_init returned` 那行"时才值得换**：把 `regprobe.efi` 装成 `R:\EFI\BOOT\BOOTAA64.EFI`，开机拍照，
+再把真加载器换回来（`BOOTAA64.EFI.before-control-mark` 一直都在）。这样一次拍照就能拿到真机的定时器频率与 MMU 配置。
