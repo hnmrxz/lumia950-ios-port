@@ -17,6 +17,7 @@ CASES = {
     "draw": "lumia-early-map",
     "noclean": "lumia-early-map-noclean",
     "notlbi": "lumia-early-map-notlbi",
+    "selftest": "lumia-early-map-selftest",
 }
 BASE_ARGS = "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1"
 
