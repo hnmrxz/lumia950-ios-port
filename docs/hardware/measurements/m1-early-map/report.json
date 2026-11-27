@@ -310,5 +310,55 @@
       "FAR 0x158 is the same in every failing form and ELR sits inside the exception vector, so the reported fault is the nested one: the first fault happened earlier and the vector then failed as well. The first fault's address is therefore still unknown.",
       "The next measurement should store a single word into a page the kernel already maps (for example this marker's own leaf page) and then into the framebuffer: if only the framebuffer store faults, the address range or its attributes are the issue; if both fault, the store path itself is."
     ]
+  },
+  "round_173": {
+    "what": "The early marker now draws before arm_vm_init in QEMU, and the kernel still reaches root-wait",
+    "artifact": {
+      "kernel_sha256": "404140cb4d8b1e52cd9b7dac7634d22b9c1f5c10bac245b306030880df743681",
+      "commit": "f5231f1",
+      "build": "46001255635",
+      "scripts": [
+        "scripts/verify-early-split.py",
+        "scripts/verify-probe-word.py"
+      ]
+    },
+    "root_cause_of_the_store_fault": [
+      "The two-store probe settled the store path: one word into the kernel's own data (0xA5A5A5A5 read back) and one word into the framebuffer, and the kernel reached root-wait with ESR 0x0.",
+      "The drawing rows were the problem. The framebuffer base sits 1.7 MB into its 2 MB block, and rows 120..135 at a 3200-byte stride end at 0xEC80A400 -- past the single block the marker maps. The loop faulted exactly where it crossed the boundary, which is why a single store passed, and why removing the cache clean or the TLB invalidate changed nothing.",
+      "Drawing rows 8..15 keeps every store inside the mapped block."
+    ],
+    "five_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "noclean": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "notlbi": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      }
+    },
+    "result": {
+      "mapping_installed_and_drawn": true,
+      "kernel_continues": "root-wait, and the fixture's own PASS line reports clock/WFE/topology setup, a real return from arm_vm_init, the source-provider POST and bootstrap, PE_init_iokit and bsd_init",
+      "note": "state 0 means the marker installed the mapping and finished its rows; the panel itself is painted over later by PE_create_console, which is why the state code, not the final framebuffer dump, is the evidence"
+    },
+    "limits": "QEMU only. The handset has not run this kernel; the drawing position was chosen for the emulator's block layout and the same arithmetic applies on hardware, where the video base is 0x400000 and the identity map starts at physBase."
   }
 }

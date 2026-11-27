@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The identity mapping the marker installs was read back from the running kernel and is exactly where it belongs (L1 entry 3 a table at physical 0x48b5c000, and that table holding a block for 0xEC600000), while a dry run that only maps reaches root-wait; the forms that also store fault with ESR 0x96000005 / FAR 0x158 whatever maintenance they skip",
+      "what": "The early marker installs an identity-map entry for the framebuffer block, draws rows 8..15 before arm_vm_init and the kernel still reaches root-wait: state 0, ESR 0x0, while the untouched configuration reports 4",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -856,14 +856,14 @@
         },
         {
           "label": "host-tested",
-          "path": "scripts/verify-table-after-dry.py"
+          "path": "scripts/verify-early-split.py"
         },
         {
           "label": "host-tested",
-          "path": "scripts/verify-leaf-after-dry.py"
+          "path": "scripts/verify-probe-word.py"
         }
       ],
-      "limits": "QEMU only. The store path still faults with a nested-fault signature whose first address is unknown; the handset was not touched."
+      "limits": "QEMU only. The handset has not run this kernel, so M1's handset evidence is still missing; nothing was flashed."
     }
   ]
 }
