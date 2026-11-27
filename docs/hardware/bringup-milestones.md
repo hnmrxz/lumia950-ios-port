@@ -173,3 +173,14 @@ LUMIA: gpt self-check 0 (0 ok, 1 valid refused, 2 wrong partition, 3 corrupt acc
 同一份 artifact 的六种标记形态仍全部 root-wait（4 / 1 / 0 / 0 / 0 / 30）。
 
 **边界**：磁盘是**内存里的合成盘**。没有块设备 ⇒ 没读 eMMC、没解析真机 GPT ⇒ 仍不声明 `hardware-tested`。
+
+## M2 的集成计划（2026-11-27）
+
+M2 的阻塞点不是驱动代码，而是**投递方式**：`NativeSdhci` 子类化 `IOBlockStorageDevice`，而 `IOStorageFamily` 只在 prelink 合并后存在，
+所以源内核链接不到它（`board.toml` 的 `[kernel.link_excluded]` 已记录这条决定）。
+
+`docs/hardware/m2-storage-integration-plan.md` 把它拆成可判定的六步：编成 kext bundle → 加入 prelinked 镜像 → 确认启动无回归 →
+确认真的被实例化 → 只读读到一个扇区 → 证明整个过程没有发出写命令。并写明先走"prelink 注入"、只有它被证否才评估"加载器投递"。
+
+其中两步是**只读保证**的关键：S5（能读）与 S6（**没有写命令**）。现在的只读证据只有源码断言（
+`scripts/test-storage-read-only.py` 的 5 条），S6 要求的运行时计数还没有。
