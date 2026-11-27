@@ -19,7 +19,6 @@ what was claimed.
 
 from __future__ import annotations
 
-import dataclasses
 import importlib.util
 import sys
 from pathlib import Path
@@ -30,6 +29,9 @@ _HERE = Path(__file__).resolve().parent
 def _guard():
     spec = importlib.util.spec_from_file_location("boot_chain_guard", _HERE / "boot-chain-guard.py")
     module = importlib.util.module_from_spec(spec)
+    # dataclasses resolves annotations through sys.modules[cls.__module__]; without the registration Python 3.12 raises
+    # AttributeError: 'NoneType' object has no attribute '__dict__' when the dataclass in this module is created
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -37,11 +39,19 @@ def _guard():
 GUARD = _guard()
 
 
-@dataclasses.dataclass
 class Decision:
-    allowed: bool
-    message: str
-    protected: str | None = None
+    """The outcome of one question. A plain class on purpose: this module is loaded through importlib by several scripts, and a
+    dataclass makes the loader depend on sys.modules bookkeeping that Python 3.12 enforces and 3.15 does not."""
+
+    __slots__ = ("allowed", "message", "protected")
+
+    def __init__(self, allowed: bool, message: str, protected: str | None = None) -> None:
+        self.allowed = allowed
+        self.message = message
+        self.protected = protected
+
+    def __repr__(self) -> str:
+        return f"Decision(allowed={self.allowed!r}, protected={self.protected!r})"
 
 
 def protected_object(path: Path) -> str | None:

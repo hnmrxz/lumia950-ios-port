@@ -32,6 +32,8 @@ def _shared_gate():
     module_path = Path(__file__).with_name("boot-chain-io.py")
     spec = importlib.util.spec_from_file_location("boot_chain_io", module_path)
     module = importlib.util.module_from_spec(spec)
+    # Python 3.12 needs the module in sys.modules before exec_module, because the dataclass inside resolves its own module
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 

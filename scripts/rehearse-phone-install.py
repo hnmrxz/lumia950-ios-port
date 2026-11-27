@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import struct
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -95,6 +96,12 @@ def main() -> int:
         untouched = (not any(paths["efiesp"].iterdir()), not any(paths["mainos"].iterdir()))
         print("== the dry run wrote nothing:", untouched == (True, True))
 
+        # The rehearsal installs over a reference store that already holds the boot files, so it is a replacement of protected
+        # objects and has to give the evidence a real run would give. The reference store itself is the recovery file here.
+        reference = base / "reference-before"
+        shutil.copytree(paths["efiesp"], reference / "efiesp", dirs_exist_ok=True)
+        shutil.copytree(paths["mainos"], reference / "mainos", dirs_exist_ok=True)
+
         install_and_verify = [
             sys.executable, str(ROOT / "scripts" / "phone-install.py"),
             "--efiesp", str(paths["efiesp"]),
@@ -103,6 +110,10 @@ def main() -> int:
             "--payload", str(paths["payload"]),
             "--bootshim", str(paths["shim"]),
             "--uefi-elf", str(paths["uefi"]),
+            "--replace-protected",
+            "--backup", str(paths["good"]),
+            "--reason", "install rehearsal writes the reference store",
+            "--verify", "the run verifies every file by SHA-256 and the BCD layout afterwards",
             "--apply",
         ]
 

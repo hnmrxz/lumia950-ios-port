@@ -29,6 +29,7 @@ import importlib.util as _importlib_util
 
 _GATE_SPEC = _importlib_util.spec_from_file_location("boot_chain_io", Path(__file__).with_name("boot-chain-io.py"))
 GATE = _importlib_util.module_from_spec(_GATE_SPEC)
+_importlib_util.sys.modules[_GATE_SPEC.name] = GATE
 _GATE_SPEC.loader.exec_module(GATE)
 
 SKIP = {"System Volume Information"}

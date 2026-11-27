@@ -27,6 +27,8 @@ METADATA_DIRECTORIES = {".fseventsd", ".Spotlight-V100", ".Trashes", ".Temporary
 # delete cannot be used to sidestep the rule.
 GATE_SPEC = importlib.util.spec_from_file_location("boot_chain_io", Path(__file__).with_name("boot-chain-io.py"))
 GATE = importlib.util.module_from_spec(GATE_SPEC)
+import sys as _sys
+_sys.modules[GATE_SPEC.name] = GATE
 GATE_SPEC.loader.exec_module(GATE)
 
 
