@@ -98,3 +98,65 @@ error: osfmk/arm64/genassym.c:270: patch does not apply
 
 先取回框架那份 patch 文件（`unixnu/patches/...` 里被 `build-xnu-4k-baseline.sh` 引用的那一份），确认它的格式与文件列表，然后把我们的
 hunk **追加**为最后一段，再用 `git apply` 复验：应用后 `start.s` 同时包含框架的 4K 基线与我们的映射。这样只有一次构建，也不与框架争顺序。
+
+## 10. 阶段一审计：早期观测路径逐项核对（2026-11-27）
+
+### 10.1 三个地址必须分开（源码核对）
+
+| 名称 | 来源 | 用途 | 何时可用 |
+|---|---|---|---|
+| `boot_args.Video.v_baseAddr` | DarwinBoot 传入的**物理**地址（真机 `0x00400000`，QEMU `0xEC7A0000`） | 只用于计算要映射的物理块 | 全程可读，但**不能直接当指针** |
+| bootstrap 页表映射 `0xFFFFFFF0E0000000` | `arm_init` 里新建的一条 L1 表项 + 一个 L2 块表项 | 早期标记的唯一合法写入口 | 从 `arm_init` 开始 |
+| `vinfo.v_baseaddr` | `PE_create_console()` 之后由 XNU video console 发布 | 第二阶段色块（`STAGE_2`） | `arm_vm_init` 之后 |
+
+**已证实的问题（P0）**：`STAGE_0`（`native_boot_progress_remember`/`stage`）在 `PE_init_platform()` **之前**就把
+`args->Video.v_baseAddr`（物理地址）传给驱动并当指针使用。这一步在 `arm_vm_init` 之前必然 fault——早期实测正是
+`_sleh_synchronous_sp1`。这不是"驱动写错了"，而是**物理地址在 MMU 建立映射前被当成虚拟地址**。
+修复方向：`STAGE_0` 只能记录参数（不写 framebuffer），第一次写屏必须走 `lumia-early-map` 建立的映射；
+`lumia-bars`/`lumia-bars2` 走 `vinfo`（后 MMU）。
+
+### 10.2 开关组合（生成代码核对）
+
+| 参数 | 行为 |
+|---|---|
+| 无 | 不写屏；`STAGE_0` 仍会记录参数（**待修**：记录本身不写 framebuffer 才安全） |
+| `lumia-early-map` | 建立映射并在 `arm_vm_init` 前画 16 行；**当前 QEMU 失败** |
+| `lumia-bars` | 在 `PE_init_platform()` 之后用 `vinfo` 画（`vinfo` 此时全零 ⇒ 不画） |
+| `lumia-bars2` | 阶段 2 色块（后 MMU） |
+
+### 10.3 页表计算核对（源码 + 常量）
+
+`bootstrap_pagetables + 0` = V=P L1，`+ ARM_PGBYTES` = KVA L1（start.s 第 596–598 行），L2 页由空闲指针分配；
+`BOOTSTRAP_TABLE_SIZE = 34 页`，所以多用一个 BSS 页不越界。索引与掩码全部取自 `osfmk/arm64/proc_reg.h` 的
+`ARM_TT_L1/L2_INDEX_MASK`、`_SHIFT`，表项模板取 `ARM_TTE_BOOT_TABLE` / `ARM_TTE_BOOT_BLOCK`。
+BSS 页的物理地址用 `args->virtBase/physBase` 换算，与 start.s 建立 V=P 映射的关系一致。
+
+**仍是假设**：框架的 4K 基线补丁是否改变了 KVA 根表的层级（4K 粒度为 L0/L1/L2/L3 四级），以及 `bootstrap_pagetables`
+在该补丁后是否仍以 `+PGBYTES` 为 KVA L1。**这一条没有被验证**，见 10.5。
+
+### 10.4 `apply_bsd()` 重复定义（已证实，待修）
+
+`ci/boot-progress.py` 中 `def apply_bsd(` 出现 **2 次**，后一个覆盖前一个。当前两者内容一致，所以行为未受影响，
+但这是"改了看不出来"的隐患，必须合并为一个。
+
+### 10.5 QEMU 实测（两次，均已归档）
+
+| 用例 | 结果 | 证据 |
+|---|---|---|
+| 无 `lumia-early-map` | `root-wait`（与改动前一致） | `docs/hardware/measurements/m1-early-map/report.json` |
+| 有 `lumia-early-map` | `_sleh_synchronous_sp1`；ESR `0x96000005`、FAR `0x158`、ELR=`el1_sp0_synchronous_vector_long+0x34` | 同上 |
+
+**读法**：ELR 落在**异常向量本身**，说明这是**嵌套异常**——向量在保存现场时访问 `0x158` 失败，即被打断的上下文栈/映射
+已经坏了。寄存器显示绘图循环**已经跑过**（x8=stride、x9=width、x10=映射基址、x15=颜色），且 x20 变成了 `0x158`。
+所以症状指向**寄存器/栈被破坏**，而不是帧缓冲地址算错。
+
+加入"只写入空表项 + 索引边界检查"后症状**未变**，因此"覆盖了已用表项"这个假设**未被证实**。
+
+### 10.6 结论与下一步
+
+1. 早期映射**未通过验收**，**不得上真机**；默认路径（无该参数）行为不变，普通启动无回归。
+2. 下一步不再靠猜：用 fixture 在 `arm_init` 下断点，单步走过建表的三条 store，读回 `l1_index`、`l1[l1_index]`、
+   `table_pa`、`TTBR1_EL1`，确认写的是不是 MMU 真正使用的那张表；若表层级不同，改为读取 `TTBR1_EL1` 得到根表地址，
+   再从根表按真实层级走到 L1，而不是假定 `bootstrap_pagetables + ARM_PGBYTES`。
+3. 同时修 `STAGE_0`：把"记录参数"和"写屏"彻底分开，任何物理地址都不得在建立映射前被解引用。
+4. 在此之前，M1 的观测仍只有 `docs/hardware/measurements/vinfo-early` 的零值结论与真机"无输出"的事实。

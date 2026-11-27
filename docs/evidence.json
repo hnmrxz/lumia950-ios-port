@@ -844,6 +844,26 @@
         }
       ],
       "limits": "Emulator only. It is a negative result about an instrument, not about the handset: nothing here says anything about how far the kernel gets on the phone."
+    },
+    {
+      "id": "m1-early-map-qemu",
+      "what": "The early framebuffer mapping built in arm_init reaches the drawing loop in QEMU but the kernel then stops in the exception vector with a translation fault at 0x158, while the same kernel without the boot argument still reaches root-wait",
+      "label": "QEMU-tested",
+      "evidence": [
+        {
+          "label": "QEMU-tested",
+          "path": "docs/hardware/measurements/m1-early-map/report.json"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/verify-early-mapping.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-early-marker.py"
+        }
+      ],
+      "limits": "Emulator only, and a negative result for the marker: the mapping is not proven and was not taken to the handset. The handset itself was not touched in this round."
     }
   ]
 }

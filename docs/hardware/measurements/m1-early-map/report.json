@@ -1,0 +1,51 @@
+{
+  "what": "QEMU acceptance for the early framebuffer mapping in arm_init (lumia-early-map)",
+  "kernel_sha256": "4cf0b8f4a93fa1f50499cae3060c8f43ff4014078a28cfa8bca54001b7c5567b",
+  "kernel": "out/earlymap/mach.development.bcm2837.unstripped, build 45952024166 (head 5f3fdfa)",
+  "fixture": {
+    "script": "scripts/verify-early-mapping.py",
+    "qemu": "qemu-system-aarch64, edk2-aarch64-code.fd, adt-profile qemu, 2816 MB, smp 2",
+    "args_off": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1",
+    "args_on": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1 lumia-early-map"
+  },
+  "off": {
+    "past_bsd_outcome": "root-wait",
+    "stop_symbols": [
+      "_panic"
+    ],
+    "early_bar_pixels": 0,
+    "verdict": "unchanged: reaches root-wait exactly as the kernel before this change"
+  },
+  "on": {
+    "past_bsd_outcome": "stopped",
+    "stop_symbols": [
+      "_sleh_synchronous_sp1"
+    ],
+    "fault_elr_symbol": "el1_sp0_synchronous_vector_long+0x34",
+    "system_registers": {
+      "sctlr_el1": "0x3454593d",
+      "cntfrq_el0": "0x124f800",
+      "elr_el1": "0xfffffff007402034",
+      "tcr_el1": "0x22a51a251a",
+      "esr_el1": "0x96000005",
+      "far_el1": "0x158"
+    },
+    "registers_subset": {
+      "x8": "0xc80",
+      "x9": "0x320",
+      "x10": "0xfffffff0e0000000",
+      "x13": "0xfffffff0e01a0000",
+      "x15": "0xe03030",
+      "x19": "0xfffffff007a9e720",
+      "x20": "0x158"
+    },
+    "early_bar_pixels": 0,
+    "verdict": "FAILS: stops with a synchronous exception before arm_vm_init, so the marker cannot be read"
+  },
+  "reading": [
+    "ESR 0x96000005 (data abort, translation fault level 1) with FAR 0x158 and ELR at el1_sp0_synchronous_vector_long+0x34: the reported ELR is the exception vector itself, not the instruction that first faulted, so this is a nested fault -- the vector could not store the interrupted context. A corrupted stack or a mapping the vector needs is the likely reason.",
+    "The saved registers show the drawing loop had run in the failing build too (x8 the stride, x9 the width, x10 the mapped base, x15 the colour), and x20 became 0x158, which is the fault address. That points at register or stack corruption from the mapping code rather than at a bad framebuffer address.",
+    "The empty-slot check and the bounds checks did not change the symptom, so the assumption behind them -- that the fault came from overwriting an occupied L1 entry -- is not confirmed. The next instrument has to see the table walk, not guess at it."
+  ],
+  "conclusion": "The early mapping is NOT accepted and must not go to the handset. The default path (no lumia-early-map) is unchanged and keeps reaching root-wait, so nothing regressed for ordinary boots."
+}
