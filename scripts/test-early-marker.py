@@ -65,8 +65,7 @@ class EarlyMarkerTests(unittest.TestCase):
 
     def test_the_mapping_only_uses_an_empty_l1_slot(self):
         block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("if (l1[slot] == 0)", block, "only an empty slot may be chosen")
-        self.assertIn("slot == 0", block, "when no slot is empty the marker must give up")
+        self.assertIn("l1[l1_index] != 0", block, "an occupied slot must be refused, not overwritten")
         self.assertIn("l2_index >= entries", block)
         self.assertIn("(root[root_index] & 3) != 3", block, "the root entry has to be a table before it is followed")
 
@@ -118,7 +117,6 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("lumia_early_map_state = 2", block, "refused by default")
         self.assertIn("lumia_early_map_state = 5", block, "no root entry")
         self.assertIn("lumia_early_map_state = 6", block, "index out of range")
-        self.assertIn("lumia_early_map_state = 8", block, "no empty slot")
         self.assertIn("lumia_early_map_state = 3", block, "invalid panel arguments")
         self.assertIn("lumia_early_map_state = 1", block, "installed but not drawn")
         self.assertIn("lumia_early_map_state = 0", block, "installed and drawn")
