@@ -24,6 +24,7 @@ SELF_CONTAINED = (
     "test-adt-profile.py",
     "test-build-manifest.py",
     "test-check-phase.py",
+    "test-prelinked-guard.py",
     "test-checkpoints.py",
     "test-compare-xnu-reports.py",
     "test-phone-modes.py",

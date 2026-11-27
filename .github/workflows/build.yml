@@ -958,7 +958,7 @@ jobs:
         # The owner asked for the handset path, so this branch publishes the prelinked image too. It
         # carries extensions merged out of an Apple kernelcache; the main line still never uploads it,
         # and this step is gated on the probe branch for that reason.
-        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
+        if: ${{ github.event.repository.private && (github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact) }}
         run: |
           prelinked=$(find "$UNIXNU_OUT" -path '*/kernel/kernel.macho' -print -quit || true)
           [ -n "$prelinked" ] || { echo "::error::no prelinked image in the output tree"; exit 1; }
@@ -971,7 +971,7 @@ jobs:
           ls -l "$out"
 
       - name: Upload the prelinked image for the handset
-        if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
+        if: ${{ github.event.repository.private && (github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lumia950-prelinked
