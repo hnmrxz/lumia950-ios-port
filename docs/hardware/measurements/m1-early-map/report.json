@@ -33,5 +33,44 @@
     "handset_handoff": true,
     "handset_xnu_entry": false,
     "handset_bsd_init": false
+  },
+  "round_168": {
+    "what": "Two-page level fix tested: still a fault, and the fault signature is identical to the first attempt",
+    "artifact": {
+      "kernel_sha256": "409a1a391977c5312c27826d41162bcda81946de7617477d0a1aeda9b794a49c",
+      "commit": "9fc225c",
+      "build": "45981395798"
+    },
+    "results": {
+      "off": {
+        "past_bsd_outcome": "root-wait",
+        "esr_el1": "0x0",
+        "state": 4
+      },
+      "on": {
+        "past_bsd_outcome": "stopped",
+        "esr_el1": "0x96000005",
+        "far_el1": "0x158",
+        "elr_el1": "0xfffffff007402034",
+        "fault_elr_symbol": "el1_sp0_synchronous_vector_long+0x34",
+        "state": null
+      }
+    },
+    "registers": {
+      "x8": "0xec7a0000",
+      "x9": "0xc80",
+      "x10": "0x320",
+      "x13": "0xe03030",
+      "x15": "0xec800000",
+      "x19": "0xfffffff007a9e720",
+      "x20": "0x158"
+    },
+    "reading": [
+      "The marker ran far enough to compute the addresses -- x8 holds the video physical base 0xEC7A0000, x9 the stride, x10 the width, x15 the block base 0xEC800000 -- and then the kernel took a data abort at address 0x158 with ELR inside the exception vector, so the vector's own store faulted too: the same nested-fault signature as the very first attempt.",
+      "0x158 is not a framebuffer address, so this is not the store through the new mapping. It is a NULL-offset access after the table write, and x20 holding 0x158 suggests the register that should carry a pointer was clobbered.",
+      "Two independent shapes -- an entry in the kernel-VA tables and an added level in the identity map with its own pages -- end in the same signature. That points at the write to these bootstrap tables itself, or at the structures that follow it, rather than at the address arithmetic."
+    ],
+    "decision": "Restored the refusing identity-map version (state 5, root-wait, ESR 0). Both installation attempts stay in the record.",
+    "next_step": "This is now a debugger question: break after the marker, read TTBR0_EL1 and the written entries, and single-step the next few instructions to see which access reaches 0x158. Another table shape would be a fourth guess."
   }
 }

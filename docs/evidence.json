@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The refusing identity-map marker keeps QEMU at root-wait with ESR 0x0 (state 4 without the boot argument, 5 with it), while both attempts to actually install the mapping -- an entry in the kernel-VA tables and an added level in the identity map -- faulted",
+      "what": "Three shapes of the pre-VM mapping were measured in QEMU: writing the kernel-VA tables, and adding an identity-map level twice (the second with a page per level) all end in a nested fault at VA 0x158, while the refusing marker keeps the kernel at root-wait with ESR 0x0 (state 4 off, 5 on)",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -863,7 +863,7 @@
           "path": "scripts/test-early-marker.py"
         }
       ],
-      "limits": "QEMU only, and the mapping is not installed: the marker proves nothing about the handset's pre-VM stop. The handset was not touched."
+      "limits": "QEMU only, and the mapping is not installed: nothing here says where the handset stops. The handset was not touched."
     }
   ]
 }
