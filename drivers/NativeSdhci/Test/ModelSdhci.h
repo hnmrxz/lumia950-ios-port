@@ -37,6 +37,28 @@ public:
         put32(kRegCapabilities, 0x00000000u);
     }
 
+    /* A card in the state the driver's warm path expects: ready for data, state Transfer, a CSD the decoder accepts, and 4 GiB of capacity. */
+    void makeWarmCard(u64 capacityBytes)
+    {
+        const u32 sectors = static_cast<u32>(capacityBytes / 512u);
+        for (u32 index = 0; index < 512; ++index) {
+            extCsd[index] = 0;
+        }
+        extCsd[192] = 7;   /* EXT_CSD revision */
+        extCsd[61] = 0;    /* 512-byte sectors */
+        extCsd[179] = 0;   /* user partition */
+        extCsd[15] = 0;    /* command queue off */
+        extCsd[212] = static_cast<u8>(sectors);
+        extCsd[213] = static_cast<u8>(sectors >> 8);
+        extCsd[214] = static_cast<u8>(sectors >> 16);
+        extCsd[215] = static_cast<u8>(sectors >> 24);
+        // CSD registers chosen so that normalizeResponse136 yields structure 3, mmcVersion 4, readBlockLen 9 (checked in the test)
+        csd[0] = 0;
+        csd[1] = 0;
+        csd[2] = 0x00000900u;
+        csd[3] = 0x00D00000u;
+    }
+
     void fillPattern(u8 seed)
     {
         for (u32 index = 0; index < 512; ++index) {
@@ -109,6 +131,12 @@ private:
             value |= static_cast<u32>(regs[(offset + byte) % sizeof(regs)]) << (8 * byte);
         }
         return value;
+    }
+
+    u32 statusWord() const
+    {
+        const u32 state = card.selected ? 4u : 3u;   /* Transfer : Standby */
+        return (1u << 8) | (state << 9);
     }
 
     void reset()
@@ -189,28 +217,39 @@ private:
             break;
         case kCmd3SetRelativeAddr:
             card.relativeAddress = static_cast<u16>(argument >> 16);
-            put32(kRegResponse, 0x00000900u);
+            put32(kRegResponse, statusWord());
             break;
         case kCmd7SelectCard:
-            card.selected = (argument >> 16) == card.relativeAddress;
-            put32(kRegResponse, 0x00000900u);
+            /* an argument of zero deselects: the card then reports Standby, which is what the driver waits for before reading the CSD */
+            card.selected = (argument >> 16) == card.relativeAddress && (argument >> 16) != 0;
+            put32(kRegResponse, statusWord());
             break;
         case kCmd9SendCsd:
-            put32(kRegResponse, 0x00000000u);
-            put32(kRegResponse + 4, 0x00000000u);
+            put32(kRegResponse, csd[0]);
+            put32(kRegResponse + 4, csd[1]);
+            put32(kRegResponse + 8, csd[2]);
+            put32(kRegResponse + 12, csd[3]);
             break;
         case kCmd16SetBlockLength:
             card.blockLength = argument;
-            put32(kRegResponse, 0x00000900u);
+            put32(kRegResponse, statusWord());
             break;
         case kCmd8SendExtCsd:
+            card.dataIndex = 0;
+            pendingData = true;
+            dataSource = extCsd;
+            put32(kRegResponse, statusWord());
+            break;
         case kCmd17ReadSingleBlock:
             card.dataIndex = 0;
             pendingData = true;
-            put32(kRegResponse, 0x00000900u);
+            dataSource = card.data;
+            put32(kRegResponse, statusWord());
             break;
         case kCmd13SendStatus:
-            put32(kRegResponse, (static_cast<u32>(card.relativeAddress) << 16) | 0x00000900u);
+            /* R1 card status: bits 31:16 are the error/exception flags the driver masks, bit 8 is READY_FOR_DATA and bits 12:9 are
+               CURRENT_STATE. The relative address is not part of R1 -- it rides in R6 -- so putting it here was the model's bug. */
+            put32(kRegResponse, statusWord());
             break;
         default:
             put32(kRegResponse, 0x00000900u);
@@ -223,7 +262,7 @@ private:
     {
         u32 value = 0;
         for (u32 byte = 0; byte < 4; ++byte) {
-            value |= static_cast<u32>(card.data[(card.dataIndex + byte) & 511u]) << (8 * byte);
+            value |= static_cast<u32>(dataSource[(card.dataIndex + byte) & 511u]) << (8 * byte);
         }
         card.dataIndex = (card.dataIndex + 4) & 511u;
         if (card.dataIndex == 0) {
@@ -240,6 +279,9 @@ private:
     bool pendingData = false;
     bool transferComplete = false;
     u32 blockLength = 0;
+    u8 extCsd[512] = {};
+    const u8 *dataSource = nullptr;
+    u32 csd[4] = {};
     ModelCard card = {};
 };
 

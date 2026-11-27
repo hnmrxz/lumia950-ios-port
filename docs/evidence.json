@@ -1095,7 +1095,7 @@
     },
     {
       "id": "sdhci-register-model",
-      "what": "The storage driver's read sequence runs against a host register model of the SDHCI controller and is accepted: configure, start, CMD0..CMD3, a 512-byte CMD17 whose bytes match the pattern, a 512-byte transfer report, and no write or erase command issued",
+      "what": "The storage driver runs against a host register model of the SDHCI controller and is accepted, in both shapes: a cold command sequence (CMD0..CMD3, CMD17 reading 512 bytes that match the pattern, 512 reported) and the warm path the phone actually takes (WarmCard::attach finding an RCA, deselecting, decoding the CSD and EXT_CSD, selecting again and reading a block), with zero write or erase commands in either",
       "label": "host-tested",
       "evidence": [
         {
@@ -1107,7 +1107,7 @@
           "path": "drivers/NativeSdhci/Test/ModelSdhci.h"
         }
       ],
-      "limits": "A model of the controller, not the controller: it proves the driver's sequence is legal for this model, and says nothing about the Lumia's SDHCI window, clock or card"
+      "limits": "A model of the controller, not the controller: it proves the driver's sequences are legal for this model, and says nothing about the Lumia's SDHCI window, clock or card"
     },
     {
       "id": "sdhci-command-encoding",

@@ -77,6 +77,30 @@ int main()
     check(host.result().bytesTransferred == 512, "the transfer reports 512 bytes");
     check(g_model.writeCommands == 0, "no write or erase command was issued");
 
+    /* The path the driver actually runs on the phone: a warm card, found by RCA, selected, then read. */
+    g_model.makeWarmCard(4ULL << 30);
+    PollingHost warmHost;
+    check(warmHost.configure(io), "the warm path configures a second controller instance");
+    WarmCard warmCard;
+    const u16 candidates[] = {1};
+    const bool attached = warmCard.attach(warmHost, candidates, sizeof(candidates) / sizeof(candidates[0]));
+    check(attached, "a warm card is found, selected and decoded");
+    if (attached) {
+        check(warmCard.info().relativeAddress == 1, "the RCA the model served is the one the driver kept");
+        check(warmCard.info().capacityBytes > (2ULL << 30), "the capacity comes from SEC_COUNT and is above the driver's floor");
+        u8 sector[512] = {};
+        check(warmCard.readBlock(0, sector), "a block is read through the warm card");
+        bool warmMatches = true;
+        for (u32 index = 0; index < 512; ++index) {
+            if (sector[index] != static_cast<u8>(0x40 + index)) {
+                warmMatches = false;
+                break;
+            }
+        }
+        check(warmMatches, "the warm read returns the model's pattern");
+    }
+    check(g_model.writeCommands == 0, "the warm path issued no write or erase command");
+
     std::printf("%s\n", failures == 0 ? "PASS: the driver's read sequence is accepted by the model" : "FAILED");
     return failures == 0 ? 0 : 1;
 }
