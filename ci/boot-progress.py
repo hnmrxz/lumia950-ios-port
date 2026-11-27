@@ -118,6 +118,51 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
              "\textern int lumia_kext_load(const char *command_line);\n"
              "\tlumia_kext_load(PE_boot_args());\n")
 
+# The first marker that can reach the panel before the VM work, now that ci/framebuffer-map.py maps one block containing the
+# framebuffer from the bootstrap tables. It deliberately does not use PE_parse_boot_argn: that call at this point is the one thing the
+# withdrawn skip switches had in common with their failure, so the token is matched with a plain scan of CommandLine instead.
+#
+# The block template is write-back normal memory, so every line the marker writes is cleaned with `dc civac`; without that the panel
+# may never see the data. The physical address comes from boot_args.Video, and the mapped KVA base is the constant the start.s patch
+# uses, so the two halves cannot drift.
+EARLY_MAP = (
+    "\n\t/* Bring-up marker: draw before the VM work, through the mapping ci/framebuffer-map.py adds. */\n"
+    "\t{\n"
+    "\t\tconst char *line = args->CommandLine;\n"
+    "\t\tconst char *want = \"lumia-early-map\";\n"
+    "\t\tint hit = 0;\n"
+    "\t\tconst char *p = line;\n"
+    "\t\twhile (*p != '\\0' && !hit) {\n"
+    "\t\t\tconst char *a = p;\n"
+    "\t\t\tconst char *b = want;\n"
+    "\t\t\tif (a != line && a[-1] != ' ' && a[-1] != '\\t') { p++; continue; }\n"
+    "\t\t\twhile (*a != '\\0' && *b != '\\0' && *a == *b) { a++; b++; }\n"
+    "\t\t\tif (*b == '\\0' && (*a == '\\0' || *a == ' ' || *a == '\\t')) { hit = 1; break; }\n"
+    "\t\t\tp++;\n"
+    "\t\t}\n"
+    "\t\tif (hit) {\n"
+    "\t\t\tconst unsigned long block = 0x2000000UL;\n"
+    "\t\t\tconst unsigned long base = 0xFFFFFFF0E0000000UL;\n"
+    "\t\t\tconst unsigned long pa = (unsigned long)args->Video.v_baseAddr;\n"
+    "\t\t\tvolatile unsigned int *fb = (volatile unsigned int *)(base + (pa & (block - 1)));\n"
+    "\t\t\tconst unsigned long stride = (unsigned long)args->Video.v_rowBytes;\n"
+    "\t\t\tconst unsigned long width = (unsigned long)args->Video.v_width;\n"
+    "\t\t\tunsigned long row;\n"
+    "\t\t\tunsigned long column;\n"
+    "\t\t\tfor (row = 120; row < 136; row++) {\n"
+    "\t\t\t\tfor (column = 0; column < width; column++) {\n"
+    "\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n"
+    "\t\t\t\t}\n"
+    "\t\t\t}\n"
+    "\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n"
+    "\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n"
+    "\t\t\t\t__asm__ volatile(\"dc civac, %0\" :: \"r\"(address) : \"memory\");\n"
+    "\t\t\t}\n"
+    "\t\t\t__asm__ volatile(\"dsb sy\" ::: \"memory\");\n"
+    "\t\t}\n"
+    "\t}\n"
+)
+
 STAGE_0 = (
     "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
     + DECLARATION
@@ -201,7 +246,7 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # Stage 0 goes immediately before the first statement of arm_init, not at the top of the body: the body
     # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
     # declaration a declaration-after-statement.
-    text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
+    text = text.replace(PLATFORM_CALL, EARLY_MAP + STAGE_0 + PLATFORM_CALL, 1)
     text = text.replace(PLATFORM_CALL + EARLY_BAR, PLATFORM_CALL + EARLY_BAR, 1)
     if EARLY_BAR not in text:
         insertion = text.find(PLATFORM_CALL) + len(PLATFORM_CALL)

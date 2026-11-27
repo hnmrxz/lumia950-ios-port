@@ -759,6 +759,14 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/prng-single-init.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/prng-single-init.py" --root "$UNIXNU_OUT" --check
 
+      - name: Map the framebuffer from the bootstrap page tables
+        # The kernel cannot write the panel before arm_vm_init: vinfo is still zero there and the console that maps the
+        # framebuffer is created after the VM work. This adds one block mapping in start.s so the early marker in the next
+        # step has somewhere to write.
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/framebuffer-map.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/framebuffer-map.py" --root "$UNIXNU_OUT" --check
+
       - name: Instrument the kernel entry with the bring-up bars
         run: |
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
