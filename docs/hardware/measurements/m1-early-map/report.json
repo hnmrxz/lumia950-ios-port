@@ -1,46 +1,34 @@
 {
-  "what": "M1 early-mapping acceptance, final round: safe refusal verified on a build that the submodule repair allowed",
+  "what": "M1 early-mapping acceptance after the identity-map change (TTBR0 instead of TTBR1)",
   "artifact": {
-    "kernel_sha256": "d57f6eeab961a104c0047cf1da6970c9d1525b3bf7d8730cc3f24210115ae523",
-    "commit": "d51be80",
-    "build": "45972181135",
-    "jobs": "validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel -- all success",
-    "submodule_repair": "drivers/NativeMetal was recorded at c6d29caa (no longer served; GitHub answers 422) and built from the remote's head 78c4abf99e36 instead; scripts/repair-framework-submodules.sh records the substitution in the job summary"
-  },
-  "fixture": {
-    "script": "scripts/verify-early-mapping.py",
-    "qemu": "qemu-system-aarch64, edk2-aarch64-code.fd, adt-profile qemu, 2816 MB, smp 2",
-    "args_off": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1",
-    "args_on": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1 lumia-early-map",
-    "artifacts_per_run": "report.json, dmesg.txt, serial.log, framebuffer dump (written by the fixture into out/qemu-earlymap-*-run)"
+    "kernel_sha256": "311a94601c09c40421d6f473712e41dbc24feb4495de838046c7ed60ee6f96a8",
+    "commit": "db0bb9c",
+    "build": "45975269374",
+    "jobs": "all six jobs success"
   },
   "results": {
     "off": {
       "past_bsd_outcome": "root-wait",
-      "stop_symbols": [
-        "_panic"
-      ],
       "esr_el1": "0x0",
       "state": 4,
-      "state_meaning": "token absent",
-      "regression": "none"
+      "meaning": "token absent"
     },
     "on": {
       "past_bsd_outcome": "root-wait",
-      "stop_symbols": [
-        "_panic"
-      ],
       "esr_el1": "0x0",
-      "state": 7,
-      "state_meaning": "the fixed L1 slot was already taken",
-      "regression": "none"
+      "state": 5,
+      "meaning": "the identity-map L1 entry for the framebuffer's block is not a table"
     }
   },
+  "reading": [
+    "No fault and no regression: the identity-map version refuses instead of breaking the boot, which is what the TTBR1 version could not do (build 45969556167 removed the console).",
+    "State 5 says the identity map does not cover the framebuffer's block at all under QEMU, because start.s maps only the kernel's own physical range; the boot arguments' video base (0xEC7A0000 here) is outside it.",
+    "The walk also has a naming problem to settle before the next build: with a 4 KB granule the TTBR points at the root (L0) and the byte range is chosen at L1, so indexing TTBR0 with the L1 mask is only correct on the 16 KB granule. The next version has to follow ARM_TT_ROOT_* first and then ARM_TT_L1_*, exactly as the TTBR1 version did when it moved from state 2 to 7."
+  ],
   "conclusion": {
-    "default_path": "unchanged: root-wait, no exception",
-    "early_map_path": "safe refusal (7); the mapping does not install, so no marker is drawn",
-    "not_proven": "mapping installation, drawing, and therefore anything about the handset's pre-VM stop",
-    "why_stopped": "the alternative that would install (highest empty L1 slot) removed the console entirely in build 45969556167, which means an arbitrary entry in the bootstrap tables is not something arm_vm_init can account for; the next step is to read arm_vm_init's consumption of these tables, not to try another slot"
+    "default_path": "unchanged (root-wait, ESR 0)",
+    "early_map_path": "safe refusal (5); nothing drawn; mapping not installed",
+    "next_step": "walk root then L1 in the identity map and only then fill the block entry, still refusing when an index is out of range or a slot holds a different block"
   },
   "evidence_levels": {
     "qemu_reaches_root_wait": true,
@@ -49,42 +37,5 @@
     "handset_handoff": true,
     "handset_xnu_entry": false,
     "handset_bsd_init": false
-  },
-  "history": [
-    {
-      "build": "45952024166",
-      "outcome": "stopped in the exception vector (FAR 0x158)",
-      "state": null
-    },
-    {
-      "build": "45954313018",
-      "outcome": "root-wait, panel cleared by the console",
-      "state": null
-    },
-    {
-      "build": "45958314960",
-      "outcome": "root-wait",
-      "state": 2
-    },
-    {
-      "build": "45960618255",
-      "outcome": "root-wait",
-      "state": 7
-    },
-    {
-      "build": "45962941472",
-      "outcome": "build failure: NativeMetal submodule",
-      "state": null
-    },
-    {
-      "build": "45969556167",
-      "outcome": "no console at all (arbitrary L1 entry)",
-      "state": null
-    },
-    {
-      "build": "45972181135",
-      "outcome": "root-wait",
-      "state": 7
-    }
-  ]
+  }
 }
