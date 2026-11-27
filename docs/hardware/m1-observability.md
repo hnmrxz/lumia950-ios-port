@@ -438,3 +438,9 @@ fixture 自己的 PASS 行同时报告：时钟/WFE/拓扑初始化、`arm_vm_in
 - **边界**：面板最终会被 `PE_create_console()` 覆盖重绘，所以判断依据是**状态码**而不是最终帧缓冲 dump；
 - **未包含**：真机尚未运行这份内核。真机上帧缓冲基址是 `0x400000`，identity 映射从 `physBase` 起，
   行范围是否落在被映射块内需要按真机数值重算（这正是下一步要验证的）。
+
+## 20. 真机验证准备
+
+真机尚未运行这份内核。真机与模拟器的帧缓冲基址、stride、所在 GB 都不同，
+行范围与表项分支已由 \scripts/test-early-map-arithmetic.py\ 对两种面板分别算过。
+操作步骤、验收判据（屏幕色带）与回滚写在 \docs/hardware/m1-early-map-handset-plan.md\。

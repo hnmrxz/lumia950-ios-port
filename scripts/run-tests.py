@@ -27,6 +27,7 @@ SELF_CONTAINED = (
     "test-boot-chain-guard.py",
     "test-boot-chain-io.py",
     "test-early-marker.py",
+    "test-early-map-arithmetic.py",
     "test-storage-read-only.py",
     "test-protection-is-wired.py",
     "test-prelinked-guard.py",
