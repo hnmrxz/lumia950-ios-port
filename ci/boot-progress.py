@@ -186,30 +186,17 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
 # 4 = token absent, 3 = invalid panel arguments, 2 = the guard refused, 1 = mapping installed, 0 = drawn. A static local of arm_init so
 # both the marker and the post-VM report see the same object without touching anything at file scope.
 EARLY_STATE = (
-    "\n\tstatic volatile unsigned int lumia_early_map_state = 4;\n"
-    "\tstatic int lumia_token_at(const char *p, const char *want)\n"
-    "\t{\n"
-    "\t\tconst char *a = p;\n"
-    "\t\tconst char *b = want;\n"
-    "\t\twhile (*a != '\\0' && *b != '\\0' && *a == *b) { a++; b++; }\n"
-    "\t\treturn *b == '\\0' && (*a == '\\0' || *a == ' ' || *a == '\\t');\n"
-    "\t}\n"
+    "\n/* 4 = token absent, 3 = invalid panel arguments, 2 = refused, 1 = usable, 0 = drawn. */\n"
+    "static volatile unsigned int lumia_early_map_state = 4;\n"
+    "static int lumia_token_at(const char *p, const char *want)\n"
+    "{\n"
+    "\tconst char *a = p;\n"
+    "\tconst char *b = want;\n"
+    "\twhile (*a != \'\\0\' && *b != \'\\0\' && *a == *b) { a++; b++; }\n"
+    "\treturn *b == \'\\0\' && (*a == \'\\0\' || *a == \' \' || *a == \'\\t\');\n"
+    "}\n"
 )
 
-# A marker that can reach the panel before the VM work: the mapping is measured safe, and the drawing path is split so each of its steps
-# can be left out by its own boot argument.
-#
-#   lumia-early-map           map and draw
-#   lumia-early-map-dry       map only                      (state 1: installed, nothing drawn)
-#   lumia-early-map-noclean   draw without the cache clean
-#   lumia-early-map-notlbi    draw without the TLB invalidate
-#
-# Measured context: at arm_vm_init TTBR0_EL1 points at bootstrap_pagetables, indexed at 1 GB, only the kernel's own gigabyte carries a table
-# (entry 1 -> physical 0x4818f000), and the gigabyte holding the QEMU framebuffer is empty. Writing that entry and the leaf block is safe;
-# what still faults sits in the drawing path.
-#
-# States: 0 drawn, 1 usable but not drawn, 2 refused, 3 bad panel arguments, 4 token absent, 6 index out of range, 7 the leaf slot holds
-# another block, 9 a block stands in the way and will not be split.
 EARLY_MAP = (
     '\n\t/* Bring-up marker: map the framebuffer through the identity tables, then draw -- with the maintenance steps selectable. */\n\t{\n\t\tconst char *line = args->CommandLine;\n\t\tint hit = 0;\n\t\tint dry_run = 0;\n\t\tint no_clean = 0;\n\t\tint no_tlbi = 0;\n\t\tconst char *p = line;\n\t\twhile (*p != \'\\0\') {\n\t\t\tif (p != line && p[-1] != \' \' && p[-1] != \'\\t\') { p++; continue; }\n\t\t\tif (lumia_token_at(p, "lumia-early-map")) { hit = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-dry")) { hit = 1; dry_run = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-noclean")) { hit = 1; no_clean = 1; }\n\t\t\telse if (lumia_token_at(p, "lumia-early-map-notlbi")) { hit = 1; no_tlbi = 1; }\n\t\t\tp++;\n\t\t}\n\t\tif (hit) {\n\t\t\t/* Measured: at arm_vm_init TTBR0_EL1 points at bootstrap_pagetables, indexed at 1 GB, only the kernel\'s gigabyte carries a\n\t\t\t * table, and the gigabyte holding the QEMU framebuffer is empty. Writing that entry and the leaf block was then proven safe by\n\t\t\t * the dry form, which reaches root-wait with the mapping installed. What still faults is the drawing path, so each of its steps\n\t\t\t * can be left out by its own boot argument to name the group responsible. */\n\t\t\tstatic uint64_t lumia_l2[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n\t\t\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);\n\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n\t\t\tconst uint64_t to_va = (uint64_t)args->virtBase - (uint64_t)args->physBase;\n\t\t\tconst uint64_t l2_pa = (uint64_t)lumia_l2 - to_va;\n\t\t\tuint64_t ttbr0;\n\t\t\tuint64_t *l1;\n\t\t\tuint64_t l1_index;\n\t\t\tuint64_t l1_entry;\n\t\t\tuint64_t *l2;\n\t\t\tuint64_t l2_index;\n\t\t\tint usable = 0;\n\t\t\tlumia_early_map_state = 2;\n\t\t\t__asm__ volatile("mrs %0, ttbr0_el1" : "=r"(ttbr0));\n\t\t\tl1 = (uint64_t *)((ttbr0 & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\tif (pa == 0 || args->Video.v_rowBytes == 0 || args->Video.v_width == 0 || args->Video.v_height == 0) {\n\t\t\t\tlumia_early_map_state = 3;\n\t\t\t} else {\n\t\t\t\tl1_index = (block_pa & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n\t\t\t\tif (l1_index >= entries) {\n\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t} else {\n\t\t\t\t\tl1_entry = l1[l1_index];\n\t\t\t\t\tif ((l1_entry & 3) == 1) {\n\t\t\t\t\t\tlumia_early_map_state = (l1_entry & ARM_TTE_TABLE_MASK) <= block_pa ? 1 : 9;\n\t\t\t\t\t\tusable = (lumia_early_map_state == 1);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tif ((l1_entry & 3) == 3) {\n\t\t\t\t\t\t\tl2 = (uint64_t *)((l1_entry & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2 = lumia_l2;\n\t\t\t\t\t\t\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (l2_pa & ARM_TTE_TABLE_MASK);\n\t\t\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tl2_index = (block_pa & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n\t\t\t\t\t\tif (l2_index >= entries) {\n\t\t\t\t\t\t\tlumia_early_map_state = 6;\n\t\t\t\t\t\t} else if (l2[l2_index] != 0 && (l2[l2_index] & (block - 1)) != block_pa) {\n\t\t\t\t\t\t\tlumia_early_map_state = 7;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tl2[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n\t\t\t\t\t\t\tlumia_early_map_state = 1;\n\t\t\t\t\t\t\tusable = 1;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\tif (usable && !dry_run) {\n\t\t\t\tvolatile unsigned int *fb;\n\t\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n\t\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n\t\t\t\tunsigned long height = (unsigned long)args->Video.v_height;\n\t\t\t\tunsigned long row;\n\t\t\t\tunsigned long column;\n\t\t\t\tif (!no_tlbi) {\n\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t__asm__ volatile("tlbi vmalle1" ::: "memory");\n\t\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t\t__asm__ volatile("isb" ::: "memory");\n\t\t\t\t}\n\t\t\t\tfb = (volatile unsigned int *)pa;\n\t\t\t\tif (height > 136 && width <= 16384 && stride <= 65536) {\n\t\t\t\t\tfor (row = 120; row < 136; row++) {\n\t\t\t\t\t\tfor (column = 0; column < width; column++) {\n\t\t\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tif (!no_clean) {\n\t\t\t\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n\t\t\t\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n\t\t\t\t\t\t\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");\n\t\t\t\t\t\t}\n\t\t\t\t\t\t__asm__ volatile("dsb sy" ::: "memory");\n\t\t\t\t\t}\n\t\t\t\t\tlumia_early_map_state = 0;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n'
 )
@@ -297,7 +284,22 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # Stage 0 goes immediately before the first statement of arm_init, not at the top of the body: the body
     # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
     # declaration a declaration-after-statement.
-    text = text.replace(PLATFORM_CALL, EARLY_STATE + EARLY_MAP + STAGE_0 + PLATFORM_CALL, 1)
+    if "lumia_token_at" not in text:
+        # Insert before the definition of arm_init, not between its return type and its name: the source puts the return type on its own
+        # line, and an earlier version split "void" from "arm_init(" that way, which the compiler rejected.
+        pattern = re.compile(r"(?m)^arm_init\(\s*$")
+        match = pattern.search(text)
+        if match is None:
+            return False, "skipped: no arm_init definition to put the marker before"
+        start = match.start()
+        # walk back over the attribute macro and the return type, so the declaration lands before both of them
+        for token in ("\n__startup_func", "\nvoid"):
+            found = text.rfind(token, 0, start)
+            if found >= 0:
+                start = min(start, found + 1)
+        anchor = start
+        text = text[:anchor] + EARLY_STATE + text[anchor:]
+    text = text.replace(PLATFORM_CALL, EARLY_MAP + STAGE_0 + PLATFORM_CALL, 1)
     text = text.replace(PLATFORM_CALL + EARLY_BAR, PLATFORM_CALL + EARLY_BAR, 1)
     if EARLY_BAR not in text:
         insertion = text.find(PLATFORM_CALL) + len(PLATFORM_CALL)
