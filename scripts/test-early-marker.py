@@ -65,9 +65,10 @@ class EarlyMarkerTests(unittest.TestCase):
 
     def test_the_mapping_only_uses_an_empty_l1_slot(self):
         block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("l1[l1_index] == 0", block, "an occupied slot must not be overwritten")
-        self.assertIn("l1_index < entries", block)
-        self.assertIn("l2_index < entries", block)
+        self.assertIn("l1[l1_index] != 0", block, "an occupied slot must be refused, and the refusal recorded")
+        self.assertIn("l1_index >= entries", block)
+        self.assertIn("l2_index >= entries", block)
+        self.assertIn("(root[root_index] & 3) != 3", block, "the root entry has to be a table before it is followed")
 
     def test_nothing_is_drawn_unless_the_mapping_was_installed(self):
         block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
@@ -88,11 +89,13 @@ class EarlyMarkerTests(unittest.TestCase):
 
     def test_invalid_panel_arguments_skip_the_marker(self):
         block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
-        self.assertIn("pa != 0", block)
-        self.assertIn("v_rowBytes != 0", block)
-        self.assertIn("v_width != 0", block)
-        self.assertIn("v_height != 0", block)
+        self.assertIn("pa == 0", block)
+        self.assertIn("v_rowBytes == 0", block)
+        self.assertIn("v_width == 0", block)
+        self.assertIn("v_height == 0", block)
         self.assertIn("height > 136", block)
+        self.assertIn("width <= 16384", block, "an absurd width must not be multiplied out")
+        self.assertIn("stride <= 65536", block, "nor an absurd stride")
 
     def test_applying_twice_changes_nothing(self):
         module = load()
@@ -109,6 +112,20 @@ class EarlyMarkerTests(unittest.TestCase):
         # the injected block is the only addition before the platform call; the call itself still happens exactly once
         self.assertEqual(self.text.count("PE_init_platform(FALSE, args)"), 1)
         self.assertLess(self.text.index("Bring-up marker"), self.text.index("PE_init_platform(FALSE, args)"))
+
+    def test_every_outcome_has_its_own_state_code(self):
+        block = self.text[self.text.index("Bring-up marker"):self.text.index("PE_init_platform")]
+        self.assertIn("lumia_early_map_state = 2", block, "refused by default")
+        self.assertIn("lumia_early_map_state = 5", block, "no root entry")
+        self.assertIn("lumia_early_map_state = 6", block, "index out of range")
+        self.assertIn("lumia_early_map_state = 7", block, "slot already taken")
+        self.assertIn("lumia_early_map_state = 3", block, "invalid panel arguments")
+        self.assertIn("lumia_early_map_state = 1", block, "installed but not drawn")
+        self.assertIn("lumia_early_map_state = 0", block, "installed and drawn")
+
+    def test_the_state_is_reported_after_the_vm_work(self):
+        self.assertIn("LUMIA: early map state", self.text)
+        self.assertLess(self.text.index("arm_vm_init"), self.text.index("LUMIA: early map state"))
 
 
 if __name__ == "__main__":
