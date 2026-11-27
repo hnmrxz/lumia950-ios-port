@@ -70,3 +70,13 @@ microSD 可作为独立辅助平台，但**不能用它的成功替代 eMMC 真�
 3. 要到 `arm_vm_init` 之前观测，只能走文档里那两条路线（A：bootstrap 页表映射帧缓冲；B：RAM mailbox + 热复位）。
 
 下一步按决策规则执行：**先做 A 的 QEMU 原型**（不改真机），并用现有门禁（`past_bsd=root-wait`、底部分段色块、`check-evidence`）验证它没有破坏已验证路径。
+
+## M1 观测路线 A 的设计（读源码后落地前的记录）
+
+docs/hardware/m1-observability.md 把路线 A 的机制写到了可以直接照着写代码的程度：start.s 的
+create_bootstrap_mapping 的寄存器契约、块大小（16K 页内核 32 MB、4K 页内核 2 MB）、块模板
+ARM_TTE_BOOT_BLOCK 是 write-back 因此必须 dc civac、以及运行时从 boot args 读 video 物理基址以同时适配真机与 QEMU。
+
+它同时列出四条风险（内存属性别名、KVA 槽选择、两平台帧缓冲位置不同、30 分钟构建周期）和 QEMU 侧的验收标准：
+不启用开关时行为与改动前完全一致；启用时在 rm_vm_init 之前出现可回读色块且内核仍到 root-wait。
+**没有这两条，代码不允许上真机。**
