@@ -476,7 +476,7 @@ jobs:
             python3 scripts/test-probe-qemu.py --application native-gpu --esp out/LumiaGpuPower/esp \
               --firmware "$firmware" --gic-version "$gic" --log "out/LumiaGpuPower/refusal-gic$gic.log"
           done
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: lumia950-efi-preflight
@@ -508,7 +508,7 @@ jobs:
         run: |
           bash scripts/build-gicv2-test.sh
           python3 scripts/test-gicv2-qemu.py build/gicv2-qemu/gicv2-test.elf
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: lumia950-gicv2-core-emulation
@@ -571,7 +571,7 @@ jobs:
       - name: Build and stage the payload
         run: bash scripts/build-payload.sh out/payload
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lumia950-payload
           path: out/payload/**
@@ -986,7 +986,7 @@ jobs:
 
       - name: Upload the prelinked image for the handset
         if: ${{ github.event.repository.private && (github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact) }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lumia950-prelinked
           path: out/handset/**
@@ -994,7 +994,7 @@ jobs:
 
       - name: Upload the source-built kernel
         if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lumia950-kernel-source
           path: out/kernel-source/**
@@ -1005,7 +1005,7 @@ jobs:
       # bsd_init. Publish the image the gates actually booted so a handset test can use exactly that.
       - name: Upload the unstripped kernel the gates booted
         if: github.ref_name == 'probe/pthread-darwin22' || github.ref_name == 'main' || inputs.handset_artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lumia950-kernel-unstripped
           path: |
@@ -1016,7 +1016,7 @@ jobs:
 
       - name: Archive what the emulated boot reached
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: lumia950-xnu-entry
           path: out/xnu-entry/**
@@ -1090,7 +1090,7 @@ jobs:
           echo "::warning::repository is public; the lumia950-kernel artifact is not uploaded"
           echo "::warning::it carries kernel extensions merged out of an Apple kernelcache"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         # always(): the compile log is what a failed run has to hand over, and every
         # step after the failing one is skipped by default. Private only: this artifact contains
         # Apple kernel extensions, and KERNEL_ARTIFACT_RETENTION_DAYS defaults to one day.
@@ -1218,7 +1218,7 @@ jobs:
           print(f"install preconditions ok: {len(files)} files, {total} bytes")
           PY
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         # Source-only: the tree holds no Apple binary, so it does not need the private-only gate
         # the kernel artifact has. It is still a device tree, hence the short retention.
         with:
@@ -1324,7 +1324,7 @@ jobs:
                     "| fault at:", report.get("fault_elr_symbol"), "| far:", report.get("fault_far"))
           PY
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: lumia950-xnu-entry
