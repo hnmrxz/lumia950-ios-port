@@ -1,0 +1,39 @@
+{
+  "what": "Handset photograph of the DarwinBoot hand-off page: the real loader ran from the phone's own EFI files and handed control to the kernel",
+  "captured": "2026-11-27 (Asia/Shanghai), supplied by the device owner",
+  "photo": "handset-photo.jpg",
+  "observations": {
+    "menu": "UniXNU 0.1.0, config \\EFI\\UniXNU\\unixnu.toml, entry 1 'iOS 16.7.16' (xnu) selected",
+    "darwinboot_lines": [
+      "DARWINBOOT: payload from another volume 0 of 0",
+      "DARWINBOOT: ARM64 va=0xFFFFFFF004004000 pa=0x27004000 args=0x2BAE0000 entry=0x2B..",
+      "DEC488 owned=0x20000000",
+      "DARWINBOOT: video base=0x400000 display=1 row=4320 width=1080 height=1920 depth=32",
+      "DARWINBOOT: inputs validated; exiting boot services",
+      "DARWINBOOT: hand-off to the kernel"
+    ],
+    "handoff_page": {
+      "kernel_va": "0xFFFFFFF004004000",
+      "kernel_pa": "0x27004000",
+      "entry_pa": "0x2BEC488",
+      "args_pa": "0x2BAE0000",
+      "window_bytes": "0x20000000",
+      "video": "base 0x400000, 1080x1920, row 4320 bytes, 32 bpp",
+      "entry_words": "140006F5 00000000 00000000 00000000",
+      "CurrentEL": 1,
+      "SCTLR_EL1": "0xC01B0D",
+      "TCR_EL1": "0x280003518",
+      "ID_AA64MMFR0_EL1": "0x1122 (PARange 2, 4 KiB granule supported)",
+      "ID_AA64PFR0_EL1": "0x2222"
+    },
+    "loader_bar": "green bar across the top is present in the photograph",
+    "kernel_bar": "no bottom green bar is visible in this photograph",
+    "console_text": "no kernel console output is visible on the panel in this photograph"
+  },
+  "reading": [
+    "The chain this port builds runs on the handset up to and including the branch to XNU: the loader read its config, selected the xnu entry, printed the DarwinBoot hand-off page, exited boot services and reports handing off.",
+    "The video geometry the loader reports is the hardware's own: base 0x400000, 1080x1920, row 4320 bytes, 32 bpp. It matches the earlier control-mark measurement and differs from the emulator's 800x600.",
+    "The photograph does not show kernel console output or the post-MMU bottom bar, so it does not establish that the kernel executed -- it establishes that the loader handed off. Whether the screen stayed on this page, changed, or the device reset was not recorded.",
+    "SCTLR_EL1 0xC01B0D and TCR_EL1 0x280003518 are the handset's own values at hand-off; the emulator reports different ones (0x30D0198D / 0x280803518), which is why the kernel's early assumptions have to be checked against the handset rather than the emulator."
+  ]
+}

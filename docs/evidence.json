@@ -660,6 +660,26 @@
         }
       ],
       "limits": "Emulator only. It is the best configuration this repository knows how to produce; whether the handset executes it is still the open question."
+    },
+    {
+      "id": "handset-handoff-page",
+      "what": "Handset photograph of the DarwinBoot hand-off page: UniXNU 0.1.0 loaded its config, selected the xnu entry, printed the hand-off page with the hardware's own video geometry (base 0x400000, 1080x1920, row 4320) and EL1 state (SCTLR_EL1 0xC01B0D, TCR_EL1 0x280003518), and reports handing off to the kernel",
+      "label": "hardware-tested",
+      "evidence": [
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/measurements/handoff-hardware/handset-photo.jpg"
+        },
+        {
+          "label": "hardware-tested",
+          "path": "docs/hardware/measurements/handoff-hardware/report.json"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/2026-11-27-handset-handoff.md"
+        }
+      ],
+      "limits": "The photograph establishes the hand-off, not kernel execution: it shows no kernel console output and no bottom bar, and does not record whether the screen changed afterwards."
     }
   ]
 }
