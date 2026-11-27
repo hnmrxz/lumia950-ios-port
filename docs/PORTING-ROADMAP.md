@@ -120,3 +120,18 @@ Apple logo 与锁屏首帧**不属于 P3**：本链路没有 iBoot 去画 logo�
 - 不自动修改 GPT / format userdata，不写入 eMMC。
 - 不猜测物理地址、GPIO、IRQ、PSCI method、panel PLL 或分区 LBA。
 - 不把 950 XL / Xperia 的驱动完整支持状态移植到 Lumia 950 的状态表。
+
+## 里程碑 M1–M5 与阶段 P0–P5 的对应（2026-11-27）
+
+主路线以 `docs/hardware/bringup-milestones.md` 为准。阶段编号继续用于构建与证据管理，但对目标的关系是：
+
+| 阶段 | 里程碑 |
+|---|---|
+| P0 构建与证据 | 支撑全部里程碑 |
+| P1 EFI → DarwinBoot → XNU entry | **M1：XNU 进入 BSD 初始化**（当前首要目标） |
+| P2 存储与 iOS root | **M2 eMMC 控制器/块设备 → M3 只读 GPT → M4 APFS 容器/卷 → M5 root 挂载与用户态** |
+| P3 显示与输入 | M5 之后（GOP 控制台先用着；NativeMdss 不阻塞 M1–M5） |
+| P4 用户态与系统服务 | M5 |
+| P5 Format 2 / SoC common | 最后 |
+
+microSD 实验不属于任一里程碑的验收条件；它只回答"载荷能不能从别的卷读"。

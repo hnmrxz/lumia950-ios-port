@@ -804,6 +804,26 @@
         }
       ],
       "limits": "Host tests against temporary volumes. No phone was connected and no protected object was written; the microSD experiment is still a design with unverified capabilities."
+    },
+    {
+      "id": "objective-restated-m1-m5",
+      "what": "The objective is restated as five non-skippable milestones on the handset: M1 BSD initialisation, M2 eMMC controller and block device, M3 read-only GPT, M4 APFS container and volumes, M5 APFS root and userland; the microSD experiment is auxiliary and MainOS formatting is not a prerequisite. Read-only access is enforced in the storage driver and held by a test",
+      "label": "source-reviewed",
+      "evidence": [
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/bringup-milestones.md"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-storage-read-only.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/state.md"
+        }
+      ],
+      "limits": "A definition and a source-level guard, not a hardware result: M1 is still unmet and every milestone's evidence column records the handset as the judge."
     }
   ]
 }

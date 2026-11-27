@@ -74,6 +74,27 @@ is cheap and reversible (the NTFS read path already works and a FAT32 volume on 
 an **APFS root** needs a block device driver in the kernel, a working kext delivery path and the real root-matching rule -- none of
 which exist yet. `Apple_HFS` is the emulator fixture's expectation, not a property of the pinned kernel (which has no HFS+ at all).
 
+## The objective, restated (2026-11-27)
+
+The finish line is not the Apple logo, not a kernel log line and not the DarwinBoot hand-off:
+
+> Lumia 950 (Talkman / MSM8992) boots XNU, reaches BSD initialisation, reads the eMMC **read-only** through XNU's own storage stack,
+> parses the GPT, identifies the APFS container and mounts an APFS root, and stays running.
+
+`docs/hardware/bringup-milestones.md` is the authority for how that decomposes (M1 BSD initialisation, M2 eMMC controller and block
+device, M3 read-only GPT, M4 APFS container and volumes, M5 APFS root and userland), with the evidence each milestone needs and the
+rule that none can be skipped. The microSD payload experiment is an auxiliary check of an alternative payload volume, and formatting
+MainOS is not a prerequisite for any of the five milestones.
+
+As of this note M1 is **not** met: the handset shows the loader's hand-off page and then nothing, which after the measurements in
+`docs/hardware/2026-11-27-handset-handoff.md` means the kernel stops before `arm_vm_init` -- a point where the kernel has no
+framebuffer mapping and cannot print. The two candidate observation routes are written in the milestone document, with the rule that
+route A (a mapping made from the kernel's own bootstrap page tables) is prototyped in QEMU first.
+
+One engineering requirement from the same review is now enforced by a test: read-only access has to hold in the driver layer, not by a
+mount option. `scripts/test-storage-read-only.py` refuses any change that would add a write or erase command to `NativeSdhci`, that
+would forward an outbound transfer, or that would stop reporting write protection.
+
 ## Checks
 
 `scripts/run-tests.py` 34/34 (7 need inputs), `scripts/check-evidence.py` 16 subjects,
