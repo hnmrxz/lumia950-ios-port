@@ -896,6 +896,22 @@
         }
       ],
       "limits": "Host tests against temporary volumes. The script has not run against the phone, because the phone is not connected."
+    },
+    {
+      "id": "early-map-branch-model",
+      "what": "The early marker decision branches are modelled and tested exhaustively on the host: empty gigabyte, existing table (the handset case), covering block, non-covering block, taken leaf slot, same block, zero address, and the row range that used to cross the block boundary",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-early-map-model.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/model-early-map.py"
+        }
+      ],
+      "limits": "A model of the C, not the C: it catches logic errors in the branch table, not drift between the model and the kernel. The C remains the authority."
     }
   ]
 }
