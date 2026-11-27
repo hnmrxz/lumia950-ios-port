@@ -52,3 +52,18 @@
 - 不为进入 M2 而格式化 MainOS、改分区表或写 eMMC；
 - 不在未验证只读保证前让任何文件系统挂载该设备；
 - 不把"编译通过/prelink 有条目"当作 M2 达成（里程碑文档已写明这条规则）。
+
+## 7. S1 已经成立（2026-11-28 实测）
+
+kernel 作业现在按顺序构建容器并检查它，build 46028655982 的输出：
+
+```
+ok   .../org.unixnu.NativeSdhci/Contents/MacOS/NativeSdhci: arm64 kext bundle, 645 symbols,
+     segments ['__DATA','__DATA_CONST','__LINKEDIT','__TEXT','__TEXT_EXEC']
+.../NativeSdhci.mkext: 95462 bytes, plist at 94208, checksum 0x4AEB457C
+.../generated/mkext_blob.cpp: 95462 bytes as lumia_sdhci_mkext
+```
+
+同一份构建里 `archive` 步骤的失败数为 **0**（此前 `mkext_blob.cpp is missing` 被作业吞掉）。
+
+**因此 S1 通过、S2 未尝试**：bundle 与 container 都已生成并通过格式检查，但把它放进 prelinked 镜像仍被拒（已知的段冲突）。

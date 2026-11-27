@@ -992,6 +992,26 @@
         }
       ],
       "limits": "A plan. No kext is bundled, nothing is injected into the prelinked image, and the read-only proof is still source-level: measured only by tests on the driver sources."
+    },
+    {
+      "id": "sdhci-kext-container",
+      "what": "The NativeSdhci kext and its mkext container are built in the kernel job before the archive that embeds them, and checked on the runner: an arm64 kext bundle with 645 symbols and five segments, a 95,462-byte container whose plist sits at 94,208 with checksum 0x4AEB457C, and no archive-step failure anywhere in the build",
+      "label": "kernel-linked",
+      "evidence": [
+        {
+          "label": "kernel-linked",
+          "path": "docs/hardware/m2-storage-integration-plan.md"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/check-kext.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "board.toml"
+        }
+      ],
+      "limits": "The bundle and container are built and validated, not delivered: M2's S2 (putting it into the prelinked image) is still refused, and nothing has run against the device"
     }
   ]
 }
