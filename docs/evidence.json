@@ -1092,6 +1092,22 @@
         }
       ],
       "limits": "A copy of the staged tree, not the phone: no handset file was touched and no boot was performed"
+    },
+    {
+      "id": "sdhci-register-model",
+      "what": "A register model of the SDHCI controller with the real polling layer wired to it on the host: configure, start and CMD0 pass; CMD1..CMD3 and the block read do not yet, because the driver applies a blanket R1 card-error mask and the model has not been tuned to it",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "drivers/NativeSdhci/Test/check-model-sdhci.cpp"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "drivers/NativeSdhci/Test/ModelSdhci.h"
+        }
+      ],
+      "limits": "Work in progress. Three checks pass and four do not; the model is not yet evidence about the driver's protocol, and it says nothing about real hardware."
     }
   ]
 }
