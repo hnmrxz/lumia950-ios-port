@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "At arm_vm_init, TTBR0_EL1 and TTBR1_EL1 are two adjacent pages of bootstrap_pagetables, and a marker that never replaces a block entry keeps QEMU at root-wait with ESR 0x0 (state 4 without the boot argument, 5 with it)",
+      "what": "The identity table start.s builds was read from the running kernel: at arm_vm_init only entry 1 is live (a table at physical 0x4818f000) and the gigabyte holding the QEMU framebuffer (entry 3) is empty, which is exactly the state 5 the marker reports; the marker itself keeps both configurations at root-wait with ESR 0x0",
       "label": "QEMU-tested",
       "evidence": [
         {

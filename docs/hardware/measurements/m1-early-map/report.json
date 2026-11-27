@@ -112,5 +112,114 @@
       " see which slot start.s filled for the framebuffer's range. That is a read, not another build."
     ],
     "decision": "The non-destructive marker stays: it reaches root-wait in both configurations and refuses with a code instead of touching a block entry."
+  },
+  "round_170": {
+    "what": "The identity table start.s built, read from the running kernel",
+    "how": "break at _arm_vm_init (0xfffffff0073fca68), then --read-at 0xFFFFFFF00718D000:128; the fixture stores the bytes in report.read",
+    "raw": "000000000000000003f0184800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "decoded_first_16_entries": [
+      {
+        "entry": 0,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 1,
+        "value": "0x4818f003",
+        "kind": "table",
+        "address": "0x4818f000"
+      },
+      {
+        "entry": 2,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 3,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 4,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 5,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 6,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 7,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 8,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 9,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 10,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 11,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 12,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 13,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 14,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      },
+      {
+        "entry": 15,
+        "value": "0x0",
+        "kind": "invalid",
+        "address": null
+      }
+    ],
+    "reading": [
+      "Entry 1 is the only live descriptor: a table pointing at physical 0x4818f000. Entry 0 and entries 2..15 are invalid, so the identity map at this point covers the kernel's gigabyte through an L2 table and nothing else.",
+      "The framebuffer's physical base under QEMU (0xEC7A0000) falls in the gigabyte indexed by entry 3, which is invalid -- exactly the state 5 the marker reports, now with the table contents behind it rather than an inference.",
+      "This also removes the earlier idea that a block entry was being replaced: at this level the entry to change is empty. The faults in the versions that wrote it therefore came from something else, and the next run has to read the table back immediately after the write to see whether the entry landed where intended."
+    ],
+    "next_step": "Break just after the marker with the boot argument, read the same 128 bytes plus the L2 page the marker points at, and compare: which entry changed, and does the walk root -> L1 -> L2 reach 0xEC000000 afterwards."
   }
 }
