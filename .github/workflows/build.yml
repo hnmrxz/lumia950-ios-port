@@ -778,6 +778,13 @@ jobs:
           python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --check
 
+      - name: Add the SDHCI probe behind its own boot argument
+        # M2 asks whether the controller answers at all before anything reads a block. The probe only reads the identification
+        # registers and stays off unless lumia-sdhci-probe is passed, so ordinary boots are unchanged.
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/sdhci-probe.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/sdhci-probe.py" --root "$UNIXNU_OUT" --check
+
 
       - name: Gate the skmem sysctl publication behind a boot argument
         # The emulated boot stops at _skmem_sysctl_init+0x18 storing through sysctls->version; the object
