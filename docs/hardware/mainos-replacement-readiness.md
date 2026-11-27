@@ -87,3 +87,23 @@ EFI\UniXNU\Drivers\DarwinBoot.efi  打开 MainOS 上的 \EFI\UniXNU\Payloads\
 2. 不替换 `bootarm.efi`、`\UEFI.elf`、BCD（已有失败记录）。
 3. 不在真机上把 `Apple_HFS` 当作目标根卷设计（源码内核没有 HFS+）。
 4. 不把"kext ABI 编译通过 / QEMU 能插入 prelink 条目"当作"真机能读盘"。
+
+## 6. microSD 实验的落点（与本文档的关系）
+
+第 2 节表格里的第 1–4 项，全部可以在**不改动 MainOS/EFIESP** 的前提下用一张 microSD 验证。实验设计、逐步判据、失败条件与
+回滚写在 `docs/hardware/microsd-payload-experiment.md`。
+
+要点：
+
+- 只新增一个菜单条目（`xnu-sd`），原 `xnu` 条目与 MainOS 路径保持不变；
+- microSD 不参与固件启动，失败时拔卡即可恢复；
+- 在取得真机照片与日志之前，第 2 节表格中的“UEFI 枚举 microSD”等项**保持未验证**。
+
+## 7. 不能推进到阶段 4 的判据
+
+只要满足任意一条，就不允许进入“分区级改动”：
+
+1. microSD 实验在第 2 步（UEFI 枚举）失败；
+2. 没有一次**成对**（EFIESP + MainOS）分区镜像恢复的实机验证；
+3. 解锁补丁的逐文件/逐扇区清单仍未建立；
+4. `boot-chain-guard.py inventory` 与实际分区镜像的哈希对不上（说明基线本身不可信）。

@@ -764,6 +764,26 @@
         }
       ],
       "limits": "Documentation and repository records only. The values quoted from the handset were read earlier in this session while the phone was in mass storage mode; the phone is now disconnected, so nothing was re-measured for this audit."
+    },
+    {
+      "id": "boot-chain-protection-wired",
+      "what": "The six protected boot-chain object classes are enforced in code: scripts/boot-chain-guard.py decides, phone-install.py refuses an existing protected replacement without --replace-protected, and tests hold both the rule and the wiring",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-boot-chain-guard.py"
+        },
+        {
+          "label": "host-tested",
+          "path": "scripts/test-protection-is-wired.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "docs/hardware/boot-chain-preservation.md"
+        }
+      ],
+      "limits": "Host tests only: they exercise the guard and the scripts against temporary volumes. Nothing here was run against the phone, and no protected object was written."
     }
   ]
 }

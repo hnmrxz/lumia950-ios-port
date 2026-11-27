@@ -65,3 +65,66 @@ stock firmware (secure boot on)
 2. 不运行 `install-native-bringup.py` / `phone-install.py` 的 `--apply`：前者会因 CRITICAL 过期而拒绝（安全），后者在 `--uefi-elf`/`--bootshim` 默认路径下**会写**受保护文件。
 3. 若确需重新基线 CRITICAL 表，必须把"当前真机实测值 + 一次成功的真机 hand-off 证据"一起提交，不能只改数字。
 4. 替换 `BOOTAA64.EFI` 类试验一律用 `swap-loader.py`（自带备份与 `--restore`），不要手工覆盖。
+
+
+## 7. 保护规则（代码层，不靠记性）
+
+六类对象现在由一个共享判定器看管：`scripts/boot-chain-guard.py`。
+
+| 类 | 路径 | 理由 |
+|---|---|---|
+| 1 | `EFI\boot\bootarm.efi` | 固件直接启动它；替换后连 mass storage 都进不去 |
+| 2 | `EFI\boot\BootShim.efi` | 部署工具安装、BCD 指向的 ARM32 shim |
+| 3 | `UEFI.elf` | LumiaWoA AArch64 UEFI，被 shim 链式加载 |
+| 4 | `EFI\Microsoft\BOOT\BCD` | 解锁后的引导存储；改它曾导致齿轮复位循环 |
+| 5 | `EFI\BOOT\BOOTAA64.EFI` | 自定义 UEFI 的入口，本移植加载器 |
+| 6 | `EFI\UniXNU\**` | 加载器整棵树；替换其中任一文件都会让 hand-off 证据失效 |
+
+规则只有两条，且没有例外：
+
+1. **创建可以，替换要开口**：目标不存在（空卷首次安装）时允许写入；**替换已存在的受保护对象**必须同时给出
+   `--replace-protected` 与一个已存在的备份，否则拒绝。
+2. **不允许靠"先删掉再写"或"改哈希基线"绕过**：判定基于路径与"是否已存在"，与文件内容哈希无关；删掉文件只是回到
+   "创建"分支，而删除本身需要显式动作并已被文档列为禁止。
+
+### 接线情况（脚本层）
+
+| 脚本 | 现状 |
+|---|---|
+| `phone-install.py` | 每个 `install()` 调用都带 `replace_protected=args.replace_protected`；**apply 时**受保护替换被拒；dry-run 只提示不改变退出码 |
+| `install-native-bringup.py` | 保留原有两道闸：CRITICAL 哈希不符即拒、`EFI/UniXNU` 已存在即拒 |
+| `update-native-bringup.py` | 写入集合被限定为 `UPDATABLE`（内核、ADT、LumiaGpuPower.efi、manifest），不含任何受保护对象 |
+| `swap-loader.py` | 唯一被允许替换 `BOOTAA64.EFI` 的路径，且自带 `.before-control-mark` 备份与 `--restore` |
+| `phone-snapshot.py` / `phone-image.py` | 恢复必须显式给出快照名/镜像路径；不存在"默认用最新"的路径 |
+
+新增两个测试守住这些：
+`scripts/test-boot-chain-guard.py`（六类全覆盖、大小写无关、创建 vs 替换、备份缺失即拒、清单含哈希）与
+`scripts/test-protection-is-wired.py`（安装器接线、CRITICAL 与 UniXNU 闸门、swap 备份、update 白名单、snapshot 显式命名）。
+
+## 8. 备份baseline：五种东西必须分开命名
+
+以前的文档把这些混在一起，导致"用旧镜像恢复"看起来像安全操作。现在必须区分：
+
+| 类型 | 生成方式 | 覆盖范围 | 是否可作为"当前恢复基线" |
+|---|---|---|---|
+| **A. 当前 EFIESP 原始镜像** | `phone-image.py dump --volume R:` | 整分区字节 | 仅当与"当前"实测哈希一致时才可（见下） |
+| **B. 当前 MainOS 原始镜像** | 同上，MainOS 卷 | 整分区字节 | 同上 |
+| **C. 文件级备份** | `phone-snapshot.py save` | 文件与目录结构（含 BCD、bootarm、EFI 树） | 可以，但**会覆盖**受保护文件，必须先 inventory 对比 |
+| **D. GPT 分区布局** | 只读枚举（下表） | 分区 GUID/起止 LBA/类型 | 是必需的参照，不参与恢复 |
+| **E. 历史快照** | 任意日期留下的 A–C | 那个时点的状态 | **禁止**当作当前基线 |
+
+**明确禁止**：把 `out/phone-backups/unlocked-efiesp.img`（磁盘上 33,554,432 B / `e72bb27d…`）当作当前 EFIESP 的恢复基线——
+它的长度与哈希都与其说明文档（16,777,216 B / `1e9b2ff3…`）不符，身份未确认。MainOS 镜像（2,999,971,840 B / `64955e16…`）与记录一致。
+
+### GPT 布局的只读采集（Windows，无需管理员）
+
+```powershell
+Get-Disk | Where-Object FriendlyName -match 'Phone' |
+  Select-Object Number, FriendlyName, Size, PartitionStyle, Guid |
+  Export-Clixml out/phone-backups/gpt-disk.xml
+Get-Partition | Where-Object DiskNumber -eq <Number> |
+  Select-Object PartitionNumber, DriveLetter, Offset, Size, Type, Guid |
+  Export-Clixml out/phone-backups/gpt-partitions.xml
+```
+
+这两个文件记录的是 D 类基线；它们**不写手机**，也不含密钥。

@@ -26,6 +26,42 @@ ROOT = Path(__file__).resolve().parent.parent
 STAGING = ROOT.parent / "out"
 
 
+def protected_object(destination: Path) -> str | None:
+    """Which protected boot-chain object this destination is, if any.
+
+    The list and the reasons live in scripts/boot-chain-guard.py so that every installer asks the same question. This wrapper keeps
+    the installer's default behaviour: writing a protected object is refused unless the caller asked for it explicitly.
+    """
+    import importlib.util
+
+    module_path = Path(__file__).with_name("boot-chain-guard.py")
+    spec = importlib.util.spec_from_file_location("boot_chain_guard", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    # compare on the tail of the path: callers pass \volume-relative destinations such as efiesp / "UEFI.elf"
+    parts = destination.as_posix().replace("\\", "/")
+    for protected in list(module.PROTECTED) + ["efi/unixnu"]:
+        if parts.casefold().endswith(protected) or ("/" + protected + "/") in parts.casefold():
+            return protected
+    return None
+
+
+def refuse_protected(destination: Path, replace: bool) -> bool:
+    protected = protected_object(destination)
+    if protected is None:
+        return True
+    if not destination.exists():
+        # creating the object on a blank volume destroys nothing; only a replacement needs the acknowledgement
+        print(f"allowed: {destination} is the protected object {protected}, and it does not exist yet")
+        return True
+    if replace:
+        print(f"allowed: {destination} is the protected object {protected}, and --replace-protected was given")
+        return True
+    print(f"refused: {destination} is the protected object {protected}", file=sys.stderr)
+    print("         pass --replace-protected together with a verified backup, or leave it alone", file=sys.stderr)
+    return False
+
+
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -82,7 +118,8 @@ def pe_subsystem(path: Path) -> int | None:
     return data[offset + 0x5C]
 
 
-def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = None) -> bool:
+def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = None,
+            replace_protected: bool = False) -> bool:
     subsystem = pe_subsystem(src)
     note = "" if subsystem is None else f" subsystem 0x{subsystem:02X}"
     print(f"  {src.name:32} {src.stat().st_size:>10} B  sha256 {digest(src)[:16]}{note}")
@@ -91,6 +128,12 @@ def install(src: Path, dst: Path, apply: bool, require_subsystem: int | None = N
             print(f"error: {src.name} has subsystem {subsystem}, which is not the required "
                   f"0x{require_subsystem:02X}; the boot manager would not start it", file=sys.stderr)
             return False
+    if apply:
+        if not refuse_protected(dst, replace_protected):
+            return False
+    elif protected_object(dst) is not None and not replace_protected:
+        # a dry run reports the refusal instead of performing it, so it keeps its exit code while still showing the requirement
+        print(f"  note: {dst} is a protected boot-chain object; --replace-protected will be required to write it")
     if not apply:
         return True
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -203,6 +246,9 @@ def main(argv: list[str] | None = None) -> int:
                              "custom UEFI looks when no boot entry is configured. Measured on the handset, "
                              "2026-11-26: the UEFI reported 'Failed to boot OS. No usable boot entry found' "
                              "with the loader only at EFI\\UniXNU\\UniXNU.efi")
+    parser.add_argument("--replace-protected", action="store_true",
+                        help="acknowledge that a protected boot-chain object is being written (UEFI.elf, BootShim.efi, "
+                             "BOOTAA64.EFI, BCD, bootarm.efi, EFI/UniXNU/**); refused without it")
     parser.add_argument("--keep-uefi-elf", action="store_true",
                         help="do not write UEFI.elf; verify the one already on EFIESP. The deployment tools "
                              "install their own build there, and it is the file their shim chainloads, so "
@@ -242,24 +288,24 @@ def main(argv: list[str] | None = None) -> int:
     else:
         shim = resolve_bootshim(args.bootshim)
         print(f"shim source: {shim}")
-        ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A)
+        ok &= install(shim, shim_destination, args.apply, require_subsystem=0x0A, replace_protected=args.replace_protected)
 
     if args.keep_uefi_elf:
         ok &= verify_kept_uefi_elf(efiesp / "UEFI.elf")
     else:
         print("UEFI.elf -> EFIESP root")
-        ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply)
+        ok &= install(args.uefi_elf, efiesp / "UEFI.elf", args.apply, replace_protected=args.replace_protected)
 
     print("UniXNU payload -> EFIESP")
     for name in ("UniXNU.efi", "unixnu.toml"):
         source = args.stage / "EFI" / "UniXNU" / name
         if source.is_file():
-            ok &= install(source, efiesp / "EFI" / "UniXNU" / name, args.apply)
+            ok &= install(source, efiesp / "EFI" / "UniXNU" / name, args.apply, replace_protected=args.replace_protected)
     drivers = args.stage / "EFI" / "UniXNU" / "Drivers"
     if drivers.is_dir():
         for source in sorted(drivers.iterdir()):
             if source.is_file():
-                ok &= install(source, efiesp / "EFI" / "UniXNU" / "Drivers" / source.name, args.apply)
+                ok &= install(source, efiesp / "EFI" / "UniXNU" / "Drivers" / source.name, args.apply, replace_protected=args.replace_protected)
 
     if args.loader_alias:
         loader = args.stage / "EFI" / "UniXNU" / "UniXNU.efi"
@@ -276,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     if payloads.is_dir():
         for source in sorted(payloads.iterdir()):
             if source.is_file():
-                ok &= install(source, mainos / "EFI" / "UniXNU" / "Payloads" / source.name, args.apply)
+                ok &= install(source, mainos / "EFI" / "UniXNU" / "Payloads" / source.name, args.apply, replace_protected=args.replace_protected)
     else:
         print("  (no staged kernel; run scripts/stage-kernel.py --payload-out first)")
 
@@ -289,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
             for source in sorted(args.refind.rglob("*")):
                 if source.is_file():
                     relative = source.relative_to(args.refind)
-                    ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply)
+                    ok &= install(source, efiesp / "EFI" / "REFIND" / relative, args.apply, replace_protected=args.replace_protected)
 
     if args.verify_bcd is not None:
         ok &= verify_bcd(args.verify_bcd, args.layout)
