@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The mapping itself is safe in QEMU: with the identity-table entry and leaf block installed but nothing drawn, the kernel reaches root-wait (state 1, ESR 0x0), while the form that also draws stops with ESR 0x96000005 / FAR 0x158",
+      "what": "The identity mapping the marker installs was read back from the running kernel and is exactly where it belongs (L1 entry 3 a table at physical 0x48b5c000, and that table holding a block for 0xEC600000), while a dry run that only maps reaches root-wait; the forms that also store fault with ESR 0x96000005 / FAR 0x158 whatever maintenance they skip",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -856,14 +856,14 @@
         },
         {
           "label": "host-tested",
-          "path": "scripts/verify-early-split.py"
+          "path": "scripts/verify-table-after-dry.py"
         },
         {
           "label": "host-tested",
-          "path": "scripts/test-early-marker.py"
+          "path": "scripts/verify-leaf-after-dry.py"
         }
       ],
-      "limits": "QEMU only. The drawing path still faults, so nothing is proven about the handset's pre-VM stop; the handset was not touched."
+      "limits": "QEMU only. The store path still faults with a nested-fault signature whose first address is unknown; the handset was not touched."
     }
   ]
 }

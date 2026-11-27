@@ -259,5 +259,56 @@
       "A related correction from this round: the first attempt at the dry token armed nothing, because the boot argument contains no plain 'lumia-early-map' token, and the run looked identical to off (state 4). The token now sets both flags."
     ],
     "next_step": "Add a third form that stores without the cache clean, and one that stores without the TLB invalidate, and run all forms on one artifact: whichever keeps the kernel alive names the instruction group."
+  },
+  "round_172": {
+    "what": "Five forms on one artifact, then the installed mapping read back out of the running kernel",
+    "artifact": {
+      "kernel_sha256": "e29479304893b8c9dd3996af1cfdf3c7d1a11f4c6cc914c7f98f60e20fa70206",
+      "commit": "38681bb",
+      "build": "45995798732",
+      "scripts": [
+        "scripts/verify-early-split.py",
+        "scripts/verify-table-after-dry.py",
+        "scripts/verify-leaf-after-dry.py"
+      ]
+    },
+    "five_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "stopped",
+        "esr": "0x96000005",
+        "far": "0x158"
+      },
+      "noclean": {
+        "outcome": "stopped",
+        "esr": "0x96000005",
+        "far": "0x158"
+      },
+      "notlbi": {
+        "outcome": "stopped",
+        "esr": "0x96000005",
+        "far": "0x158"
+      }
+    },
+    "readback": {
+      "how": "with the dry argument, break at PE_init_platform and read the identity table and the leaf table it points at",
+      "identity_entry_3": "0x48b5c003 (table, physical 0x48b5c000)",
+      "leaf_entry_for_the_framebuffer": "0xec600601 (block at physical 0xec600000)",
+      "reading": "The mapping this marker installs is exactly where it belongs: the gigabyte entry became a table, and that table carries a block for the 2 MB block containing 0xEC7A0000. The write path is therefore correct and has been verified by reading the tables back, not by inferring from the absence of a fault."
+    },
+    "remaining_question": [
+      "Leaving out the cache clean or the TLB invalidate does not change the outcome, so the fault follows the stores themselves.",
+      "FAR 0x158 is the same in every failing form and ELR sits inside the exception vector, so the reported fault is the nested one: the first fault happened earlier and the vector then failed as well. The first fault's address is therefore still unknown.",
+      "The next measurement should store a single word into a page the kernel already maps (for example this marker's own leaf page) and then into the framebuffer: if only the framebuffer store faults, the address range or its attributes are the issue; if both fault, the store path itself is."
+    ]
   }
 }
