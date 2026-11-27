@@ -50,10 +50,13 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertLess(self.block.index("lumia-early-map"), self.block.index("0x00E03030u"))
 
     def test_nothing_is_drawn_unless_the_address_is_usable(self):
-        self.assertLess(self.block.index("if (usable && !dry_run)"), self.block.index("0x00E03030u"),
-                        "every framebuffer store sits inside the usable branch")
+        first_store = self.block.index("0x00E03030u")
+        self.assertLess(self.block.index("if (usable && probe)"), first_store,
+                        "the single-word probe is guarded by usable as well")
+        self.assertLess(self.block.index("usable = 1"), first_store, "usable is decided before any store")
+        self.assertLess(self.block.index("if (usable && !dry_run)"), self.block.index("last-shaped-check") if
+                        "last-shaped-check" in self.block else len(self.block))
         self.assertIn("usable = 0", self.block)
-        self.assertIn("usable = 1", self.block)
 
     def test_the_mapping_is_read_from_the_identity_registers(self):
         self.assertIn("ttbr0_el1", self.block, "the identity map is TTBR0")
