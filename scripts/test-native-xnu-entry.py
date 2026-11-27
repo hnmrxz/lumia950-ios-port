@@ -494,7 +494,7 @@ def run(args):
             probe.bind(("127.0.0.1", 0))
             monitor_port = probe.getsockname()[1]
         command = [args.qemu, "-machine", "virt,gic-version=2", "-cpu", "cortex-a53,cntfrq=19200000", "-smp", str(args.smp),
-            "-m", "768", "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
+            "-m", str(args.memory), "-bios", str(args.firmware.resolve()), "-display", "none", "-serial", "stdio",
             "-monitor", f"tcp:127.0.0.1:{monitor_port},server=on,wait=off", "-nic", "none",
             "-no-reboot", "-device", "ramfb", "-S",
             "-gdb", gdb,
@@ -903,6 +903,8 @@ def main():
     parser.add_argument("--watch", action="append", default=[], metavar="SYMBOL",
                         help="record whether this symbol is reached at all (one shot, retired on "
                              "the first hit); repeatable")
+    parser.add_argument("--memory", type=int, default=768,
+                        help="QEMU RAM in MiB; the handset ADT claims 0xaf600000 bytes, so it needs -m 2816 to be consistent")
     parser.add_argument("--smp", type=int, default=1,
                         help="CPUs in the emulated machine (default 1). QEMU returns zero for the "
                              "GIC target registers on a uniprocessor GICv2 (hw/intc/arm_gic.c: "

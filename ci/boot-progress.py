@@ -49,6 +49,15 @@ AFTER_CONSOLE = (
 # this port is the one in bsd_init.
 
 BEFORE_VM_INIT = "\tarm_vm_init(xmaxmem, args);\n"
+
+# Text from the kernel has to wait until the VM work is done: a kprintf right after PE_init_platform() faulted at SP1 before VM
+# setup (run 45918861169), because the console exists then but its framebuffer mapping does not. The first line that can safely be
+# printed is therefore this one, immediately after arm_vm_init() returns -- and it is the line that answers the handset
+# question, because a kernel that reaches it has run through the whole early boot path.
+AFTER_VM_INIT_MARKER = (
+    "\n\t/* Bring-up instrument: the VM work is done, so the console can be written. */\n"
+    "\tkprintf(\"LUMIA: arm_vm_init returned, entering the rest of arm_init\\n\");\n"
+)
 PLATFORM_CALL = "\tPE_init_platform(FALSE, args); /* Get platform expert set up */\n"
 # The third bar is drawn after the platform expert has installed the video console, through the same mapping the
 # console itself writes to. That mapping comes from the kernel's own `vinfo`, declared in
@@ -154,7 +163,7 @@ def apply_to(path: Path) -> tuple[bool, str]:
     # opens with declarations (`unsigned int maxmem;` ...), and a statement above them would make every later
     # declaration a declaration-after-statement.
     text = text.replace(PLATFORM_CALL, STAGE_0 + PLATFORM_CALL, 1)
-    text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT, 1)
+    text = text.replace(BEFORE_VM_INIT, STAGE_2 + BEFORE_VM_INIT + AFTER_VM_INIT_MARKER, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
 

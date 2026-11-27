@@ -1,0 +1,18 @@
+{
+  "what": "Handset photograph of the UniXNU menu after the hand-off attempt, with the previous boot's DarwinBoot page still visible behind it and the menu counting down to boot the same entry again",
+  "captured": "2026-11-27 (Asia/Shanghai), supplied by the device owner",
+  "photo": "handset-photo.jpg",
+  "observations": {
+    "menu": "UniXNU 0.1.0, config \\EFI\\UniXNU\\unixnu.toml, entry 1 'iOS 16.7.16' (xnu) selected, 'Booting iOS 16.7.16 in 1 s'",
+    "menu_footer": "Up/Down: select   Enter: boot   1-9: boot entry   Esc: stop timer   drivers 2 loaded / 0 failed   kits 0   acpi 0",
+    "leftover_darwinboot_text": "the previous boot's DARWINBOOT lines and hand-off page are still drawn on the panel behind the menu",
+    "loader_bar": "green bar at the top of the screen",
+    "kernel_bar": "no bottom green bar",
+    "kernel_text": "no kernel console text"
+  },
+  "reading": [
+    "The device is back at the loader's menu after the hand-off, which is the loader running again rather than the kernel showing progress: the menu footer says the two drivers loaded and no kernel output appears anywhere on the panel.",
+    "The DarwinBoot page from the earlier attempt is still on the panel, so the menu redraws over old pixels rather than clearing them; that is why both pages are visible at once.",
+    "Together with the hand-off photograph this says the chain runs up to the branch and the kernel produces nothing afterwards. Whether the device reset by itself or was restarted was not recorded by the photograph."
+  ]
+}
