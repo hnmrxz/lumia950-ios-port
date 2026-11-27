@@ -18,6 +18,9 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [44003233713](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/44003233713) | `44930b9` | dispatch `target=both` | all eight jobs, including `xnu-entry-qemu` | success | 10m30s |
 | [45960618255](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45960618255) | `c2796d9` | manual | validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel | success | the artifact both QEMU acceptance runs used (state 4 off, 7 on) |
 | [45962941472](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45962941472) | `926e1f0` | manual | validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel | failure | kernel job cannot init the framework's NativeMetal submodule (pinned commit no longer served); rerun failed the same way |
+| [45967455733](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45967455733) | `4a99d9f` | manual | kernel and the fast jobs | failure | repair step was in the payload job only; kernel still hit the NativeMetal fetch |
+| [45969556167](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45969556167) | `59dc609` | manual | kernel and the fast jobs | success | first build after the repair; state 7 replaced by the empty-slot scan, which then failed |
+| [45972181135](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/45972181135) | `d51be80` | manual | kernel and the fast jobs | success | final acceptance artifact d57f6eea: off state 4, on state 7, both root-wait, ESR 0x0 |
 
 The last row is the definitive one. In addition to the three artifacts it is the first run in which
 **the linked kernel was executed**: `xnu-entry-qemu` boots the same run's kernel through the

@@ -847,7 +847,7 @@
     },
     {
       "id": "m1-early-map-state",
-      "what": "The early framebuffer mapping reports its outcome through the post-VM console: with the boot argument the state is a specific refusal code (2 no root entry, 7 slot taken so far) while both configurations still reach root-wait; without it the state is 4",
+      "what": "Both QEMU configurations reach root-wait with no exception (ESR 0x0): without the boot argument the early marker reports 4 (token absent) and with it 7 (the fixed L1 slot was taken), so the mapping is refused safely rather than installing",
       "label": "QEMU-tested",
       "evidence": [
         {
@@ -863,7 +863,7 @@
           "path": "scripts/test-early-marker.py"
         }
       ],
-      "limits": "QEMU only, and the mapping is still not installed: every run so far has ended with a refusal code while the kernel itself reaches root-wait. The handset was not touched."
+      "limits": "QEMU only. The mapping does not install, so the early marker proves nothing about the handset's pre-VM stop; the handset was not touched and nothing was flashed."
     }
   ]
 }

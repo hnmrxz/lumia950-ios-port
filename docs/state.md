@@ -97,11 +97,14 @@ would forward an outbound transfer, or that would stop reporting write protectio
 
 ## M1 observation: where it stands
 
-The early-marker work is code-complete on the repository side and converging in QEMU, but the mapping is not installed yet. Both
-configurations reach root-wait; with `lumia-early-map` the post-VM console reports a specific refusal code from `lumia_early_map_state`
-(2 meant the chosen address had no root entry, 7 means the L1 slot was occupied) rather than a fault. The empty-slot build that would
-answer whether it installs is blocked by the framework's `drivers/NativeMetal` submodule, whose pinned commit is no longer served by its
-remote, so every kernel build fails before compiling. Details in `docs/hardware/m1-observability.md` section 11.
+Both QEMU configurations reach root-wait on artifact `d57f6eea` (commit `d51be80`) with ESR 0x0, and the early marker reports its own
+refusal through the post-VM console: 4 without the boot argument, 7 with it, meaning the fixed L1 slot was already taken and nothing was
+drawn. The mapping is therefore not installed and proves nothing about the handset yet.
+
+The attempt that would have installed it -- filling the highest empty L1 entry -- removed the console entirely (build 45969556167), so
+entries cannot be added to the bootstrap tables without understanding how `arm_vm_init` consumes them; that read is the next step, not
+another slot. The submodule blocker that stopped every build is repaired in CI: `drivers/NativeMetal` is re-pointed to the remote's head
+only when its recorded commit is really gone, and the substitution is printed. Details in `docs/hardware/m1-observability.md` section 11.
 
 ## Checks
 

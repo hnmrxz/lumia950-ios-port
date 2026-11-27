@@ -1,67 +1,46 @@
 {
-  "what": "M1 early-mapping acceptance runs: the mapping guard's own report through the post-VM console",
+  "what": "M1 early-mapping acceptance, final round: safe refusal verified on a build that the submodule repair allowed",
   "artifact": {
-    "kernel_sha256": "2c0be9060618f95eb97757299fb59edd74b7ddf73526a2a33e0f0e97e9744639",
-    "commit": "c2796d9",
-    "build": "45960618255",
-    "note": "the last artifact whose kernel job succeeded; the run after it (45962941472) could not build, see blocker"
+    "kernel_sha256": "d57f6eeab961a104c0047cf1da6970c9d1525b3bf7d8730cc3f24210115ae523",
+    "commit": "d51be80",
+    "build": "45972181135",
+    "jobs": "validate, efi-preflight, gicv2-emulation, payload, installer-windows, kernel -- all success",
+    "submodule_repair": "drivers/NativeMetal was recorded at c6d29caa (no longer served; GitHub answers 422) and built from the remote's head 78c4abf99e36 instead; scripts/repair-framework-submodules.sh records the substitution in the job summary"
   },
   "fixture": {
     "script": "scripts/verify-early-mapping.py",
     "qemu": "qemu-system-aarch64, edk2-aarch64-code.fd, adt-profile qemu, 2816 MB, smp 2",
     "args_off": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1",
-    "args_on": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1 lumia-early-map"
+    "args_on": "-v cpus=1 lumia-bars2 skmem_sysctl_skip=1 lumia-early-map",
+    "artifacts_per_run": "report.json, dmesg.txt, serial.log, framebuffer dump (written by the fixture into out/qemu-earlymap-*-run)"
   },
   "results": {
     "off": {
       "past_bsd_outcome": "root-wait",
-      "arm_vm_init_returned": true,
+      "stop_symbols": [
+        "_panic"
+      ],
+      "esr_el1": "0x0",
       "state": 4,
-      "state_meaning": "token absent"
+      "state_meaning": "token absent",
+      "regression": "none"
     },
     "on": {
       "past_bsd_outcome": "root-wait",
-      "arm_vm_init_returned": true,
+      "stop_symbols": [
+        "_panic"
+      ],
+      "esr_el1": "0x0",
       "state": 7,
-      "state_meaning": "the chosen L1 slot was already taken"
+      "state_meaning": "the fixed L1 slot was already taken",
+      "regression": "none"
     }
   },
-  "history_of_state_codes": [
-    {
-      "build": "45952024166",
-      "state": null,
-      "outcome": "stopped in the exception vector (FAR 0x158)",
-      "fix": "read the L1 table from TTBR1 instead of assuming bootstrap_pagetables + PGBYTES"
-    },
-    {
-      "build": "45954313018",
-      "state": null,
-      "outcome": "root-wait, but the panel shows the console's own background at the marker rows",
-      "fix": "report the outcome through the console after the VM work, since PE_create_console() clears the panel"
-    },
-    {
-      "build": "45958314960",
-      "state": 2,
-      "outcome": "root-wait",
-      "meaning": "guard refused",
-      "fix": "the chosen address 0xFFFFFFF0E0000000 has no root entry; share the kernel's root entry instead"
-    },
-    {
-      "build": "45960618255",
-      "state": 7,
-      "outcome": "root-wait",
-      "meaning": "L1 slot taken",
-      "fix": "scan the L1 table for an empty slot (committed, but the build for it is blocked)"
-    }
-  ],
-  "blocker": {
-    "what": "the kernel job cannot initialize the framework's NativeMetal submodule",
-    "error": "fatal: remote error: upload-pack: not our ref c6d29caad6d880cc8204ebe3bc34d77479a3255d (submodule path 'drivers/NativeMetal')",
-    "runs": [
-      "45962941472 (both the first attempt and the rerun)"
-    ],
-    "reading": "the pinned commit is no longer served by the submodule's remote, so this is not a code failure and not a flake that a rerun fixes; the same failure stops every kernel build until the pin or the remote changes",
-    "not_done": "the empty-slot build, and therefore the QEMU run that would say whether the mapping installs"
+  "conclusion": {
+    "default_path": "unchanged: root-wait, no exception",
+    "early_map_path": "safe refusal (7); the mapping does not install, so no marker is drawn",
+    "not_proven": "mapping installation, drawing, and therefore anything about the handset's pre-VM stop",
+    "why_stopped": "the alternative that would install (highest empty L1 slot) removed the console entirely in build 45969556167, which means an arbitrary entry in the bootstrap tables is not something arm_vm_init can account for; the next step is to read arm_vm_init's consumption of these tables, not to try another slot"
   },
   "evidence_levels": {
     "qemu_reaches_root_wait": true,
@@ -70,5 +49,42 @@
     "handset_handoff": true,
     "handset_xnu_entry": false,
     "handset_bsd_init": false
-  }
+  },
+  "history": [
+    {
+      "build": "45952024166",
+      "outcome": "stopped in the exception vector (FAR 0x158)",
+      "state": null
+    },
+    {
+      "build": "45954313018",
+      "outcome": "root-wait, panel cleared by the console",
+      "state": null
+    },
+    {
+      "build": "45958314960",
+      "outcome": "root-wait",
+      "state": 2
+    },
+    {
+      "build": "45960618255",
+      "outcome": "root-wait",
+      "state": 7
+    },
+    {
+      "build": "45962941472",
+      "outcome": "build failure: NativeMetal submodule",
+      "state": null
+    },
+    {
+      "build": "45969556167",
+      "outcome": "no console at all (arbitrary L1 entry)",
+      "state": null
+    },
+    {
+      "build": "45972181135",
+      "outcome": "root-wait",
+      "state": 7
+    }
+  ]
 }

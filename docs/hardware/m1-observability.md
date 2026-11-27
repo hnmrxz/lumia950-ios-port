@@ -161,65 +161,54 @@ BSS 页的物理地址用 `args->virtBase/physBase` 换算，与 start.s 建立 
 3. 同时修 `STAGE_0`：把"记录参数"和"写屏"彻底分开，任何物理地址都不得在建立映射前被解引用。
 4. 在此之前，M1 的观测仍只有 `docs/hardware/measurements/vinfo-early` 的零值结论与真机"无输出"的事实。
 
-## 11. 现状（2026-11-27 收尾）：两条 QEMU 路径都到 root-wait，映射仍未装上
+## 11. 现状（2026-11-27，本轮收尾）
 
-### 11.1 已完成的代码
+### 11.1 已完成且保留
 
 | 项 | 状态 |
 |---|---|
-| bootstrap 页表映射 | **已实现**，在 `arm_init` 里从 `TTBR1_EL1` 读根表、按真实层级取 L1，不再假定 `bootstrap_pagetables + PGBYTES` |
-| `STAGE_0` / `STAGE_2` 用物理地址写屏 | **已移除**（审计确认的 P0 缺陷），现在只记录参数 |
-| `apply_bsd()` 重复定义 | **已合并为 1 个** |
-| 映射结果自报 | **已实现**：`lumia_early_map_state` 经 post-VM `kprintf` 打印 |
-| 面板参数校验 | 已实现：地址/stride/宽/高非零、`height > 136`、`width <= 16384`、`stride <= 65536` |
+| 从 `TTBR1_EL1` 读根表、按真实层级取 L1 | **已实现**（不再假定 `bootstrap_pagetables + PGBYTES`） |
+| `STAGE_0` / `STAGE_2` 用物理地址写屏 | **已移除**（审计确认的 P0） |
+| `apply_bsd()` 重复定义 | **已合并** |
+| 映射结果自报 | **已实现**（post-VM `kprintf` 打印 `lumia_early_map_state`） |
+| 面板参数边界 | 已实现（非零、`height > 136`、`width ≤ 16384`、`stride ≤ 65536`） |
+| 任意空 L1 槽扫描 | **已撤回**（见 11.3，会让内核在 `arm_vm_init` 之前彻底失联） |
 
-### 11.2 状态码（每一次 QEMU 都是可解释的数字）
+### 11.2 本轮 QEMU 验收（artifact `d57f6eea…`，commit `d51be80`，build 45972181135）
 
-| 码 | 含义 |
+| 配置 | 结果 | ESR | 状态码 |
+|---|---|---|---|
+| 无 `lumia-early-map` | **root-wait** | `0x0` | **4**（参数缺失） |
+| 有 `lumia-early-map` | **root-wait** | `0x0` | **7**（固定 L1 槽已被占用） |
+
+**两条路径都没有新增异常**；默认路径与改动前一致。**映射仍未装入**，因此早期标记仍未画出。
+
+### 11.3 为什么不再尝试别的槽位
+
+build 45969556167（扫描最高空槽）的结果是**内核在 `arm_vm_init` 之前彻底失联**——没有串口输出、没有 dmesg、没有状态码。
+这说明 bootstrap 表不是"随便找个空槽塞进去"就能用的：`arm_vm_init` 要消费这些表来建立 kernel pmap，塞进去的表项它无法解释。
+所以扫描已撤回，回到"拒绝并自报状态 7"的**不崩**形态。
+
+**下一步不是换槽位，而是读源码**：看 `arm_vm_init` 如何遍历/消费 `bootstrap_pagetables`，据此决定这条映射应该放在哪一层、哪一个范围，
+或者换成不碰页表的观测方式（路线 B：把标记写进内核镜像内已映射的变量，另找读取途径）。
+
+### 11.4 阻塞已解除（本轮）
+
+上一轮 kernel 构建全部失败的根因是框架 `drivers/NativeMetal` 钉的提交 `c6d29caa` 被远端 force-push 掉（GitHub API 返回 422）。
+现在 `scripts/repair-framework-submodules.sh` 会先核对该提交是否仍可服务，**只在确实不可用时**把该子模块改指到远端 head，并在 job summary 里写明替换。
+本轮构建因此恢复：`drivers/NativeMetal` 由 `c6d29caa` 改为 `78c4abf99e36`。
+
+### 11.5 证据等级（禁止互相替代）
+
+| 等级 | 现在 |
 |---|---|
-| 0 | 映射装入且标记已画 |
-| 1 | 映射装入但未画（面板太矮等） |
-| 2 | 守卫拒绝（默认值） |
-| 3 | 面板参数无效 |
-| 4 | 启动参数里没有 `lumia-early-map` |
-| 5 | 该虚拟地址没有根表项 |
-| 6 | 索引越界 |
-| 7 | 选中的 L1 槽已被占用 |
-| 8 | L1 表没有空槽 |
-
-### 11.3 QEMU 实测序列（同一 fixture，逐步收敛）
-
-| 构建 | 结果 | 由此做的修改 |
-|---|---|---|
-| 45952024166 | 停在异常向量（FAR `0x158`） | 改为从 `TTBR1_EL1` 取 L1 |
-| 45954313018 | root-wait，但面板被 console 清屏 | 改用 post-VM `kprintf` 自报状态 |
-| 45958314960 | root-wait，状态 **2** | 地址 `0xFFFFFFF0E0000000` 无根表项 → 改共享内核根表项 |
-| 45960618255 | root-wait，状态 **7** | 固定槽位被占用 → 改为扫描最高空槽（已提交） |
-| 45962941472 | **构建失败（基础设施）** | 见 11.4 |
-
-### 11.4 当前阻塞（不是代码问题）
-
-```
-fatal: remote error: upload-pack: not our ref c6d29caad6d880cc8204ebe3bc34d77479a3255d
-fatal: Fetched in submodule path 'drivers/NativeMetal', but it did not contain c6d29caa...
-```
-
-框架的 `drivers/NativeMetal` 子模块指向的提交在远端已不存在，**任何** kernel 构建都会在此失败；重跑同样失败。
-所以"扫描空槽"那次构建**没有产出**，状态 8 / 0 的 QEMU 结果**尚未取得**。
-
-### 11.5 证据等级（不得互相替代）
-
-| 等级 | 当前 |
-|---|---|
-| QEMU 到 root-wait | **是**（off 与 on 都到） |
-| QEMU 映射装入 | **否**（状态 7，槽位被占用） |
+| QEMU 到 root-wait | **是** |
+| QEMU 映射装入 | **否**（状态 7） |
 | QEMU 到 BSD init | 否 |
 | 真机 hand-off | 是（此前建立） |
 | 真机 XNU entry | 否 |
 | 真机 BSD init | 否 |
 
-### 11.6 下一步
+### 11.6 是否进入真机 M1 测试准入评审
 
-1. 先解除 11.4 的阻塞（要么等远端恢复，要么在框架里改钉一个远端仍提供的 `NativeMetal` 提交——这属于框架改动，需要单独评审）；
-2. 构建成功后跑 `scripts/verify-early-mapping.py`，看状态是 0（成功）还是 8（无空槽）；
-3. 只有状态 0 且仍到 root-wait，才算"早期映射在 QEMU 成立"，届时再讨论真机。
+**不进入**。完成条件要求"状态 0 且默认路径无回归"；现在是"默认路径无回归 + 状态 7"。映射装入这一步尚未成立。
