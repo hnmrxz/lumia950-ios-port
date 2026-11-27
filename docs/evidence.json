@@ -808,7 +808,7 @@
     {
       "id": "objective-restated-m1-m5",
       "what": "The objective is restated as five non-skippable milestones on the handset: M1 BSD initialisation, M2 eMMC controller and block device, M3 read-only GPT, M4 APFS container and volumes, M5 APFS root and userland; the microSD experiment is auxiliary and MainOS formatting is not a prerequisite. Read-only access is enforced in the storage driver and held by a test",
-      "label": "source-reviewed",
+      "label": "host-tested",
       "evidence": [
         {
           "label": "source-reviewed",
@@ -823,7 +823,7 @@
           "path": "docs/state.md"
         }
       ],
-      "limits": "A definition and a source-level guard, not a hardware result: M1 is still unmet and every milestone's evidence column records the handset as the judge."
+      "limits": "The milestone definition is written material; the part measured here is the read-only guard, which is host-tested. M1 itself is unmet and every milestone's evidence column names the handset as the judge."
     }
   ]
 }
