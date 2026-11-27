@@ -112,6 +112,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"after the write, the boot arguments must contain: {TOKEN}")
         return 0
 
+    # The runbook: what the phone looked like before the write, so a later report can be checked against it.
+    runbook = args.backup.parent / "handset-run.txt"
+    if not runbook.is_file():
+        runbook.write_text(
+            "handset run of the early-map kernel\n"
+            f"artifact        : {args.kernel}\n"
+            f"artifact sha256 : {artifact}\n"
+            f"previous kernel : {existing or 'absent'}\n"
+            f"boot argument   : {TOKEN}\n"
+            f"config before   : {text.strip()}\n",
+            encoding="utf-8")
+        print(f"runbook written to {runbook}")
+
     args.backup.parent.mkdir(parents=True, exist_ok=True)
     if target.is_file():
         shutil.copy2(target, args.backup)

@@ -97,14 +97,17 @@ would forward an outbound transfer, or that would stop reporting write protectio
 
 ## M1 observation: where it stands
 
-Both QEMU configurations reach root-wait on artifact `d57f6eea` (commit `d51be80`) with ESR 0x0, and the early marker reports its own
-refusal through the post-VM console: 4 without the boot argument, 7 with it, meaning the fixed L1 slot was already taken and nothing was
-drawn. The mapping is therefore not installed and proves nothing about the handset yet.
+The pre-VM blind spot is gone in the emulator. On artifact 717752f7 the kernel maps the framebuffer through the bootstrap identity tables,
+draws rows 8..15 before arm_vm_init, and still reaches bsd_init and root-wait; the self-test runs the branch the handset will take (its
+framebuffer shares the kernel image's gigabyte, so the identity entry is already a table) with the handset's own stride and width, and reports
+state 30 with its sentinels intact. The untouched configuration reports 4, so the default path is unchanged.
 
-The attempt that would have installed it -- filling the highest empty L1 entry -- removed the console entirely (build 45969556167), so
-entries cannot be added to the bootstrap tables without understanding how `arm_vm_init` consumes them; that read is the next step, not
-another slot. The submodule blocker that stopped every build is repaired in CI: `drivers/NativeMetal` is re-pointed to the remote's head
-only when its recorded commit is really gone, and the substitution is printed. Details in `docs/hardware/m1-observability.md` section 11.
+What is still missing is the handset itself: it has not run this kernel. The run is one guarded command
+(scripts/deploy-early-map.py) plus a photograph, and the acceptance reading is written down in
+docs/hardware/m1-early-map-handset-plan.md -- an eight-row red bar at the top of the panel means the kernel reached the marker; the bar plus
+the post-VM log means it crossed arm_vm_init. No step is promoted to verified without that photograph.
+
+M1 (the handset entering BSD initialisation) is therefore still unmet, and the goal stays active.
 
 ## Checks
 

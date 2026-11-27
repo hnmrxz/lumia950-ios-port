@@ -80,3 +80,19 @@ ARM_TTE_BOOT_BLOCK 是 write-back 因此必须 dc civac、以及运行时从 boo
 它同时列出四条风险（内存属性别名、KVA 槽选择、两平台帧缓冲位置不同、30 分钟构建周期）和 QEMU 侧的验收标准：
 不启用开关时行为与改动前完全一致；启用时在 rm_vm_init 之前出现可回读色块且内核仍到 root-wait。
 **没有这两条，代码不允许上真机。**
+
+## M1 仪器状态（2026-11-27 收尾）
+
+M1（真机进入 BSD 初始化）**仍未达成**，但"看不见内核停在哪"这个障碍**已经解除**：
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| 内核能在 `arm_vm_init` **之前**写屏 | ✅ QEMU 成立 | 状态 0，artifact `717752f7…` |
+| 真机将要走的页表分支（帧缓冲所在 GB 已有表） | ✅ QEMU 成立 | selftest 状态 30，同一 artifact |
+| 真机几何（stride 4320 / width 1080 / 行 8–15） | ✅ QEMU 执行过 | 同上 |
+| 内核到 BSD 初始化与 root-wait | ✅ QEMU | fixture PASS 行 |
+| **真机出现该色带** | ❌ **未运行** | 只差一次开机 |
+| **真机进入 BSD 初始化** | ❌ **未达成** | — |
+
+部署方式已收敛成一条带闸门的命令（`scripts/deploy-early-map.py`），真机验证单在
+`docs/hardware/m1-early-map-handset-plan.md`。**没有照片之前，任何一步都不升级为已验证。**
