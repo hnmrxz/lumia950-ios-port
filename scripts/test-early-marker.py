@@ -50,13 +50,12 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertLess(self.block.index("lumia-early-map"), self.block.index("0x00E03030u"))
 
     def test_nothing_is_drawn_unless_the_address_is_usable(self):
-        first_store = self.block.index("0x00E03030u")
-        self.assertLess(self.block.index("if (usable && probe)"), first_store,
-                        "the single-word probe is guarded by usable as well")
-        self.assertLess(self.block.index("usable = 1"), first_store, "usable is decided before any store")
-        self.assertLess(self.block.index("if (usable && !dry_run)"), self.block.index("last-shaped-check") if
-                        "last-shaped-check" in self.block else len(self.block))
         self.assertIn("usable = 0", self.block)
+        self.assertIn("usable = 1", self.block)
+        for gate in ("if (usable && selftest)", "if (usable && probe)", "if (usable && !dry_run && !selftest)"):
+            self.assertIn(gate, self.block, f"every store path is guarded by usable: {gate}")
+        self.assertLess(self.block.index("usable = 1"), self.block.index("if (usable && selftest)"),
+                        "usable is decided before any store path runs")
 
     def test_the_mapping_is_read_from_the_identity_registers(self):
         self.assertIn("ttbr0_el1", self.block, "the identity map is TTBR0")
@@ -69,7 +68,8 @@ class EarlyMarkerTests(unittest.TestCase):
 
     def test_the_dry_run_installs_the_mapping_without_writing(self):
         self.assertIn("lumia-early-map-dry", self.block)
-        self.assertIn("if (usable && !dry_run)", self.block, "the store is the part a dry run skips")
+        self.assertIn("if (usable && !dry_run && !selftest)", self.block,
+                      "the panel store is the part a dry run skips")
 
     def test_each_drawing_step_can_be_left_out(self):
         self.assertIn("lumia-early-map-noclean", self.block)
@@ -86,7 +86,8 @@ class EarlyMarkerTests(unittest.TestCase):
             self.assertIn(token, self.block)
 
     def test_a_leaf_slot_holding_another_block_is_refused(self):
-        self.assertIn("(l2[l2_index] & (block - 1)) != block_pa", self.block)
+        self.assertIn("(l2[l2_index] & ARM_TTE_BLOCK_L2_MASK) != block_pa", self.block,
+                      "the block comparison uses the block mask, not the low flag bits")
 
     def test_the_framebuffer_pointer_is_the_identity_address(self):
         self.assertIn("fb = (volatile unsigned int *)pa", self.block)
@@ -101,7 +102,7 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertNotIn("row < 136", self.block)
 
     def test_invalid_panel_arguments_skip_the_marker(self):
-        for token in ("pa == 0", "v_rowBytes == 0", "v_width == 0", "v_height == 0",
+        for token in ("pa == 0", "stride == 0", "width == 0", "height == 0",
                       "height > 16", "width <= 16384", "stride <= 65536"):
             self.assertIn(token, self.block)
 
@@ -129,6 +130,39 @@ class EarlyMarkerTests(unittest.TestCase):
     def test_the_default_path_is_unchanged(self):
         self.assertEqual(self.text.count("PE_init_platform(FALSE, args)"), 1)
         self.assertLess(self.text.index("Bring-up marker"), self.text.index("PE_init_platform(FALSE, args)"))
+
+    def test_the_self_test_has_its_own_buffer_and_geometry(self):
+        """The first self-test pointed the drawing loop at a 4 KB page with the panel's stride and width, which overran it."""
+        self.assertIn("lumia_test_pixels[4096]", self.block, "its own buffer, sized in words")
+        self.assertIn("if (selftest) {", self.block)
+        self.assertIn("stride = 256;", self.block)
+        self.assertIn("width = 64;", self.block)
+        self.assertIn("height = 16;", self.block)
+
+    def test_the_self_test_keeps_sentinels_inside_the_same_buffer(self):
+        self.assertIn("buffer[column] = 0x5AA5C33Cu;", self.block)
+        self.assertIn("buffer[4080 + column] = 0xC33C5AA5u;", self.block)
+        self.assertIn("0x5AA5C33Cu", self.block)
+        self.assertIn("0xC33C5AA5u", self.block)
+
+    def test_the_self_test_stays_inside_the_sentinels(self):
+        """Drawing starts at word 16 and covers at most 8 rows of 64 words, ending well before word 4080."""
+        self.assertIn("buffer[16 + (row * stride) / 4 + column]", self.block)
+        self.assertLess(16 + 8 * 256 // 4, 4080, "the drawn region must not reach the trailing sentinel")
+
+    def test_the_self_test_reports_the_branch_it_took(self):
+        self.assertIn("created_table = 1", self.block)
+        self.assertIn("lumia_early_map_state = 30", self.block, "existing-table branch, sentinels intact")
+        self.assertIn("lumia_early_map_state = 31", self.block, "a table had to be created")
+        self.assertIn("lumia_early_map_state = 32", self.block, "a sentinel broke")
+
+    def test_the_panel_draw_keeps_the_panel_geometry(self):
+        """The self-test must not change what the plain marker draws on the handset."""
+        normal = self.block[self.block.index("if (usable && !dry_run && !selftest)"):]
+        self.assertIn("fb = (volatile unsigned int *)pa;", normal)
+        self.assertIn("for (row = 8; row < 16; row++)", normal)
+        self.assertIn("args->Video.v_rowBytes", self.block)
+        self.assertIn("args->Video.v_width", self.block)
 
 
 if __name__ == "__main__":

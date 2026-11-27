@@ -53,8 +53,10 @@ def generated() -> str:
 
 
 def row_range(text: str) -> tuple[int, int]:
-    match = re.search(r"for \(row = (\d+); row < (\d+); row\+\+\)", text)
-    assert match, "the marker has no row loop"
+    """The panel's row range: the loop inside the plain draw branch, not the self-test's own loop."""
+    gate = text.index("if (usable && !dry_run && !selftest)")
+    match = re.search(r"for \(row = (\d+); row < (\d+); row\+\+\)", text[gate:])
+    assert match, "the marker has no panel row loop"
     return int(match.group(1)), int(match.group(2))
 
 
