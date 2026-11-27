@@ -164,20 +164,33 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
 # -- so the entry is written only when the slot reads back empty, both indices are bounds checked, and nothing is drawn unless the mapping
 # was installed. The second version emitted the block without newlines (adjacent string literals concatenate) and the kernel build stopped
 # at "expected expression" in arm_init.c, so the snippet below is one string with real newlines, written to this file by repr().
+# A marker that can reach the panel before the VM work. It installs its own mapping, because that is the only thing that exists that
+# early and start.s is patched by the framework's 4K-baseline series.
+#
+# Three measurements shaped this version, and the fourth (below) is what the QEMU failure taught:
+#   * drawing through boot_args.Video.v_baseAddr before arm_vm_init is a guaranteed fault (physical address, no mapping) -- STAGE_0 no
+#     longer does it;
+#   * the mapping is written only into an empty L1 slot, both indices are bounds checked, and nothing is drawn unless it was installed;
+#   * the snippet is one string with real newlines (adjacent literals concatenate, which once put every statement on one line).
+#
+# And the assumption that did not survive: that the KVA L1 table sits at bootstrap_pagetables + ARM_PGBYTES. The QEMU run stopped in the
+# exception vector with FAR 0x158 rather than at the framebuffer, so this version does not assume -- it reads TTBR1_EL1, follows the root
+# entry for the chosen virtual address, and uses the L1 table the MMU actually walks, with ARM_TT_ROOT_* / ARM_TT_L1_* naming the levels so
+# the same code is right for a 4K and a 16K kernel.
 EARLY_MAP = (
-    '\n\t/* Bring-up marker: install one framebuffer mapping from the bootstrap tables, then draw before the VM work. */\n\t{\n\t\tconst char *line = args->CommandLine;\n\t\tconst char *want = "lumia-early-map";\n\t\tint hit = 0;\n\t\tconst char *p = line;\n\t\twhile (*p != \'\\0\' && !hit) {\n\t\t\tconst char *a = p;\n\t\t\tconst char *b = want;\n\t\t\tif (a != line && a[-1] != \' \' && a[-1] != \'\\t\') { p++; continue; }\n\t\t\twhile (*a != \'\\0\' && *b != \'\\0\' && *a == *b) { a++; b++; }\n\t\t\tif (*b == \'\\0\' && (*a == \'\\0\' || *a == \' \' || *a == \'\\t\')) { hit = 1; break; }\n\t\t\tp++;\n\t\t}\n\t\tif (hit) {\n\t\t\textern uint8_t bootstrap_pagetables[];\n\t\t\tstatic uint64_t lumia_table[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n\t\t\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);\n\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n\t\t\tconst uint64_t va = 0xFFFFFFF0E0000000ULL;\n\t\t\tconst uint64_t table_pa = (uint64_t)lumia_table - (uint64_t)args->virtBase + (uint64_t)args->physBase;\n\t\t\tuint64_t *l1 = (uint64_t *)(bootstrap_pagetables + ARM_PGBYTES);\n\t\t\tuint64_t l1_index = (va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n\t\t\tuint64_t l2_index;\n\t\t\tint installed = 0;\n\t\t\tif (pa != 0 && args->Video.v_rowBytes != 0 && args->Video.v_width != 0 && args->Video.v_height != 0\n\t\t\t    && l1_index < entries && l1[l1_index] == 0) {\n\t\t\t\tl2_index = (va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n\t\t\t\tif (l2_index < entries) {\n\t\t\t\t\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (table_pa & ARM_TTE_TABLE_MASK);\n\t\t\t\t\tlumia_table[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n\t\t\t\t\tinstalled = 1;\n\t\t\t\t}\n\t\t\t}\n\t\t\tif (installed) {\n\t\t\t\tvolatile unsigned int *fb;\n\t\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n\t\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n\t\t\t\tunsigned long height = (unsigned long)args->Video.v_height;\n\t\t\t\tunsigned long row;\n\t\t\t\tunsigned long column;\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("tlbi vmalle1" ::: "memory");\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("isb" ::: "memory");\n\t\t\t\tfb = (volatile unsigned int *)(va + (pa - block_pa));\n\t\t\t\tif (height > 136) {\n\t\t\t\t\tfor (row = 120; row < 136; row++) {\n\t\t\t\t\t\tfor (column = 0; column < width; column++) {\n\t\t\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n\t\t\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n\t\t\t\t\t\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");\n\t\t\t\t\t}\n\t\t\t\t\t__asm__ volatile("dsb sy" ::: "memory");\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n'
+    '\n\t/* Bring-up marker: install one framebuffer mapping, then draw before the VM work. */\n\t{\n\t\tconst char *line = args->CommandLine;\n\t\tconst char *want = "lumia-early-map";\n\t\tint hit = 0;\n\t\tconst char *p = line;\n\t\twhile (*p != \'\\0\' && !hit) {\n\t\t\tconst char *a = p;\n\t\t\tconst char *b = want;\n\t\t\tif (a != line && a[-1] != \' \' && a[-1] != \'\\t\') { p++; continue; }\n\t\t\twhile (*a != \'\\0\' && *b != \'\\0\' && *a == *b) { a++; b++; }\n\t\t\tif (*b == \'\\0\' && (*a == \'\\0\' || *a == \' \' || *a == \'\\t\')) { hit = 1; break; }\n\t\t\tp++;\n\t\t}\n\t\tif (hit) {\n\t\t\tstatic uint64_t lumia_table[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n\t\t\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);\n\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n\t\t\tconst uint64_t va = 0xFFFFFFF0E0000000ULL;\n\t\t\tconst uint64_t to_va = (uint64_t)args->virtBase - (uint64_t)args->physBase;\n\t\t\tconst uint64_t table_pa = (uint64_t)lumia_table - to_va;\n\t\t\tuint64_t ttbr1;\n\t\t\tuint64_t *root;\n\t\t\tuint64_t root_index;\n\t\t\tuint64_t l1_pa;\n\t\t\tuint64_t *l1;\n\t\t\tuint64_t l1_index;\n\t\t\tuint64_t l2_index;\n\t\t\tint installed = 0;\n\t\t\t__asm__ volatile("mrs %0, ttbr1_el1" : "=r"(ttbr1));\n\t\t\troot = (uint64_t *)((ttbr1 & ARM_TTE_TABLE_MASK) + to_va);\n\t\t\troot_index = (va & ARM_TT_ROOT_INDEX_MASK) >> ARM_TT_ROOT_SHIFT;\n\t\t\tl1_pa = root[root_index] & ARM_TTE_TABLE_MASK;\n\t\t\tl1 = (uint64_t *)(l1_pa + to_va);\n\t\t\tl1_index = (va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n\t\t\tif (pa != 0 && args->Video.v_rowBytes != 0 && args->Video.v_width != 0 && args->Video.v_height != 0\n\t\t\t    && (root[root_index] & 3) == 3 && l1_pa != 0 && l1_index < entries && l1[l1_index] == 0) {\n\t\t\t\tl2_index = (va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n\t\t\t\tif (l2_index < entries) {\n\t\t\t\t\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (table_pa & ARM_TTE_TABLE_MASK);\n\t\t\t\t\tlumia_table[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n\t\t\t\t\tinstalled = 1;\n\t\t\t\t}\n\t\t\t}\n\t\t\tif (installed) {\n\t\t\t\tvolatile unsigned int *fb;\n\t\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n\t\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n\t\t\t\tunsigned long height = (unsigned long)args->Video.v_height;\n\t\t\t\tunsigned long row;\n\t\t\t\tunsigned long column;\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("tlbi vmalle1" ::: "memory");\n\t\t\t\t__asm__ volatile("dsb ish" ::: "memory");\n\t\t\t\t__asm__ volatile("isb" ::: "memory");\n\t\t\t\tfb = (volatile unsigned int *)(va + (pa - block_pa));\n\t\t\t\tif (height > 136) {\n\t\t\t\t\tfor (row = 120; row < 136; row++) {\n\t\t\t\t\t\tfor (column = 0; column < width; column++) {\n\t\t\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n\t\t\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n\t\t\t\t\t\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");\n\t\t\t\t\t}\n\t\t\t\t\t__asm__ volatile("dsb sy" ::: "memory");\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n'
 )
 
 STAGE_0 = (
-    "\n\t/* Bring-up instrument: remember the panel and draw the first bar before the MMU work. */\n"
+    "\n\t/* Bring-up instrument: remember the panel; drawing before the VM work needs a mapping, which comes later. */\n"
     + DECLARATION
     + "\tnative_boot_progress_remember((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
     + "args->Video.v_height, args->CommandLine);\n"
-    + "\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
-    + "args->Video.v_height, args->CommandLine, 0);\n"
 )
-STAGE_2 = ("\tnative_boot_progress_stage((void *)args->Video.v_baseAddr, args->Video.v_rowBytes, "
-           "args->Video.v_height, args->CommandLine, 1);\n")
+# Withdrawn for the same reason as the stage call in STAGE_0: it hands the physical video base to a driver that stores through it, and at
+# this point in arm_init the framebuffer still has no mapping. The mapping the early marker installs is the only pre-VM drawing path, and
+# it is behind its own boot argument; the console stage draws through vinfo once PE_create_console() has run.
+STAGE_2 = ""
 
 def find(root: Path) -> list[Path]:
     found: list[Path] = []
@@ -273,19 +286,6 @@ def apply_to(path: Path) -> tuple[bool, str]:
         text = text.replace(call, guard, 1)
     path.write_text(text, encoding="utf-8")
     return True, "patched"
-
-
-def apply_bsd(path: Path) -> tuple[bool, str]:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    if MARKER in text:
-        return True, "already carries the third stage"
-    if BSD_ANCHOR not in text:
-        return False, "skipped: no throttle_init() in this copy of bsd_init.c"
-    text = text.replace(BSD_ANCHOR, BSD_STAGE + BSD_ANCHOR, 1)
-    path.write_text(text, encoding="utf-8")
-    return True, "patched"
-
-
 
 
 def check(path: Path) -> tuple[bool, str]:

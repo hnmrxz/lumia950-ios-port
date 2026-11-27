@@ -57,25 +57,29 @@ class BootProgressHookTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def test_arm_init_remembers_the_panel_and_draws_stage_zero(self):
+    def test_arm_init_remembers_the_panel_without_drawing_through_it(self):
+        """The record call is allowed before the platform expert; a store through the physical address is not.
+
+        Before arm_vm_init the boot arguments' video base is a physical address with no mapping, so the old stage call was a guaranteed
+        fault. Recording the numbers is harmless and that is all this position may do.
+        """
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
         body = self.module.arm_init_body(text)
         self.assertIsNotNone(body, "the sample has no arm_init to anchor on")
-        stage0 = text.index("args->CommandLine, 0)")
-        self.assertGreater(stage0, body, "stage 0 must be inside arm_init")
-        self.assertLess(stage0, text.index("PE_init_platform"), "stage 0 must come before the platform call")
-        declarations = text.index("int early = 0;")
-        self.assertLess(declarations, stage0, "stage 0 must not precede the declarations")
+        record = text.index("native_boot_progress_remember((void *)args->Video.v_baseAddr")
+        self.assertGreater(record, body, "the record call must be inside arm_init")
+        self.assertLess(record, text.index("PE_init_platform"), "it must come before the platform call")
+        self.assertNotIn("native_boot_progress_stage((void *)args->Video.v_baseAddr", text,
+                         "nothing may draw through the physical video base")
 
-    def test_stage_one_sits_before_arm_vm_init(self):
+    def test_no_stage_draws_before_arm_vm_init(self):
         ok, message = self.module.apply_to(self.file)
         self.assertTrue(ok, message)
         text = self.file.read_text(encoding="utf-8")
-        stage1 = text.index("args->CommandLine, 1)")
-        self.assertLess(stage1, text.index("arm_vm_init(xmaxmem, args);"))
-        self.assertNotIn("CommandLine, 2)", text, "nothing is drawn after the MMU comes on")
+        for stage in ("CommandLine, 0)", "CommandLine, 1)", "CommandLine, 2)"):
+            self.assertNotIn(stage, text, "no stage may draw from the boot arguments' physical video base")
 
     def test_the_panel_comes_from_boot_args(self):
         self.assertTrue(self.module.apply_to(self.file)[0])
