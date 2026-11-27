@@ -770,6 +770,13 @@ jobs:
         run: |
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --apply
           python3 "$GITHUB_WORKSPACE/ci/boot-progress.py" --root "$UNIXNU_OUT" --check
+      - name: Compile the read-only GPT parser into the image
+        # The parser is host-tested against the reference reader; this puts it in the kernel image so the evidence is about the
+        # image and not only about the host. Nothing calls it yet -- the block device it reads through does not exist.
+        run: |
+          python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --apply
+          python3 "$GITHUB_WORKSPACE/ci/inject-gpt-parser.py" --root "$UNIXNU_OUT" --check
+
 
       - name: Gate the skmem sysctl publication behind a boot argument
         # The emulated boot stops at _skmem_sysctl_init+0x18 storing through sysctls->version; the object
