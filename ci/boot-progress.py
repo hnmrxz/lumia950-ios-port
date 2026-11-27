@@ -139,56 +139,81 @@ BSD_STAGE = ("\n\t/* Bring-up instrument: report what it can see, then draw if t
 #
 # It is behind 'lumia-early-map', matched with a plain scan of CommandLine rather than PE_parse_boot_argn -- the call the withdrawn skip
 # switches had in common with their failure.
+# A marker that can reach the panel before the VM work. It builds its own mapping from the bootstrap tables, because that is the only
+# mapping that exists that early and start.s itself is patched by the framework's 4K-baseline series.
+#
+# The measured failure this version fixes: the first attempt wrote the L1 entry unconditionally and the kernel then took a translation
+# fault at VA 0x158 (ESR 0x96000005, FAR 0x158, ELR in the text, while the drawing loop had already run -- x8 held the mapped base,
+# x9 the stride, x10 the width, x15 the colour). Writing an L1 slot without knowing whether it is free is the one thing that can damage
+# a mapping the kernel is relying on, so now the entry is only written when the slot reads back as empty, every index is bounds
+# checked, and nothing at all is drawn unless the mapping was installed. The address, stride and size are validated first, and the loop
+# is skipped when the panel is too short for the marker's rows.
 EARLY_MAP = (
-    "\n\t/* Bring-up marker: build one framebuffer mapping from the bootstrap tables, then draw before the VM work. */\n"
-    "\t{\n"
-    "\t\tconst char *line = args->CommandLine;\n"
-    "\t\tconst char *want = \"lumia-early-map\";\n"
-    "\t\tint hit = 0;\n"
-    "\t\tconst char *p = line;\n"
-    "\t\twhile (*p != '\\0' && !hit) {\n"
-    "\t\t\tconst char *a = p;\n"
-    "\t\t\tconst char *b = want;\n"
-    "\t\t\tif (a != line && a[-1] != ' ' && a[-1] != '\\t') { p++; continue; }\n"
-    "\t\t\twhile (*a != '\\0' && *b != '\\0' && *a == *b) { a++; b++; }\n"
-    "\t\t\tif (*b == '\\0' && (*a == '\\0' || *a == ' ' || *a == '\\t')) { hit = 1; break; }\n"
-    "\t\t\tp++;\n"
-    "\t\t}\n"
-    "\t\tif (hit) {\n"
-    "\t\t\textern uint8_t bootstrap_pagetables[];\n"
-    "\t\t\tstatic uint64_t lumia_table[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));\n"
-    "\t\t\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;\n"
-    "\t\t\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;\n"
-    "\t\t\tconst uint64_t block_pa = pa & ~(block - 1);\n"
-    "\t\t\tconst uint64_t va = 0xFFFFFFF0E0000000ULL;\n"
-    "\t\t\tconst uint64_t table_pa = (uint64_t)lumia_table - (uint64_t)args->virtBase + (uint64_t)args->physBase;\n"
-    "\t\t\tuint64_t *l1 = (uint64_t *)(bootstrap_pagetables + ARM_PGBYTES);\n"
-    "\t\t\tuint64_t index = (va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;\n"
-    "\t\t\tvolatile unsigned int *fb;\n"
-    "\t\t\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;\n"
-    "\t\t\tunsigned long width = (unsigned long)args->Video.v_width;\n"
-    "\t\t\tunsigned long row;\n"
-    "\t\t\tunsigned long column;\n"
-    "\t\t\tl1[index] = ARM_TTE_BOOT_TABLE | (table_pa & ARM_TTE_TABLE_MASK);\n"
-    "\t\t\tindex = (va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;\n"
-    "\t\t\tlumia_table[index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);\n"
-    "\t\t\t__asm__ volatile(\"dsb ish\" ::: \"memory\");\n"
-    "\t\t\t__asm__ volatile(\"tlbi vmalle1\" ::: \"memory\");\n"
-    "\t\t\t__asm__ volatile(\"dsb ish\" ::: \"memory\");\n"
-    "\t\t\t__asm__ volatile(\"isb\" ::: \"memory\");\n"
-    "\t\t\tfb = (volatile unsigned int *)(va + (pa - block_pa));\n"
-    "\t\t\tfor (row = 120; row < 136; row++) {\n"
-    "\t\t\t\tfor (column = 0; column < width; column++) {\n"
-    "\t\t\t\t\tfb[(row * stride) / 4 + column] = 0x00E03030u;\n"
-    "\t\t\t\t}\n"
-    "\t\t\t}\n"
-    "\t\t\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {\n"
-    "\t\t\t\tunsigned long address = (unsigned long)fb + row * 64;\n"
-    "\t\t\t\t__asm__ volatile(\"dc civac, %0\" :: \"r\"(address) : \"memory\");\n"
-    "\t\t\t}\n"
-    "\t\t\t__asm__ volatile(\"dsb sy\" ::: \"memory\");\n"
-    "\t\t}\n"
-    "\t}\n"
+    ''
+    '\\t/* Bring-up marker: install one framebuffer mapping from the bootstrap tables, then draw before the VM work. */'
+    '\\t{'
+    '\\t\\tconst char *line = args->CommandLine;'
+    '\\t\\tconst char *want = "lumia-early-map";'
+    '\\t\\tint hit = 0;'
+    '\\t\\tconst char *p = line;'
+    "\\t\\twhile (*p != '\\\\0' && !hit) {"
+    '\\t\\t\\tconst char *a = p;'
+    '\\t\\t\\tconst char *b = want;'
+    "\\t\\t\\tif (a != line && a[-1] != ' ' && a[-1] != '\\\\t') { p++; continue; }"
+    "\\t\\t\\twhile (*a != '\\\\0' && *b != '\\\\0' && *a == *b) { a++; b++; }"
+    "\\t\\t\\tif (*b == '\\\\0' && (*a == '\\\\0' || *a == ' ' || *a == '\\\\t')) { hit = 1; break; }"
+    '\\t\\t\\tp++;'
+    '\\t\\t}'
+    '\\t\\tif (hit) {'
+    '\\t\\t\\textern uint8_t bootstrap_pagetables[];'
+    '\\t\\t\\tstatic uint64_t lumia_table[ARM_PGBYTES / 8] __attribute__((aligned(ARM_PGBYTES)));'
+    '\\t\\t\\tconst uint64_t entries = (uint64_t)(ARM_PGBYTES / 8);'
+    '\\t\\t\\tconst uint64_t block = (uint64_t)ARM_TT_L2_SIZE;'
+    '\\t\\t\\tconst uint64_t pa = (uint64_t)args->Video.v_baseAddr;'
+    '\\t\\t\\tconst uint64_t block_pa = pa & ~(block - 1);'
+    '\\t\\t\\tconst uint64_t va = 0xFFFFFFF0E0000000ULL;'
+    '\\t\\t\\tconst uint64_t table_pa = (uint64_t)lumia_table - (uint64_t)args->virtBase + (uint64_t)args->physBase;'
+    '\\t\\t\\tuint64_t *l1 = (uint64_t *)(bootstrap_pagetables + ARM_PGBYTES);'
+    '\\t\\t\\tuint64_t l1_index = (va & ARM_TT_L1_INDEX_MASK) >> ARM_TT_L1_SHIFT;'
+    '\\t\\t\\tuint64_t l2_index;'
+    '\\t\\t\\tint installed = 0;'
+    '\\t\\t\\tif (pa != 0 && args->Video.v_rowBytes != 0 && args->Video.v_width != 0 && args->Video.v_height != 0'
+    '\\t\\t\\t    && l1_index < entries && l1[l1_index] == 0) {'
+    '\\t\\t\\t\\tl2_index = (va & ARM_TT_L2_INDEX_MASK) >> ARM_TT_L2_SHIFT;'
+    '\\t\\t\\t\\tif (l2_index < entries) {'
+    '\\t\\t\\t\\t\\tl1[l1_index] = ARM_TTE_BOOT_TABLE | (table_pa & ARM_TTE_TABLE_MASK);'
+    '\\t\\t\\t\\t\\tlumia_table[l2_index] = ARM_TTE_BOOT_BLOCK | (block_pa & ARM_TTE_BLOCK_L2_MASK);'
+    '\\t\\t\\t\\t\\tinstalled = 1;'
+    '\\t\\t\\t\\t}'
+    '\\t\\t\\t}'
+    '\\t\\t\\tif (installed) {'
+    '\\t\\t\\t\\tvolatile unsigned int *fb;'
+    '\\t\\t\\t\\tunsigned long stride = (unsigned long)args->Video.v_rowBytes;'
+    '\\t\\t\\t\\tunsigned long width = (unsigned long)args->Video.v_width;'
+    '\\t\\t\\t\\tunsigned long height = (unsigned long)args->Video.v_height;'
+    '\\t\\t\\t\\tunsigned long row;'
+    '\\t\\t\\t\\tunsigned long column;'
+    '\\t\\t\\t\\t__asm__ volatile("dsb ish" ::: "memory");'
+    '\\t\\t\\t\\t__asm__ volatile("tlbi vmalle1" ::: "memory");'
+    '\\t\\t\\t\\t__asm__ volatile("dsb ish" ::: "memory");'
+    '\\t\\t\\t\\t__asm__ volatile("isb" ::: "memory");'
+    '\\t\\t\\t\\tfb = (volatile unsigned int *)(va + (pa - block_pa));'
+    '\\t\\t\\t\\tif (height > 136) {'
+    '\\t\\t\\t\\t\\tfor (row = 120; row < 136; row++) {'
+    '\\t\\t\\t\\t\\t\\tfor (column = 0; column < width; column++) {'
+    '\\t\\t\\t\\t\\t\\t\\tfb[(row * stride) / 4 + column] = 0x00E03030u;'
+    '\\t\\t\\t\\t\\t\\t}'
+    '\\t\\t\\t\\t\\t}'
+    '\\t\\t\\t\\t\\tfor (row = (120 * stride) / 64; row < (136 * stride) / 64; row++) {'
+    '\\t\\t\\t\\t\\t\\tunsigned long address = (unsigned long)fb + row * 64;'
+    '\\t\\t\\t\\t\\t\\t__asm__ volatile("dc civac, %0" :: "r"(address) : "memory");'
+    '\\t\\t\\t\\t\\t}'
+    '\\t\\t\\t\\t\\t__asm__ volatile("dsb sy" ::: "memory");'
+    '\\t\\t\\t\\t}'
+    '\\t\\t\\t}'
+    '\\t\\t}'
+    '\\t}'
+    ''
 )
 
 STAGE_0 = (
