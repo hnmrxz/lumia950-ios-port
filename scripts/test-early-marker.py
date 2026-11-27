@@ -92,12 +92,17 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertIn("fb = (volatile unsigned int *)pa", self.block)
 
     def test_the_cache_clean_covers_the_rows_that_were_written(self):
-        for token in ("(120 * stride) / 64", "(136 * stride) / 64", "dc civac"):
+        for token in ("(8 * stride) / 64", "(16 * stride) / 64", "dc civac"):
             self.assertIn(token, self.block)
+
+    def test_the_rows_stay_inside_one_mapped_block(self):
+        """The rows used to run past the block the marker maps: a single store worked, the loop did not."""
+        self.assertIn("for (row = 8; row < 16; row++)", self.block)
+        self.assertNotIn("row < 136", self.block)
 
     def test_invalid_panel_arguments_skip_the_marker(self):
         for token in ("pa == 0", "v_rowBytes == 0", "v_width == 0", "v_height == 0",
-                      "height > 136", "width <= 16384", "stride <= 65536"):
+                      "height > 16", "width <= 16384", "stride <= 65536"):
             self.assertIn(token, self.block)
 
     def test_every_outcome_has_its_own_state_code(self):
