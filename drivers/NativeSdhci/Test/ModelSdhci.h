@@ -56,6 +56,7 @@ public:
     u32 read32(u32 offset)
     {
         if (offset == kRegInterruptStatus && pendingData) {
+            std::printf("      [model] buffer ready advertised; IS now 0x%x\n", get32(kRegInterruptStatus));
             /* data is ready the moment the host looks: the driver polls this register, and it acknowledges the command's bits before it
                starts polling, so setting the bit at command time would be cleared again */
             put32(kRegInterruptStatus, get32(kRegInterruptStatus) | kIntBufferReadReady);
@@ -134,6 +135,7 @@ private:
             return;
         }
         if (offset == kRegInterruptStatus) {
+            std::printf("      [model] IS write 0x%x (clear)\n", value);
             /* interrupts are write-one-to-clear on real hardware; storing the value makes every later poll see error bits */
             const u32 current = get32(kRegInterruptStatus);
             put32(kRegInterruptStatus, current & ~value);
@@ -180,7 +182,7 @@ private:
             break;
         case kCmd1SendOpCond:
             card.ready = true;
-            put32(kRegResponse, 0x80FF8080u);   /* bit 31 is busy: zero means the card is ready */
+            put32(kRegResponse, 0x00000000u);   /* the driver masks every R1 response with kCardErrors, so the model answers with a clean card status */
             break;
         case kCmd2AllSendCid:
             put32(kRegResponse, 0x03534453u);

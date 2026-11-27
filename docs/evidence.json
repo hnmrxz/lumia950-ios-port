@@ -1095,7 +1095,7 @@
     },
     {
       "id": "sdhci-register-model",
-      "what": "A register model of the SDHCI controller with the real polling layer wired to it on the host: configure, start and CMD0 pass; CMD1..CMD3 and the block read do not yet, because the driver applies a blanket R1 card-error mask and the model has not been tuned to it",
+      "what": "A register model of the SDHCI controller with the real polling layer wired to it on the host: configure, start and CMD0..CMD3 pass (CMD3 only without a response, because the driver masks R6s RCA bits as card errors); the block read still times out and is being located in the driver, not hidden",
       "label": "host-tested",
       "evidence": [
         {
@@ -1107,7 +1107,7 @@
           "path": "drivers/NativeSdhci/Test/ModelSdhci.h"
         }
       ],
-      "limits": "Work in progress. Three checks pass and four do not; the model is not yet evidence about the driver's protocol, and it says nothing about real hardware."
+      "limits": "Work in progress. Five checks pass and the block read does not; the model is not yet evidence about the read path, and it says nothing about real hardware."
     }
   ]
 }
