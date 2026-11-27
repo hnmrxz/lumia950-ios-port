@@ -46,11 +46,11 @@ class EarlyMarkerTests(unittest.TestCase):
         cls.block = cls.text[cls.text.index("Bring-up marker"):cls.text.index("PE_init_platform")]
 
     def test_the_marker_is_injected_once_and_behind_its_token(self):
-        self.assertEqual(self.text.count("lumia-early-map"), 1)
+        self.assertEqual(self.text.count('const char *want = "lumia-early-map"'), 1)
         self.assertLess(self.block.index("lumia-early-map"), self.block.index("0x00E03030u"))
 
     def test_nothing_is_drawn_unless_the_address_is_usable(self):
-        self.assertLess(self.block.index("if (usable)"), self.block.index("0x00E03030u"),
+        self.assertLess(self.block.index("if (usable && !dry_run)"), self.block.index("0x00E03030u"),
                         "every framebuffer store sits inside the usable branch")
         self.assertIn("usable = 0", self.block)
         self.assertIn("usable = 1", self.block)
@@ -60,15 +60,18 @@ class EarlyMarkerTests(unittest.TestCase):
         self.assertNotIn("ttbr1_el1", self.block, "the kernel-VA tables must not be touched")
 
     def test_a_block_entry_is_never_replaced_by_a_table(self):
-        self.assertIn("(root_entry & 3) == 1", self.block)
-        self.assertIn("(l1_entry & 3) == 1", self.block)
+        self.assertIn("(l1_entry & 3) == 1", self.block, "a block at the gigabyte level is inspected, not overwritten")
         self.assertIn("? 1 : 9", self.block, "a block that does not cover the framebuffer is refused, not split")
         self.assertIn("l2[l2_index] = ARM_TTE_BOOT_BLOCK", self.block, "only a leaf slot ever receives the block")
 
+    def test_the_dry_run_installs_the_mapping_without_writing(self):
+        self.assertIn("lumia-early-map-dry", self.block)
+        self.assertIn("if (usable && !dry_run)", self.block, "the store is the part a dry run skips")
+
     def test_every_table_entry_is_checked_before_it_is_followed(self):
-        self.assertIn("(root_entry & 3) != 3", self.block)
-        self.assertIn("(l1_entry & 3) == 3", self.block)
-        for token in ("root_index >= entries", "l1_index >= entries", "l2_index >= entries"):
+        self.assertIn("(l1_entry & 3) == 3", self.block, "a table at the gigabyte level is followed")
+        self.assertIn("(l1_entry & 3) == 1", self.block, "a block is recognised")
+        for token in ("l1_index >= entries", "l2_index >= entries"):
             self.assertIn(token, self.block)
 
     def test_a_leaf_slot_holding_another_block_is_refused(self):
@@ -87,7 +90,7 @@ class EarlyMarkerTests(unittest.TestCase):
             self.assertIn(token, self.block)
 
     def test_every_outcome_has_its_own_state_code(self):
-        for code, meaning in ((2, "refused"), (3, "bad panel"), (5, "no root table"), (6, "index"),
+        for code, meaning in ((2, "refused"), (3, "bad panel"), (6, "index"),
                               (7, "slot has another block"), (1, "usable"), (0, "drawn")):
             self.assertIn(f"lumia_early_map_state = {code}", self.block, meaning)
         self.assertIn("? 1 : 9", self.block, "the block-in-the-way refusal")
