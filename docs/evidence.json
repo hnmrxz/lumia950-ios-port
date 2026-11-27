@@ -912,6 +912,22 @@
         }
       ],
       "limits": "A model of the C, not the C: it catches logic errors in the branch table, not drift between the model and the kernel. The C remains the authority."
+    },
+    {
+      "id": "gpt-read-reference",
+      "what": "A strict read-only GPT reader with a synthetic fixture: protective MBR, header and entry-array CRCs, primary/backup agreement and overlap checks, with four corruption modes each refused for its own reason",
+      "label": "host-tested",
+      "evidence": [
+        {
+          "label": "host-tested",
+          "path": "scripts/test-gpt-read.py"
+        },
+        {
+          "label": "source-reviewed",
+          "path": "scripts/gpt-read.py"
+        }
+      ],
+      "limits": "The fixture is synthetic -- names and LBAs are declared, not read from any device. This is the reference the kernel side of M3 has to match, not evidence about the handset GPT."
     }
   ]
 }

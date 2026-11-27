@@ -96,3 +96,17 @@ M1（真机进入 BSD 初始化）**仍未达成**，但"看不见内核停在�
 
 部署方式已收敛成一条带闸门的命令（`scripts/deploy-early-map.py`），真机验证单在
 `docs/hardware/m1-early-map-handset-plan.md`。**没有照片之前，任何一步都不升级为已验证。**
+
+## M3 参考实现（2026-11-27）
+
+M3 要求"只读读取 GPT 并用独立基准核对"。在真机可用之前，先把**参考读者**建立起来：
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/gpt-read.py` | 只读解析：保护性 MBR、header CRC、entry-array CRC、主/备头一致性、分区重叠检查；任何一项不过即拒绝并给原因 |
+| `scripts/make-gpt-fixture.py` | 合成 GPT 镜像（8 MiB、512 B 扇区、两个分区），可注入 mbr/header/entries/overlap 四种损坏 |
+| `scripts/test-gpt-read.py` | 10 条：正常读回两分区、CRC 校验、备份头一致性、四种损坏各自被拒、截断镜像被拒、CLI 退出码与 JSON |
+
+**边界**：这是一份**合成 fixture**（分区名与 LBA 都是声明为合成的，不来自任何设备）。
+它的用途是给内核侧的读取器一个**可核对的基准**，以及把"拒绝条件"写死；它**不是**真机 GPT 的证据。
+真机 M3 仍需要一次只读 dump 与它的 GP 对照（`docs/hardware/mainos-replacement-readiness.md` 的 GPT 采集步骤）。

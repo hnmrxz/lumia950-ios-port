@@ -29,6 +29,7 @@ SELF_CONTAINED = (
     "test-early-marker.py",
     "test-early-map-arithmetic.py",
     "test-early-map-model.py",
+    "test-gpt-read.py",
     "test-deploy-early-map.py",
     "test-storage-read-only.py",
     "test-protection-is-wired.py",
