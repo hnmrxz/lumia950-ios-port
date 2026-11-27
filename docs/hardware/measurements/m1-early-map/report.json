@@ -535,5 +535,59 @@
       "Nothing calls it. The block device that would feed it does not exist, so no disk has been read and no real GPT parsed.",
       "The marker results are identical to the previous artifact, so adding the parser to arm_init.c disturbed nothing."
     ]
+  },
+  "round_184": {
+    "what": "The GPT parser executed inside XNU against a synthetic disk, and the early marker is unaffected",
+    "artifact": {
+      "kernel_sha256": "1edb9cdc07d0510d6a515938a38fc78a4714d69dd1494bc7160fb03fcfeff942",
+      "commit": "e25a91d",
+      "build": "46024353060"
+    },
+    "symbols": {
+      "gpt_parse": "0xfffffff0073fb088",
+      "lumia_gpt_selfcheck": "0xfffffff0073fb874"
+    },
+    "self_check": {
+      "result": 0,
+      "line": "LUMIA: gpt self-check 0",
+      "meaning": "a valid synthetic GPT was accepted with the partition that was written (EFI, 64..200) and a header-CRC-damaged copy was refused for that reason"
+    },
+    "six_forms": {
+      "off": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 4
+      },
+      "dry": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 1
+      },
+      "draw": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "noclean": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "notlbi": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 0
+      },
+      "selftest": {
+        "outcome": "root-wait",
+        "esr": "0x0",
+        "state": 30
+      }
+    },
+    "reading": [
+      "This is the first time the parser's own logic ran inside the kernel: on the host it was compared with the reference reader, here it executed in the same environment it will use on the handset, with the CRC code and the shifts the kernel compiler produced.",
+      "It is still a synthetic disk held in memory. There is no block device, so nothing has been read from eMMC and no real GPT has been parsed.",
+      "The marker forms are unchanged, so carrying the parser and its self-check costs nothing at boot."
+    ]
   }
 }

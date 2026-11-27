@@ -26,6 +26,7 @@ below are on `hnmrxz/lumia950-ios-port`.
 | [46005024146](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46005024146) | `9a2adcf` | manual | kernel and the fast jobs | success | self-test token added (first version, buffer overrun fixed in bd77411) |
 | [46013849761](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46013849761) | `bb90eac` | manual | kernel and the fast jobs | success | six-form artifact 717752f7 with the self-test on the handset geometry: off 4, dry 1, draw 0, noclean 0, notlbi 0, selftest 30 |
 | [46020217201](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46020217201) | `78564f2` | manual | kernel and the fast jobs | success | first artifact carrying the GPT parser (gpt_parse present); six marker forms still pass |
+| [46024353060](https://github.com/hnmrxz/lumia950-ios-port/actions/runs/46024353060) | `e25a91d` | manual | kernel and the fast jobs | success | first artifact with the in-kernel GPT self-check (result 0); six marker forms still pass |
 
 The last row is the definitive one. In addition to the three artifacts it is the first run in which
 **the linked kernel was executed**: `xnu-entry-qemu` boots the same run's kernel through the

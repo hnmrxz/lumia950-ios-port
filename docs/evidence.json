@@ -954,24 +954,24 @@
       "limits": "Host compilation, an arm64 cross-compile and a synthetic image. The parser has not been linked into XNU and no real disk has been read, so neither kernel-linked nor hardware-tested is claimed."
     },
     {
-      "id": "gpt-parser-in-image",
-      "what": "The read-only GPT parser is compiled into the kernel image: gpt_parse and gpt_status_text have addresses in the unstripped kernel (0xfffffff0073fb088 and 0xfffffff0073fb828), and the six early-marker forms still reach root-wait on the same artifact",
+      "id": "gpt-parser-in-kernel",
+      "what": "The GPT parser runs inside the kernel against a synthetic disk and reports 0: it accepted a valid table with the partition it wrote (EFI, 64..200) and refused a header-CRC-damaged one for that reason, on the same artifact where all six early-marker forms still reach root-wait",
       "label": "kernel-linked",
       "evidence": [
         {
-          "label": "kernel-linked",
+          "label": "QEMU-tested",
           "path": "docs/hardware/measurements/m1-early-map/report.json"
         },
         {
-          "label": "source-reviewed",
-          "path": "ci/inject-gpt-parser.py"
+          "label": "kernel-linked",
+          "path": "drivers/Common/GptRead.c"
         },
         {
-          "label": "ABI-compiled",
-          "path": "drivers/Common/GptRead.c"
+          "label": "source-reviewed",
+          "path": "drivers/Common/GptSelfCheck.c"
         }
       ],
-      "limits": "The parser is in the image but nothing calls it: no block device, no disk read, so hardware-tested is not claimed and no real GPT has been parsed"
+      "limits": "A synthetic disk in memory. The parser has not read a real disk, so hardware-tested is not claimed and no real GPT has been parsed."
     }
   ]
 }

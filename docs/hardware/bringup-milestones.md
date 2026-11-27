@@ -153,3 +153,23 @@ M3 要求"只读读取 GPT 并用独立基准核对"。在真机可用之前，�
 因为能喂给它的块设备还不存在。
 
 **因此这一步只买到 `kernel-linked`**：没有调用、没有磁盘读取、没有真机 GPT ⇒ 不声明 `hardware-tested`。
+
+### M3：解析器已在内核里跑通（2026-11-27）
+
+`drivers/Common/GptSelfCheck.c` 在内存里拼出一份合法 GPT（保护性 MBR、主头、四条表项、备份头），
+用一个"其余 LBA 一律失败"的回调喂给解析器，然后**故意破坏 header CRC** 再解析一次。判据是两件事都成立：
+
+1. 合法表被接受，且读回的分区就是写进去的那个（EFI，64..200）；
+2. 损坏表被拒绝，**理由必须是 header CRC**。
+
+QEMU 实测（build 46024353060）：
+
+```
+LUMIA: arm_vm_init returned, entering the rest of arm_init
+LUMIA: early map state 0
+LUMIA: gpt self-check 0 (0 ok, 1 valid refused, 2 wrong partition, 3 corrupt accepted, 4 wrong reason)
+```
+
+同一份 artifact 的六种标记形态仍全部 root-wait（4 / 1 / 0 / 0 / 0 / 30）。
+
+**边界**：磁盘是**内存里的合成盘**。没有块设备 ⇒ 没读 eMMC、没解析真机 GPT ⇒ 仍不声明 `hardware-tested`。
