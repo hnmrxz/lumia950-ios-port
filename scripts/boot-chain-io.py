@@ -54,6 +54,11 @@ class Decision:
         return f"Decision(allowed={self.allowed!r}, protected={self.protected!r})"
 
 
+def digest(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 def protected_object(path: Path) -> str | None:
     """The protected class this path belongs to, by suffix match on the volume-relative path."""
     text = path.as_posix().replace("\\", "/").casefold()
@@ -67,12 +72,16 @@ def protected_object(path: Path) -> str | None:
 
 
 def authorise(destination: Path, *, replace: bool = False, delete: bool = False,
-              backup: Path | None = None, reason: str | None = None,
-              verify: str | None = None, exists: bool | None = None) -> Decision:
+              backup: Path | None = None, backup_matches: Path | None = None,
+              reason: str | None = None, verify: str | None = None,
+              exists: bool | None = None) -> Decision:
     """Decide whether this write/delete may proceed.
 
     `exists` lets a caller say what the *volume* holds rather than what the local filesystem does, which matters when the destination
     path is the phone's but only reachable through a mount that may lag.
+
+    `backup_matches` closes a hole the file-existence check could not: a backup that exists but holds something other than the object being
+    replaced is not a recovery file. When it is given, the backup and that file must hash the same.
     """
     protected = protected_object(destination)
     if protected is None:
@@ -99,8 +108,19 @@ def authorise(destination: Path, *, replace: bool = False, delete: bool = False,
         return Decision(False, f"refused: {destination} is protected ({protected}) and the request is incomplete: "
                                + "; ".join(missing), protected)
 
+    if backup_matches is not None:
+        if not Path(backup_matches).is_file():
+            return Decision(False, f"refused: {destination} is protected ({protected}) and the file the backup must match "
+                                   f"({backup_matches}) does not exist", protected)
+        if digest(Path(backup)) != digest(Path(backup_matches)):
+            return Decision(False, f"refused: {destination} is protected ({protected}) and --backup is not a copy of it "
+                                   f"({digest(Path(backup))[:16]}... vs {digest(Path(backup_matches))[:16]}...)", protected)
+
     verb = "delete" if delete else "replace"
-    return Decision(True, f"allowed: {verb} {destination} ({protected}); backup={backup}; reason={reason!r}; verify={verify!r}",
+    detail = f"backup={backup}"
+    if backup_matches is not None:
+        detail += f" (matches {backup_matches})"
+    return Decision(True, f"allowed: {verb} {destination} ({protected}); {detail}; reason={reason!r}; verify={verify!r}",
                     protected)
 
 

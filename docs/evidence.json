@@ -1079,7 +1079,7 @@
     },
     {
       "id": "handset-run-rehearsal",
-      "what": "The handset deployment procedure was rehearsed end to end on a copy of the staged EFIESP tree: the dry run wrote nothing, apply wrote the artifact, kept the previous kernel in the backup, appended the boot argument once, passed the boot-chain gate and wrote the runbook",
+      "what": "The handset deployment procedure was rehearsed end to end on two copies of the staged chain (EFIESP for the configuration, MainOS for the kernel and its adt): the dry run wrote nothing, apply wrote the kernel to MainOS, kept the old kernel, adt and configuration with hashes proven equal to what they replaced, added the boot argument once, wrote nothing into the EFIESP payload path, and wrote the runbook",
       "label": "host-tested",
       "evidence": [
         {
@@ -1091,7 +1091,7 @@
           "path": "docs/hardware/m1-early-map-handset-plan.md"
         }
       ],
-      "limits": "A copy of the staged tree, not the phone: no handset file was touched and no boot was performed"
+      "limits": "Copies of the staged tree, not the phone: no handset file was touched and no boot was performed. The gate now requires the backup to hash the same as the object it replaces, and a test proves a mismatched backup is refused"
     },
     {
       "id": "sdhci-register-model",
